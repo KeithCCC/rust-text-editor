@@ -1,12 +1,3 @@
-[package]
-name = "rust_text_editor"
-version = "0.1.0"
-edition = "2024"
-
-[dependencies]
-eframe = "0.29"
-rfd = "0.15"
-
-[[bin]]
-name = "rust_text_editor"
-path = "main.rs"
+[workspace]
+members = ["src-tauri"]
+resolver = "2"
