@@ -29,6 +29,10 @@ export function getDebugLogPath() {
   return invoke<string>("get_debug_log_path");
 }
 
+export function exitApp() {
+  return invoke<void>("exit_app");
+}
+
 export function resolveRelativePath(baseFile: string, relativePath: string) {
   return invoke<string>("resolve_relative_path", {
     baseFile,

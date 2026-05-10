@@ -15,7 +15,8 @@
         "title": "Hotaru",
         "width": 1200,
         "height": 800,
-        "maximized": true
+        "center": true,
+        "maximized": false
       }
     ],
     "security": {
@@ -24,6 +25,7 @@
   },
   "bundle": {
     "active": true,
-    "targets": "all"
+    "targets": "all",
+    "icon": ["icons/icon.ico"]
   }
 }

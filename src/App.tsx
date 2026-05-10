@@ -7,11 +7,11 @@ import {
   useRef,
   useState,
 } from "react";
-import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { MarkdownPreview } from "./components/MarkdownPreview";
-import { readTextFile, writeTextFile } from "./tauri";
+import { exitApp, readTextFile, writeTextFile } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
+import { saveCurrentWindowState } from "./windowState";
 
 const ExcalidrawEditor = lazy(() =>
   import("./components/ExcalidrawEditor").then((module) => ({
@@ -173,7 +173,8 @@ export default function App() {
 
   const handleExit = useCallback(async () => {
     try {
-      await getCurrentWindow().close();
+      await saveCurrentWindowState();
+      await exitApp();
     } catch (closeError) {
       showError("Exit failed", closeError instanceof Error ? closeError.message : String(closeError));
     }

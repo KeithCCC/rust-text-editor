@@ -68,6 +68,12 @@ fn resolve_relative_path(base_file: String, relative_path: String) -> Result<Str
         .map_err(|error| format!("Failed to resolve '{}': {}", relative_path, error))
 }
 
+#[tauri::command]
+fn exit_app(app: tauri::AppHandle) {
+    let _ = write_debug_log("[rust:exit] application exit requested");
+    app.exit(0);
+}
+
 fn normalize_path(path: PathBuf) -> std::io::Result<PathBuf> {
     if path.exists() {
         path.canonicalize()
@@ -133,7 +139,8 @@ pub fn run() {
             write_excalidraw_file,
             append_debug_log,
             get_debug_log_path,
-            resolve_relative_path
+            resolve_relative_path,
+            exit_app
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");

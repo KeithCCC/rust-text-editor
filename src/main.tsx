@@ -5,8 +5,10 @@ import "./styles.css";
 import App from "./App";
 import { ErrorBoundary } from "./components/ErrorBoundary";
 import { installGlobalDebugLogging } from "./debugLog";
+import { installWindowStatePersistence } from "./windowState";
 
 installGlobalDebugLogging();
+void installWindowStatePersistence();
 
 ReactDOM.createRoot(document.getElementById("root") as HTMLElement).render(
   <React.StrictMode>
