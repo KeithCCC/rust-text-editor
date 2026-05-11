@@ -1,5 +1,29 @@
 # Work Log
 
+## 2026-05-11 23:33:50 +09:00 - master
+
+### Summary
+
+Added support for opening a file passed by Windows file association. When a Markdown file launches Hotaru via association, the app now prioritizes that startup file over the previously remembered file.
+
+### Notable Changes
+
+- Added a native `get_startup_file_path` command that scans launch arguments for the first real file path.
+- Exposed the startup file command to the React frontend through the Tauri wrapper.
+- Updated startup document selection order to open the associated file first, then fall back to the last file, then create a new Vault note.
+- Rebuilt the release executable at `target/release/hotaru.exe`.
+
+### Validation
+
+- `cargo check` passed.
+- `npm run build` passed.
+- `npm run tauri -- build` passed.
+
+### Risks And Follow-Ups
+
+- File association must pass the document path to Hotaru, typically equivalent to `hotaru.exe "%1"`.
+- Vite still reports large Mermaid/Excalidraw-related chunks; this is a packaging warning, not a build failure.
+
 ## 2026-05-11 23:23:25 +09:00 - master
 
 ### Summary

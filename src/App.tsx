@@ -15,6 +15,7 @@ import {
   ensureDefaultHotaruVault,
   ensureHotaruVault,
   exitApp,
+  getStartupFilePath,
   readTextFile,
   writeTextFile,
 } from "./tauri";
@@ -177,6 +178,12 @@ export default function App() {
         setVaultPath(preparedVault);
         window.localStorage.setItem(VAULT_STORAGE_KEY, preparedVault);
 
+        const startupFile = await getStartupFilePath();
+        if (startupFile) {
+          await openFilePath(startupFile);
+          return;
+        }
+
         const lastFile = window.localStorage.getItem(LAST_FILE_STORAGE_KEY);
         if (lastFile) {
           try {
@@ -203,7 +210,7 @@ export default function App() {
     }
 
     void initializeVaultAndDocument();
-  }, [createAndOpenVaultNote, showError]);
+  }, [createAndOpenVaultNote, openFilePath, showError]);
 
   useEffect(() => {
     if (currentFile) {

@@ -120,6 +120,23 @@ fn create_vault_note(vault_path: String, content: String) -> Result<TextFile, St
 }
 
 #[tauri::command]
+fn get_startup_file_path() -> Result<Option<String>, String> {
+    let mut args = std::env::args_os();
+    let _ = args.next();
+
+    for arg in args {
+        let path = PathBuf::from(arg);
+        if path.is_file() {
+            return normalize_path(path)
+                .map(|path| Some(path.to_string_lossy().to_string()))
+                .map_err(|error| format!("Failed to resolve startup file path: {}", error));
+        }
+    }
+
+    Ok(None)
+}
+
+#[tauri::command]
 fn read_excalidraw_file(path: String) -> Result<String, String> {
     fs::read_to_string(&path)
         .map_err(|error| format!("Failed to read Excalidraw file '{}': {}", path, error))
@@ -233,6 +250,7 @@ pub fn run() {
             ensure_hotaru_vault,
             ensure_default_hotaru_vault,
             create_vault_note,
+            get_startup_file_path,
             read_excalidraw_file,
             write_excalidraw_file,
             append_debug_log,

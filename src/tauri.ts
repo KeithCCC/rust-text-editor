@@ -25,6 +25,10 @@ export function createVaultNote(vaultPath: string, content: string) {
   return invoke<TextFile>("create_vault_note", { vaultPath, content });
 }
 
+export function getStartupFilePath() {
+  return invoke<string | null>("get_startup_file_path");
+}
+
 export function readExcalidrawFile(path: string) {
   return invoke<string>("read_excalidraw_file", { path });
 }
