@@ -1,12 +1,12 @@
 [package]
-name = "rust_text_editor"
+name = "hotaru"
 version = "0.1.0"
 description = "Markdown editor with Mermaid and Excalidraw previews"
 authors = ["Hotaru"]
 edition = "2024"
 
 [lib]
-name = "rust_text_editor_lib"
+name = "hotaru_lib"
 crate-type = ["staticlib", "cdylib", "rlib"]
 
 [build-dependencies]

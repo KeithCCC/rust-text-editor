@@ -13,6 +13,18 @@ export function writeTextFile(path: string, content: string) {
   return invoke<void>("write_text_file", { path, content });
 }
 
+export function ensureHotaruVault(selectedDir: string) {
+  return invoke<string>("ensure_hotaru_vault", { selectedDir });
+}
+
+export function ensureDefaultHotaruVault() {
+  return invoke<string>("ensure_default_hotaru_vault");
+}
+
+export function createVaultNote(vaultPath: string, content: string) {
+  return invoke<TextFile>("create_vault_note", { vaultPath, content });
+}
+
 export function readExcalidrawFile(path: string) {
   return invoke<string>("read_excalidraw_file", { path });
 }

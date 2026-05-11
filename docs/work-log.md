@@ -1,5 +1,31 @@
 # Work Log
 
+## 2026-05-11 23:23:25 +09:00 - master
+
+### Summary
+
+Updated Hotaru's file handling and packaging path expectations. The app now builds as `hotaru.exe`, initializes a default Vault beside the running executable when none is configured, keeps Vault-backed notes autosaved, and opens dropped files directly from the desktop.
+
+### Notable Changes
+
+- Renamed the npm and Cargo package identities from `rust-text-editor` / `rust_text_editor` to `hotaru`, updating the native library entrypoint accordingly.
+- Added native Vault commands that create or resolve `hotaru-valut`, including the default Vault path beside the running executable.
+- Changed startup and new-note behavior to use the default Vault automatically, remember the last file, and display the active Vault path in the status bar.
+- Added Tauri webview drag-and-drop handling for single-file drops, reusing the existing open-file path and showing a drop overlay during hover.
+- Rebuilt release and debug outputs during verification, including `target/release/hotaru.exe`.
+
+### Validation
+
+- `cargo check` passed.
+- `npm run build` passed.
+- `npm run tauri -- build --debug` passed.
+- `npm run tauri -- build` passed.
+
+### Risks And Follow-Ups
+
+- The Vault folder name is intentionally `hotaru-valut` per the latest request, including the spelling.
+- Vite still reports large Mermaid/Excalidraw-related chunks; this is a packaging warning, not a build failure.
+
 ## 2026-05-10 23:37:20 +09:00 - master
 
 ### Summary

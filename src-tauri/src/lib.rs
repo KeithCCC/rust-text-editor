@@ -1,9 +1,11 @@
 use std::fs::{self, OpenOptions};
 use std::io::Write;
-use std::path::{Path, PathBuf};
 use std::panic;
+use std::path::{Path, PathBuf};
 
 use serde::Serialize;
+
+const VAULT_DIR_NAME: &str = "hotaru-valut";
 
 #[derive(Serialize)]
 struct TextFile {
@@ -21,7 +23,100 @@ fn read_text_file(path: String) -> Result<TextFile, String> {
 
 #[tauri::command]
 fn write_text_file(path: String, content: String) -> Result<(), String> {
+    if let Some(parent) = Path::new(&path).parent() {
+        fs::create_dir_all(parent)
+            .map_err(|error| format!("Failed to prepare directory for '{}': {}", path, error))?;
+    }
+
     fs::write(&path, content).map_err(|error| format!("Failed to write '{}': {}", path, error))
+}
+
+#[tauri::command]
+fn ensure_hotaru_vault(selected_dir: String) -> Result<String, String> {
+    let selected = PathBuf::from(&selected_dir);
+    let vault = if selected
+        .file_name()
+        .and_then(|name| name.to_str())
+        .map(|name| name.eq_ignore_ascii_case(VAULT_DIR_NAME))
+        .unwrap_or(false)
+    {
+        selected
+    } else {
+        selected.join(VAULT_DIR_NAME)
+    };
+
+    prepare_hotaru_vault(vault)
+}
+
+#[tauri::command]
+fn ensure_default_hotaru_vault() -> Result<String, String> {
+    let exe_path = std::env::current_exe()
+        .map_err(|error| format!("Failed to resolve executable path: {}", error))?;
+    let exe_dir = exe_path
+        .parent()
+        .map(Path::to_path_buf)
+        .ok_or_else(|| "Executable path has no parent directory".to_string())?;
+
+    prepare_hotaru_vault(exe_dir.join(VAULT_DIR_NAME))
+}
+
+fn prepare_hotaru_vault(vault: PathBuf) -> Result<String, String> {
+    fs::create_dir_all(&vault).map_err(|error| {
+        format!(
+            "Failed to create Hotaru vault '{}': {}",
+            vault.display(),
+            error
+        )
+    })?;
+
+    normalize_path(vault)
+        .map(|path| path.to_string_lossy().to_string())
+        .map_err(|error| format!("Failed to resolve Hotaru vault: {}", error))
+}
+
+#[tauri::command]
+fn create_vault_note(vault_path: String, content: String) -> Result<TextFile, String> {
+    let vault = PathBuf::from(&vault_path);
+    fs::create_dir_all(&vault).map_err(|error| {
+        format!(
+            "Failed to prepare Hotaru vault '{}': {}",
+            vault.display(),
+            error
+        )
+    })?;
+
+    let timestamp = std::time::SystemTime::now()
+        .duration_since(std::time::UNIX_EPOCH)
+        .map_err(|error| format!("Failed to create note timestamp: {}", error))?
+        .as_secs();
+
+    for index in 0..100 {
+        let file_name = if index == 0 {
+            format!("hotaru-note-{timestamp}.md")
+        } else {
+            format!("hotaru-note-{timestamp}-{index}.md")
+        };
+        let path = vault.join(file_name);
+
+        if !path.exists() {
+            fs::write(&path, &content).map_err(|error| {
+                format!(
+                    "Failed to create vault note '{}': {}",
+                    path.display(),
+                    error
+                )
+            })?;
+
+            return normalize_path(path)
+                .map(|path| TextFile {
+                    path: path.to_string_lossy().to_string(),
+                    content,
+                })
+                .map_err(|error| format!("Failed to resolve vault note: {}", error));
+        }
+    }
+
+    Err("Failed to create a unique Hotaru vault note name".to_string())
 }
 
 #[tauri::command]
@@ -135,6 +230,9 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_text_file,
             write_text_file,
+            ensure_hotaru_vault,
+            ensure_default_hotaru_vault,
+            create_vault_note,
             read_excalidraw_file,
             write_excalidraw_file,
             append_debug_log,
