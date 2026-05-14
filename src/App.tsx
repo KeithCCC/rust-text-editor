@@ -7,9 +7,10 @@ import {
   useRef,
   useState,
 } from "react";
-import { getCurrentWebview } from "@tauri-apps/api/webview";
+import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { MarkdownPreview } from "./components/MarkdownPreview";
+import { logDebug } from "./debugLog";
 import {
   createVaultNote,
   ensureDefaultHotaruVault,
@@ -100,12 +101,14 @@ export default function App() {
   }, []);
 
   const openFilePath = useCallback(async (path: string) => {
+    logDebug("info", "opening file path", { path });
     const file = await readTextFile(path);
     setContent(file.content);
     setCurrentFile(file.path);
     window.localStorage.setItem(LAST_FILE_STORAGE_KEY, file.path);
     setModified(false);
     setError(null);
+    logDebug("info", "opened file path", { path: file.path, chars: file.content.length });
   }, []);
 
   const openVaultFolderPicker = useCallback(async () => {
@@ -243,10 +246,14 @@ export default function App() {
     let unlisten: (() => void) | null = null;
 
     async function listenForFileDrops() {
-      unlisten = await getCurrentWebview().onDragDropEvent((event) => {
+      logDebug("info", "installing file drop listener");
+      unlisten = await getCurrentWindow().onDragDropEvent((event) => {
         const dragEvent = event.payload;
 
         if (dragEvent.type === "enter" || dragEvent.type === "over") {
+          if (dragEvent.type === "enter") {
+            logDebug("info", "file drag entered", { paths: dragEvent.paths });
+          }
           setIsFileDragOver(true);
           return;
         }
@@ -254,11 +261,14 @@ export default function App() {
         setIsFileDragOver(false);
 
         if (dragEvent.type !== "drop") {
+          logDebug("info", "file drag cancelled", { type: dragEvent.type });
           return;
         }
 
+        logDebug("info", "file dropped", { paths: dragEvent.paths });
         const [path] = dragEvent.paths;
         if (!path) {
+          showError("Drop failed", "The drop did not include a file path.");
           return;
         }
 
@@ -268,6 +278,7 @@ export default function App() {
         }
 
         void openFilePath(path).catch((dropError: unknown) => {
+          logDebug("error", "failed to open dropped file", dropError);
           showError("Drop failed", dropError instanceof Error ? dropError.message : String(dropError));
         });
       });
@@ -308,8 +319,7 @@ export default function App() {
         multiple: false,
         directory: false,
         filters: [
-          { name: "JSON", extensions: ["json"] },
-          { name: "Markdown and Text", extensions: ["md", "markdown", "txt"] },
+          { name: "Text, Markdown, and JSON", extensions: ["txt", "md", "markdown", "json"] },
           { name: "All Files", extensions: ["*"] },
         ],
       });

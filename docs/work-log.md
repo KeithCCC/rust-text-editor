@@ -1,5 +1,29 @@
 # Work Log
 
+## 2026-05-15 01:46:00 +09:00 - master
+
+### Summary
+
+Improved Hotaru's file open diagnostics and made the Open dialog default to a combined text, Markdown, and JSON filter.
+
+### Notable Changes
+
+- Switched file drop handling to the current Tauri window listener and kept the existing single-file drop behavior.
+- Added debug log entries around drop listener setup, dropped paths, file open attempts, and file open results.
+- Changed the Open dialog's primary filter to include `.txt`, `.md`, `.markdown`, and `.json` together.
+- Rebuilt the release executable and MSI/NSIS installers, then uploaded the MSI to the GitHub `v0.1.0` release.
+
+### Validation
+
+- `npm run build` passed.
+- `cargo check` passed.
+- `npm run tauri build` passed after closing the running `hotaru.exe` process.
+
+### Risks And Follow-Ups
+
+- The extra drop/open debug logging is useful for diagnosing local file issues, but can be reduced later if the log gets noisy.
+- Vite still reports large Mermaid/Excalidraw-related chunks; this remains a packaging warning, not a build failure.
+
 ## 2026-05-11 23:33:50 +09:00 - master
 
 ### Summary
