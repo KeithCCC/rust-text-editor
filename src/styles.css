@@ -314,6 +314,13 @@ button:hover {
   border-bottom: 1px solid var(--border);
 }
 
+.pane-title {
+  display: flex;
+  align-items: baseline;
+  min-width: 0;
+  gap: 10px;
+}
+
 .pane-header span {
   font-size: 13px;
   font-weight: 700;
@@ -323,6 +330,45 @@ button:hover {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.search-box {
+  display: flex;
+  align-items: center;
+  flex: 0 0 auto;
+  gap: 4px;
+  min-width: 0;
+}
+
+.search-box input {
+  width: clamp(130px, 18vw, 240px);
+  min-width: 0;
+  border: 1px solid var(--strong-border);
+  border-radius: 6px;
+  padding: 5px 8px;
+  background: var(--pane-bg);
+  color: var(--text);
+  font: 400 13px/1.2 inherit;
+}
+
+.search-box button {
+  min-width: 44px;
+  height: 28px;
+  padding: 0 8px;
+  border-radius: 6px;
+  line-height: 1;
+}
+
+.search-box button:disabled {
+  cursor: default;
+  opacity: 0.45;
+}
+
+.search-box span {
+  min-width: 44px;
+  color: var(--muted);
+  text-align: right;
+  font-weight: 600;
 }
 
 textarea {

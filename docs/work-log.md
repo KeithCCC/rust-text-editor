@@ -1,5 +1,29 @@
 # Work Log
 
+## 2026-05-18 07:45:50 +09:00 - master
+
+### Summary
+
+Added in-editor text search to Hotaru, including keyboard shortcuts, match navigation, and visible selection of the active match.
+
+### Notable Changes
+
+- Added a search box to the editor header with live match counts and Prev/Next controls.
+- Implemented case-insensitive matching against the current editor contents.
+- Added Ctrl/Cmd+F focus behavior and F3/Shift+F3 navigation.
+- Kept keyboard focus in the search field while typing, then selected and scrolled to the active match only when navigating.
+- Styled the search controls to fit the existing pane header layout.
+
+### Validation
+
+- `npm run build` passed.
+- `cargo check` passed.
+
+### Risks And Follow-Ups
+
+- The active match is highlighted via the textarea selection; highlighting all matches would require a richer editor layer or overlay.
+- The release executable and installers were not rebuilt because `target/release/hotaru.exe` was running at the time of validation.
+
 ## 2026-05-17 19:37:00 +09:00 - master
 
 ### Summary

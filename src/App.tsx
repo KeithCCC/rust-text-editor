@@ -86,9 +86,14 @@ export default function App() {
     return Number.isFinite(saved) && saved >= 25 && saved <= 75 ? saved : 50;
   });
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
+  const [searchQuery, setSearchQuery] = useState("");
+  const [activeSearchIndex, setActiveSearchIndex] = useState(0);
+  const [hasSearchSelection, setHasSearchSelection] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
+  const editorRef = useRef<HTMLTextAreaElement | null>(null);
+  const searchInputRef = useRef<HTMLInputElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
 
   const stats = useMemo(
@@ -98,6 +103,23 @@ export default function App() {
     }),
     [content],
   );
+  const searchMatches = useMemo(() => {
+    if (!searchQuery) {
+      return [];
+    }
+
+    const matches: number[] = [];
+    const normalizedContent = content.toLocaleLowerCase();
+    const normalizedQuery = searchQuery.toLocaleLowerCase();
+    let index = normalizedContent.indexOf(normalizedQuery);
+
+    while (index !== -1) {
+      matches.push(index);
+      index = normalizedContent.indexOf(normalizedQuery, index + normalizedQuery.length);
+    }
+
+    return matches;
+  }, [content, searchQuery]);
 
   const showError = useCallback((title: string, message: string) => {
     setError({ title, message });
@@ -107,6 +129,47 @@ export default function App() {
     setActiveMenu(null);
     void action();
   }, []);
+
+  const scrollEditorToOffset = useCallback((offset: number) => {
+    const editor = editorRef.current;
+    if (!editor) {
+      return;
+    }
+
+    const computedStyle = window.getComputedStyle(editor);
+    const lineHeight = Number.parseFloat(computedStyle.lineHeight) || 22;
+    const lineIndex = content.slice(0, offset).split(/\r\n|\r|\n/).length - 1;
+    const targetTop = Math.max(0, lineIndex * lineHeight - editor.clientHeight / 2);
+    editor.scrollTop = targetTop;
+  }, [content]);
+
+  const selectSearchMatch = useCallback((matchIndex: number) => {
+    const start = searchMatches[matchIndex];
+    const editor = editorRef.current;
+    if (start === undefined || !editor) {
+      return;
+    }
+
+    const end = start + searchQuery.length;
+    editor.focus();
+    editor.setSelectionRange(start, end);
+    scrollEditorToOffset(start);
+  }, [scrollEditorToOffset, searchMatches, searchQuery]);
+
+  const moveSearch = useCallback((direction: 1 | -1) => {
+    if (searchMatches.length === 0) {
+      return;
+    }
+
+    const next = hasSearchSelection
+      ? (activeSearchIndex + direction + searchMatches.length) % searchMatches.length
+      : direction === 1
+        ? 0
+        : searchMatches.length - 1;
+    setActiveSearchIndex(next);
+    setHasSearchSelection(true);
+    selectSearchMatch(next);
+  }, [activeSearchIndex, hasSearchSelection, searchMatches.length, selectSearchMatch]);
 
   const openFilePath = useCallback(async (path: string) => {
     logDebug("info", "opening file path", { path });
@@ -250,6 +313,11 @@ export default function App() {
   }, [content, currentFile, isVaultInitializing, showError, vaultPath]);
 
   useEffect(() => {
+    setActiveSearchIndex(0);
+    setHasSearchSelection(false);
+  }, [searchMatches]);
+
+  useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
       if (!menubarRef.current?.contains(event.target as Node)) {
         setActiveMenu(null);
@@ -257,6 +325,20 @@ export default function App() {
     }
 
     function handleKeyDown(event: KeyboardEvent) {
+      if ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === "f") {
+        event.preventDefault();
+        setActiveMenu(null);
+        searchInputRef.current?.focus();
+        searchInputRef.current?.select();
+        return;
+      }
+
+      if (event.key === "F3") {
+        event.preventDefault();
+        moveSearch(event.shiftKey ? -1 : 1);
+        return;
+      }
+
       if (event.key === "Escape") {
         setActiveMenu(null);
       }
@@ -269,7 +351,7 @@ export default function App() {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, []);
+  }, [moveSearch]);
 
   useEffect(() => {
     let cancelled = false;
@@ -588,10 +670,42 @@ export default function App() {
       >
         <article className="editor-pane">
           <header className="pane-header">
-            <span>Editor</span>
-            <small>{currentFile ?? "Untitled"}</small>
+            <div className="pane-title">
+              <span>Editor</span>
+              <small>{currentFile ?? "Untitled"}</small>
+            </div>
+            <div className="search-box" role="search">
+              <input
+                ref={searchInputRef}
+                type="search"
+                value={searchQuery}
+                onChange={(event) => setSearchQuery(event.target.value)}
+                onKeyDown={(event) => {
+                  if (event.key === "Enter") {
+                    event.preventDefault();
+                    moveSearch(event.shiftKey ? -1 : 1);
+                  } else if (event.key === "Escape") {
+                    setSearchQuery("");
+                    setHasSearchSelection(false);
+                    editorRef.current?.focus();
+                  }
+                }}
+                placeholder="Search"
+                aria-label="Search editor text"
+              />
+              <button type="button" onClick={() => moveSearch(-1)} disabled={searchMatches.length === 0} aria-label="Previous match">
+                Prev
+              </button>
+              <button type="button" onClick={() => moveSearch(1)} disabled={searchMatches.length === 0} aria-label="Next match">
+                Next
+              </button>
+              <span aria-live="polite">
+                {searchQuery ? `${hasSearchSelection ? activeSearchIndex + 1 : 0}/${searchMatches.length}` : "0/0"}
+              </span>
+            </div>
           </header>
           <textarea
+            ref={editorRef}
             value={content}
             onChange={(event) => handleContentChange(event.target.value)}
             spellCheck={false}
