@@ -35,6 +35,7 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
+type MenuId = "file" | "view" | "preview" | "format";
 
 const EMPTY_DOCUMENT = "";
 const THEME_STORAGE_KEY = "hotaru-theme";
@@ -84,7 +85,9 @@ export default function App() {
     const saved = Number(readStoredValue(SPLIT_STORAGE_KEY, LEGACY_SPLIT_STORAGE_KEY));
     return Number.isFinite(saved) && saved >= 25 && saved <= 75 ? saved : 50;
   });
+  const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
+  const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
 
@@ -98,6 +101,11 @@ export default function App() {
 
   const showError = useCallback((title: string, message: string) => {
     setError({ title, message });
+  }, []);
+
+  const runMenuAction = useCallback((action: () => void | Promise<void>) => {
+    setActiveMenu(null);
+    void action();
   }, []);
 
   const openFilePath = useCallback(async (path: string) => {
@@ -240,6 +248,28 @@ export default function App() {
 
     return () => window.clearTimeout(saveTimer);
   }, [content, currentFile, isVaultInitializing, showError, vaultPath]);
+
+  useEffect(() => {
+    function handlePointerDown(event: PointerEvent) {
+      if (!menubarRef.current?.contains(event.target as Node)) {
+        setActiveMenu(null);
+      }
+    }
+
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === "Escape") {
+        setActiveMenu(null);
+      }
+    }
+
+    window.addEventListener("pointerdown", handlePointerDown);
+    window.addEventListener("keydown", handleKeyDown);
+
+    return () => {
+      window.removeEventListener("pointerdown", handlePointerDown);
+      window.removeEventListener("keydown", handleKeyDown);
+    };
+  }, []);
 
   useEffect(() => {
     let cancelled = false;
@@ -469,55 +499,55 @@ export default function App() {
   return (
     <main className="app-shell" data-theme={themeMode} data-file-drag-over={isFileDragOver}>
       <header className="menubar-shell">
-        <nav className="menubar" aria-label="Application menu">
-          <div className="menu-root">
-            <button className="menu-title">File</button>
+        <nav className="menubar" aria-label="Application menu" ref={menubarRef}>
+          <div className="menu-root" data-open={activeMenu === "file"} onMouseEnter={() => activeMenu && setActiveMenu("file")}>
+            <button className="menu-title" aria-expanded={activeMenu === "file"} onClick={() => setActiveMenu((menu) => (menu === "file" ? null : "file"))}>File</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={handleNew}>New</button>
-              <button role="menuitem" onClick={handleOpen}>Open...</button>
-              <button role="menuitem" onClick={handleSave}>Save</button>
-              <button role="menuitem" onClick={handleSaveAs}>Save As...</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleNew)}>New</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>Open...</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSave)}>Save</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSaveAs)}>Save As...</button>
               <div className="menu-separator" />
-              <button role="menuitem" onClick={handleSetVault}>Set Vault...</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSetVault)}>Set Vault...</button>
               <div className="menu-separator" />
-              <button role="menuitem" onClick={handleExit}>Exit</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleExit)}>Exit</button>
             </div>
           </div>
 
-          <div className="menu-root">
-            <button className="menu-title">View</button>
+          <div className="menu-root" data-open={activeMenu === "view"} onMouseEnter={() => activeMenu && setActiveMenu("view")}>
+            <button className="menu-title" aria-expanded={activeMenu === "view"} onClick={() => setActiveMenu((menu) => (menu === "view" ? null : "view"))}>View</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitemradio" aria-checked={themeMode === "system"} onClick={() => setThemeMode("system")}>
+              <button role="menuitemradio" aria-checked={themeMode === "system"} onClick={() => runMenuAction(() => setThemeMode("system"))}>
                 {themeMode === "system" ? "[x] " : ""}System Theme
               </button>
-              <button role="menuitemradio" aria-checked={themeMode === "light"} onClick={() => setThemeMode("light")}>
+              <button role="menuitemradio" aria-checked={themeMode === "light"} onClick={() => runMenuAction(() => setThemeMode("light"))}>
                 {themeMode === "light" ? "[x] " : ""}Light Theme
               </button>
-              <button role="menuitemradio" aria-checked={themeMode === "dark"} onClick={() => setThemeMode("dark")}>
+              <button role="menuitemradio" aria-checked={themeMode === "dark"} onClick={() => runMenuAction(() => setThemeMode("dark"))}>
                 {themeMode === "dark" ? "[x] " : ""}Dark Theme
               </button>
               <div className="menu-separator" />
-              <button role="menuitem" onClick={() => setSplitPercent(50)}>Reset Split</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(50))}>Reset Split</button>
             </div>
           </div>
 
-          <div className="menu-root">
-            <button className="menu-title">Preview</button>
+          <div className="menu-root" data-open={activeMenu === "preview"} onMouseEnter={() => activeMenu && setActiveMenu("preview")}>
+            <button className="menu-title" aria-expanded={activeMenu === "preview"} onClick={() => setActiveMenu((menu) => (menu === "preview" ? null : "preview"))}>Preview</button>
             <div className="menu-popover" role="menu">
               <button
                 role="menuitemcheckbox"
                 aria-checked={isPreviewVisible}
-                onClick={() => setIsPreviewVisible((visible) => !visible)}
+                onClick={() => runMenuAction(() => setIsPreviewVisible((visible) => !visible))}
               >
                 {isPreviewVisible ? "[x] " : ""}Show Preview
               </button>
             </div>
           </div>
 
-          <div className="menu-root">
-            <button className="menu-title">Format</button>
+          <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
+            <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>Format</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={handleFormatJson}>Format JSON</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>Format JSON</button>
             </div>
           </div>
         </nav>

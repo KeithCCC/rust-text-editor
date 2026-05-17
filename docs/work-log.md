@@ -1,5 +1,30 @@
 # Work Log
 
+## 2026-05-17 19:37:00 +09:00 - master
+
+### Summary
+
+Fixed Hotaru's custom menu behavior so menu selections close immediately and users get clear feedback that an action was accepted.
+
+### Notable Changes
+
+- Replaced hover/focus-only menu display with React-managed active menu state.
+- Closed the active menu before running menu item actions such as Save, Open, theme changes, and Format JSON.
+- Added outside-click and Escape handling for dismissing open menus.
+- Kept menu-to-menu hover switching while a menu is already open.
+- Rebuilt the release executable and MSI/NSIS installers, then relaunched `target/release/hotaru.exe` for local testing.
+
+### Validation
+
+- `npm run build` passed.
+- `cargo check` passed.
+- `npm run tauri build` passed after closing the running `hotaru.exe` process.
+
+### Risks And Follow-Ups
+
+- Keyboard menu navigation is still basic; Escape is handled, but arrow-key navigation could be added later.
+- Vite still reports large Mermaid/Excalidraw-related chunks; this remains a packaging warning, not a build failure.
+
 ## 2026-05-15 01:46:00 +09:00 - master
 
 ### Summary

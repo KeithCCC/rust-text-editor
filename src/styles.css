@@ -176,7 +176,7 @@ button:hover {
   font: 400 13px/32px inherit;
 }
 
-.menu-root:focus-within .menu-title,
+.menu-root[data-open="true"] .menu-title,
 .menu-root:hover .menu-title {
   background: var(--hover-bg);
 }
@@ -194,8 +194,7 @@ button:hover {
   box-shadow: 0 12px 24px var(--shadow);
 }
 
-.menu-root:hover .menu-popover,
-.menu-root:focus-within .menu-popover {
+.menu-root[data-open="true"] .menu-popover {
   display: flex;
   flex-direction: column;
 }
