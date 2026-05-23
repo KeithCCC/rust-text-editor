@@ -95,6 +95,8 @@ export default function App() {
   const editorRef = useRef<HTMLTextAreaElement | null>(null);
   const searchInputRef = useRef<HTMLInputElement | null>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
+  const isSyncingScrollRef = useRef(false);
+  const syncScrollFrameRef = useRef<number | null>(null);
 
   const stats = useMemo(
     () => ({
@@ -170,6 +172,24 @@ export default function App() {
     setHasSearchSelection(true);
     selectSearchMatch(next);
   }, [activeSearchIndex, hasSearchSelection, searchMatches.length, selectSearchMatch]);
+
+  const syncScrollPosition = useCallback((source: HTMLElement, target: HTMLElement) => {
+    const sourceMax = source.scrollHeight - source.clientHeight;
+    const targetMax = target.scrollHeight - target.clientHeight;
+    const nextTop = sourceMax > 0 && targetMax > 0 ? (source.scrollTop / sourceMax) * targetMax : 0;
+
+    isSyncingScrollRef.current = true;
+    target.scrollTop = nextTop;
+
+    if (syncScrollFrameRef.current !== null) {
+      window.cancelAnimationFrame(syncScrollFrameRef.current);
+    }
+
+    syncScrollFrameRef.current = window.requestAnimationFrame(() => {
+      isSyncingScrollRef.current = false;
+      syncScrollFrameRef.current = null;
+    });
+  }, []);
 
   const openFilePath = useCallback(async (path: string) => {
     logDebug("info", "opening file path", { path });
@@ -316,6 +336,53 @@ export default function App() {
     setActiveSearchIndex(0);
     setHasSearchSelection(false);
   }, [searchMatches]);
+
+  useEffect(() => {
+    if (!isPreviewVisible) {
+      return;
+    }
+
+    const editor = editorRef.current;
+    const preview = previewRef.current;
+    if (!editor || !preview) {
+      return;
+    }
+    const editorElement = editor;
+    const previewElement = preview;
+
+    function handleEditorScroll() {
+      if (isSyncingScrollRef.current) {
+        return;
+      }
+      syncScrollPosition(editorElement, previewElement);
+    }
+
+    function handlePreviewScroll() {
+      if (isSyncingScrollRef.current) {
+        return;
+      }
+      syncScrollPosition(previewElement, editorElement);
+    }
+
+    const alignPreviewFrame = window.requestAnimationFrame(() => {
+      syncScrollPosition(editorElement, previewElement);
+    });
+
+    editorElement.addEventListener("scroll", handleEditorScroll, { passive: true });
+    previewElement.addEventListener("scroll", handlePreviewScroll, { passive: true });
+
+    return () => {
+      window.cancelAnimationFrame(alignPreviewFrame);
+      editorElement.removeEventListener("scroll", handleEditorScroll);
+      previewElement.removeEventListener("scroll", handlePreviewScroll);
+
+      if (syncScrollFrameRef.current !== null) {
+        window.cancelAnimationFrame(syncScrollFrameRef.current);
+        syncScrollFrameRef.current = null;
+      }
+      isSyncingScrollRef.current = false;
+    };
+  }, [content, isPreviewVisible, syncScrollPosition]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
