@@ -35,7 +35,7 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type MenuId = "file" | "view" | "preview" | "format";
+type MenuId = "file" | "view" | "format";
 
 const EMPTY_DOCUMENT = "";
 const THEME_STORAGE_KEY = "hotaru-theme";
@@ -613,18 +613,18 @@ export default function App() {
             </div>
           </div>
 
-          <div className="menu-root" data-open={activeMenu === "preview"} onMouseEnter={() => activeMenu && setActiveMenu("preview")}>
-            <button className="menu-title" aria-expanded={activeMenu === "preview"} onClick={() => setActiveMenu((menu) => (menu === "preview" ? null : "preview"))}>Preview</button>
-            <div className="menu-popover" role="menu">
-              <button
-                role="menuitemcheckbox"
-                aria-checked={isPreviewVisible}
-                onClick={() => runMenuAction(() => setIsPreviewVisible((visible) => !visible))}
-              >
-                {isPreviewVisible ? "[x] " : ""}Show Preview
-              </button>
-            </div>
-          </div>
+          <button
+            className="menu-title preview-toggle"
+            type="button"
+            aria-pressed={isPreviewVisible}
+            onMouseEnter={() => activeMenu && setActiveMenu(null)}
+            onClick={() => {
+              setActiveMenu(null);
+              setIsPreviewVisible((visible) => !visible);
+            }}
+          >
+            Preview
+          </button>
 
           <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
             <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>Format</button>
@@ -749,6 +749,7 @@ export default function App() {
                 ref={previewRef}
                 markdown={content}
                 currentFile={currentFile}
+                themeMode={themeMode}
                 onOpenExcalidraw={(path, scene) => setExcalidrawSession({ path, scene })}
               />
             </article>

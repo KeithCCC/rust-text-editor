@@ -1,4 +1,4 @@
-import { forwardRef } from "react";
+import { forwardRef, isValidElement, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import { MermaidBlock } from "./MermaidBlock";
@@ -9,11 +9,24 @@ import type { ExcalidrawScene } from "../types";
 type MarkdownPreviewProps = {
   markdown: string;
   currentFile: string | null;
+  themeMode: "system" | "light" | "dark";
   onOpenExcalidraw: (path: string, scene: ExcalidrawScene | null) => void;
 };
 
+function getCodeLanguage(className: string | undefined) {
+  return /language-([\w-]+)/.exec(className ?? "")?.[1]?.toLowerCase() ?? null;
+}
+
+function getPreCodeLanguage(children: ReactNode) {
+  if (!isValidElement<{ className?: string }>(children)) {
+    return null;
+  }
+
+  return getCodeLanguage(children.props.className);
+}
+
 export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(function MarkdownPreview(
-  { markdown, currentFile, onOpenExcalidraw },
+  { markdown, currentFile, themeMode, onOpenExcalidraw },
   ref,
 ) {
   return (
@@ -21,15 +34,23 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
       <ReactMarkdown
         remarkPlugins={[remarkGfm]}
         components={{
-          code({ className, children, ...props }) {
-            const match = /language-(\w+)/.exec(className ?? "");
-            const code = String(children).replace(/\n$/, "");
-
-            if (match?.[1] === "mermaid") {
-              return <MermaidBlock source={code} />;
+          pre({ children, ...props }) {
+            const language = getPreCodeLanguage(children);
+            if (language === "mermaid" || language === "json") {
+              return <>{children}</>;
             }
 
-            if (match?.[1] === "json") {
+            return <pre {...props}>{children}</pre>;
+          },
+          code({ className, children, ...props }) {
+            const language = getCodeLanguage(className);
+            const code = String(children).replace(/\n$/, "");
+
+            if (language === "mermaid") {
+              return <MermaidBlock source={code} themeMode={themeMode} />;
+            }
+
+            if (language === "json") {
               return <JsonCodeBlock source={code} />;
             }
 

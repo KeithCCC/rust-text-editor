@@ -1,0 +1,4 @@
+interface:
+  display_name: "Full Build"
+  short_description: "Run Hotaru's complete frontend and Tauri release build."
+  default_prompt: "Run the full Hotaru build, including the release executable."

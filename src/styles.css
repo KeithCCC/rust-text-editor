@@ -28,6 +28,15 @@ body {
   --pane-bg: #ffffff;
   --editor-bg: #fbfcfd;
   --preview-bg: #ffffff;
+  --preview-text: #1b2637;
+  --preview-heading: #0f355f;
+  --preview-link: #0969b8;
+  --preview-link-hover: #064f8c;
+  --preview-rule: #c9d8e8;
+  --preview-code-bg: #f0f5fa;
+  --preview-code-text: #26374d;
+  --preview-code-border: #c6d5e5;
+  --preview-table-head: #eef5fc;
   --surface-bg: #fbfcfd;
   --hover-bg: #eef3f8;
   --active-bg: #dce8f5;
@@ -56,6 +65,15 @@ body {
   --pane-bg: #1c222c;
   --editor-bg: #151a21;
   --preview-bg: #181e27;
+  --preview-text: #e7eef7;
+  --preview-heading: #9ed0ff;
+  --preview-link: #80bdff;
+  --preview-link-hover: #b7d9ff;
+  --preview-rule: #39485b;
+  --preview-code-bg: #111821;
+  --preview-code-text: #eaf2fb;
+  --preview-code-border: #405168;
+  --preview-table-head: #222c39;
   --surface-bg: #202733;
   --hover-bg: #2b3442;
   --active-bg: #31445a;
@@ -85,6 +103,15 @@ body {
     --pane-bg: #1c222c;
     --editor-bg: #151a21;
     --preview-bg: #181e27;
+    --preview-text: #e7eef7;
+    --preview-heading: #9ed0ff;
+    --preview-link: #80bdff;
+    --preview-link-hover: #b7d9ff;
+    --preview-rule: #39485b;
+    --preview-code-bg: #111821;
+    --preview-code-text: #eaf2fb;
+    --preview-code-border: #405168;
+    --preview-table-head: #222c39;
     --surface-bg: #202733;
     --hover-bg: #2b3442;
     --active-bg: #31445a;
@@ -179,6 +206,15 @@ button:hover {
 .menu-root[data-open="true"] .menu-title,
 .menu-root:hover .menu-title {
   background: var(--hover-bg);
+}
+
+.preview-toggle[aria-pressed="true"] {
+  background: var(--active-bg);
+}
+
+.preview-toggle:focus-visible {
+  outline: 2px solid var(--strong-border);
+  outline-offset: -2px;
 }
 
 .menu-popover {
@@ -420,15 +456,21 @@ textarea {
   min-height: 0;
   padding: 22px 28px 48px;
   background: var(--preview-bg);
-  color: var(--text);
+  color: var(--preview-text);
   line-height: 1.65;
 }
 
 .preview-body h1,
 .preview-body h2,
 .preview-body h3 {
+  color: var(--preview-heading);
   line-height: 1.2;
   margin: 1.1em 0 0.45em;
+}
+
+.preview-body h1 {
+  padding-bottom: 0.25em;
+  border-bottom: 1px solid var(--preview-rule);
 }
 
 .preview-body h1:first-child,
@@ -437,24 +479,54 @@ textarea {
   margin-top: 0;
 }
 
+.preview-body a {
+  color: var(--preview-link);
+  font-weight: 650;
+  text-decoration-color: color-mix(in srgb, var(--preview-link) 45%, transparent);
+  text-underline-offset: 3px;
+}
+
+.preview-body a:hover {
+  color: var(--preview-link-hover);
+  text-decoration-color: currentColor;
+}
+
+.preview-body p,
+.preview-body ul,
+.preview-body ol {
+  margin: 0.75em 0;
+}
+
+.preview-body hr {
+  border: 0;
+  border-top: 1px solid var(--preview-rule);
+  margin: 24px 0;
+}
+
 .preview-body pre,
 .preview-body code {
   border-radius: 6px;
-  background: var(--code-bg);
+  background: var(--preview-code-bg);
+  color: var(--preview-code-text);
   font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
 }
 
 .preview-body pre {
   overflow: auto;
   padding: 14px;
+  border: 1px solid var(--preview-code-border);
+  box-shadow: inset 3px 0 0 var(--preview-link);
 }
 
 .preview-body code {
   padding: 2px 5px;
+  border: 1px solid var(--preview-code-border);
 }
 
 .preview-body pre code {
   padding: 0;
+  border: 0;
+  box-shadow: none;
 }
 
 .preview-body table {
@@ -468,10 +540,15 @@ textarea {
   padding: 8px 10px;
 }
 
+.preview-body th {
+  background: var(--preview-table-head);
+  color: var(--preview-heading);
+}
+
 .preview-body blockquote {
   margin-left: 0;
   padding-left: 14px;
-  border-left: 3px solid var(--strong-border);
+  border-left: 3px solid var(--preview-link);
   color: var(--quote);
 }
 
@@ -514,6 +591,7 @@ textarea {
   overflow: auto;
   padding: 18px;
   text-align: center;
+  background: color-mix(in srgb, var(--preview-bg) 82%, var(--surface-bg));
 }
 
 .mermaid-preview svg {
