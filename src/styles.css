@@ -57,6 +57,11 @@ body {
   --warning-bg: #fff9ed;
   --warning-text: #7a4d00;
   --shadow: rgb(9 20 33 / 20%);
+  --editor-font-size: 14px;
+  --editor-line-height: 1.55;
+  --preview-font-size: 16px;
+  --preview-line-height: 1.65;
+  --ui-font-size: 13px;
 }
 
 .app-shell[data-theme="dark"] {
@@ -141,7 +146,7 @@ button {
   background: var(--bar-bg);
   color: var(--text);
   cursor: pointer;
-  font: 600 13px/1.2 inherit;
+  font: 600 var(--ui-font-size)/1.2 inherit;
   padding: 8px 12px;
 }
 
@@ -200,7 +205,7 @@ button:hover {
   border-radius: 0;
   background: transparent;
   padding: 0 12px;
-  font: 400 13px/32px inherit;
+  font: 400 var(--ui-font-size)/32px inherit;
 }
 
 .menu-root[data-open="true"] .menu-title,
@@ -230,6 +235,12 @@ button:hover {
   box-shadow: 0 12px 24px var(--shadow);
 }
 
+.vault-menu {
+  min-width: 260px;
+  max-height: min(420px, calc(100vh - 80px));
+  overflow-y: auto;
+}
+
 .menu-root[data-open="true"] .menu-popover {
   display: flex;
   flex-direction: column;
@@ -242,13 +253,35 @@ button:hover {
   background: transparent;
   padding: 7px 20px 7px 10px;
   text-align: left;
-  font: 400 13px/1.2 inherit;
+  font: 400 var(--ui-font-size)/1.2 inherit;
+}
+
+.menu-popover button:disabled {
+  color: var(--muted);
+  cursor: default;
 }
 
 .menu-popover button:hover,
 .menu-popover button:focus-visible {
   background: var(--active-bg);
   outline: none;
+}
+
+.menu-popover button:disabled:hover,
+.menu-popover button:disabled:focus-visible {
+  background: transparent;
+}
+
+.menu-label,
+.menu-empty {
+  padding: 7px 10px;
+  color: var(--muted);
+  font-size: 12px;
+}
+
+.menu-label {
+  font-weight: 700;
+  text-transform: uppercase;
 }
 
 .menu-separator {
@@ -267,7 +300,7 @@ button:hover {
 
 .window-caption strong {
   color: var(--text);
-  font-size: 13px;
+  font-size: var(--ui-font-size);
 }
 
 .window-caption span,
@@ -358,7 +391,7 @@ button:hover {
 }
 
 .pane-header span {
-  font-size: 13px;
+  font-size: var(--ui-font-size);
   font-weight: 700;
 }
 
@@ -384,7 +417,7 @@ button:hover {
   padding: 5px 8px;
   background: var(--pane-bg);
   color: var(--text);
-  font: 400 13px/1.2 inherit;
+  font: 400 var(--ui-font-size)/1.2 inherit;
 }
 
 .search-box button {
@@ -418,7 +451,7 @@ textarea {
   padding: 18px;
   background: var(--editor-bg);
   color: var(--text);
-  font: 14px/1.55 "Cascadia Code", "Fira Code", Consolas, monospace;
+  font: var(--editor-font-size) / var(--editor-line-height) "Cascadia Code", "Fira Code", Consolas, monospace;
 }
 
 .splitter {
@@ -457,7 +490,8 @@ textarea {
   padding: 22px 28px 48px;
   background: var(--preview-bg);
   color: var(--preview-text);
-  line-height: 1.65;
+  font-size: var(--preview-font-size);
+  line-height: var(--preview-line-height);
 }
 
 .preview-body h1,
@@ -682,6 +716,100 @@ textarea {
   border-radius: 8px;
   background: var(--pane-bg);
   box-shadow: 0 22px 60px var(--shadow);
+}
+
+.file-properties-modal {
+  width: min(720px, 100%);
+  overflow: hidden;
+  border: 1px solid var(--strong-border);
+  border-radius: 8px;
+  background: var(--pane-bg);
+  box-shadow: 0 22px 60px var(--shadow);
+}
+
+.file-properties-grid {
+  display: grid;
+  grid-template-columns: minmax(92px, auto) minmax(0, 1fr);
+  gap: 12px 18px;
+  padding: 18px;
+}
+
+.file-properties-grid dt {
+  color: var(--muted);
+  font-weight: 700;
+}
+
+.file-properties-grid dd {
+  min-width: 0;
+  margin: 0;
+  overflow-wrap: anywhere;
+}
+
+.vault-settings-body {
+  display: grid;
+  gap: 16px;
+  padding: 18px;
+}
+
+.vault-settings-body div {
+  display: grid;
+  gap: 6px;
+}
+
+.vault-settings-body span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.vault-settings-body input {
+  width: 100%;
+  min-width: 0;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-bg);
+  color: var(--text);
+  padding: 8px 10px;
+  overflow-wrap: anywhere;
+  font: 400 13px/1.4 inherit;
+}
+
+.vault-settings-body button {
+  justify-self: start;
+}
+
+.appearance-settings-body {
+  display: grid;
+  gap: 14px;
+  padding: 18px;
+}
+
+.appearance-settings-body label {
+  display: grid;
+  grid-template-columns: minmax(150px, 1fr) minmax(180px, 2fr) 52px;
+  align-items: center;
+  gap: 12px;
+}
+
+.appearance-settings-body span {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.appearance-settings-body input[type="range"] {
+  width: 100%;
+}
+
+.appearance-settings-body output {
+  color: var(--text);
+  font: 600 var(--ui-font-size)/1.2 inherit;
+  text-align: right;
+}
+
+.appearance-settings-body > button {
+  justify-self: start;
 }
 
 .modal-toolbar {

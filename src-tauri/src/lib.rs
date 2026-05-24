@@ -2,6 +2,8 @@ use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::panic;
 use std::path::{Path, PathBuf};
+use std::process::Command;
+use std::time::UNIX_EPOCH;
 
 use serde::Serialize;
 
@@ -11,6 +13,24 @@ const VAULT_DIR_NAME: &str = "hotaru-valut";
 struct TextFile {
     path: String,
     content: String,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct FileProperties {
+    path: String,
+    size: u64,
+    created_ms: Option<u64>,
+    modified_ms: Option<u64>,
+}
+
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VaultFile {
+    path: String,
+    name: String,
+    size: u64,
+    modified_ms: Option<u64>,
 }
 
 #[tauri::command]
@@ -120,6 +140,48 @@ fn create_vault_note(vault_path: String, content: String) -> Result<TextFile, St
 }
 
 #[tauri::command]
+fn get_file_properties(path: String) -> Result<FileProperties, String> {
+    let normalized = normalize_path(PathBuf::from(&path))
+        .map_err(|error| format!("Failed to resolve file path '{}': {}", path, error))?;
+    let metadata = fs::metadata(&normalized)
+        .map_err(|error| format!("Failed to read metadata for '{}': {}", normalized.display(), error))?;
+
+    Ok(FileProperties {
+        path: normalized.to_string_lossy().to_string(),
+        size: metadata.len(),
+        created_ms: metadata.created().ok().and_then(system_time_to_epoch_ms),
+        modified_ms: metadata.modified().ok().and_then(system_time_to_epoch_ms),
+    })
+}
+
+#[tauri::command]
+fn list_vault_files(vault_path: String) -> Result<Vec<VaultFile>, String> {
+    let vault = normalize_path(PathBuf::from(&vault_path))
+        .map_err(|error| format!("Failed to resolve vault path '{}': {}", vault_path, error))?;
+    let mut files = Vec::new();
+    collect_vault_files(&vault, &vault, &mut files)?;
+    files.sort_by(|left, right| left.name.to_lowercase().cmp(&right.name.to_lowercase()));
+    Ok(files)
+}
+
+#[tauri::command]
+fn open_file_in_new_instance(path: String) -> Result<(), String> {
+    let normalized = normalize_path(PathBuf::from(&path))
+        .map_err(|error| format!("Failed to resolve file path '{}': {}", path, error))?;
+    if !normalized.is_file() {
+        return Err(format!("'{}' is not a file", normalized.display()));
+    }
+
+    let exe_path = std::env::current_exe()
+        .map_err(|error| format!("Failed to resolve executable path: {}", error))?;
+    Command::new(exe_path)
+        .arg(&normalized)
+        .spawn()
+        .map(|_| ())
+        .map_err(|error| format!("Failed to open '{}' in a new instance: {}", normalized.display(), error))
+}
+
+#[tauri::command]
 fn get_startup_file_path() -> Result<Option<String>, String> {
     let mut args = std::env::args_os();
     let _ = args.next();
@@ -134,6 +196,47 @@ fn get_startup_file_path() -> Result<Option<String>, String> {
     }
 
     Ok(None)
+}
+
+fn collect_vault_files(root: &Path, current: &Path, files: &mut Vec<VaultFile>) -> Result<(), String> {
+    for entry in fs::read_dir(current)
+        .map_err(|error| format!("Failed to list vault folder '{}': {}", current.display(), error))?
+    {
+        let entry = entry.map_err(|error| format!("Failed to read vault entry: {}", error))?;
+        let path = entry.path();
+        let metadata = entry
+            .metadata()
+            .map_err(|error| format!("Failed to read metadata for '{}': {}", path.display(), error))?;
+
+        if metadata.is_dir() {
+            collect_vault_files(root, &path, files)?;
+            continue;
+        }
+
+        if metadata.is_file() {
+            let name = path
+                .strip_prefix(root)
+                .unwrap_or(path.as_path())
+                .to_string_lossy()
+                .to_string();
+            let normalized = normalize_path(path)
+                .map_err(|error| format!("Failed to resolve vault file path: {}", error))?;
+            files.push(VaultFile {
+                path: normalized.to_string_lossy().to_string(),
+                name,
+                size: metadata.len(),
+                modified_ms: metadata.modified().ok().and_then(system_time_to_epoch_ms),
+            });
+        }
+    }
+
+    Ok(())
+}
+
+fn system_time_to_epoch_ms(time: std::time::SystemTime) -> Option<u64> {
+    time.duration_since(UNIX_EPOCH)
+        .ok()
+        .and_then(|duration| u64::try_from(duration.as_millis()).ok())
 }
 
 #[tauri::command]
@@ -250,6 +353,9 @@ pub fn run() {
             ensure_hotaru_vault,
             ensure_default_hotaru_vault,
             create_vault_note,
+            get_file_properties,
+            list_vault_files,
+            open_file_in_new_instance,
             get_startup_file_path,
             read_excalidraw_file,
             write_excalidraw_file,

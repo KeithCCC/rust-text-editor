@@ -5,6 +5,20 @@ export type TextFile = {
   content: string;
 };
 
+export type FileProperties = {
+  path: string;
+  size: number;
+  createdMs: number | null;
+  modifiedMs: number | null;
+};
+
+export type VaultFile = {
+  path: string;
+  name: string;
+  size: number;
+  modifiedMs: number | null;
+};
+
 export function readTextFile(path: string) {
   return invoke<TextFile>("read_text_file", { path });
 }
@@ -23,6 +37,18 @@ export function ensureDefaultHotaruVault() {
 
 export function createVaultNote(vaultPath: string, content: string) {
   return invoke<TextFile>("create_vault_note", { vaultPath, content });
+}
+
+export function getFileProperties(path: string) {
+  return invoke<FileProperties>("get_file_properties", { path });
+}
+
+export function listVaultFiles(vaultPath: string) {
+  return invoke<VaultFile[]>("list_vault_files", { vaultPath });
+}
+
+export function openFileInNewInstance(path: string) {
+  return invoke<void>("open_file_in_new_instance", { path });
 }
 
 export function getStartupFilePath() {
