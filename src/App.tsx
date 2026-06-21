@@ -15,7 +15,7 @@ import { BUILD_INFO } from "./buildInfo";
 import { CommandPalette } from "./components/CommandPalette";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
-import { VaultSidebar, type VaultSort } from "./components/VaultSidebar";
+import { VaultSidebar, type VaultSearchMode, type VaultSort } from "./components/VaultSidebar";
 import { logDebug } from "./debugLog";
 import {
   createNamedVaultNote,
@@ -32,11 +32,13 @@ import {
   openFileInNewInstance,
   readTextFile,
   renameVaultFile,
+  searchVaultText,
   writeTextFile,
 } from "./tauri";
-import type { Backlink, FileProperties, VaultFile } from "./tauri";
+import type { Backlink, FileProperties, VaultFile, VaultSearchMatch } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
 import { saveCurrentWindowState } from "./windowState";
+import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 
 const ExcalidrawEditor = lazy(() =>
   import("./components/ExcalidrawEditor").then((module) => ({
@@ -50,7 +52,7 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type MenuId = "file" | "view" | "settings" | "format";
+type MenuId = "file" | "view" | "settings" | "search" | "format";
 
 const EMPTY_DOCUMENT = "";
 const THEME_STORAGE_KEY = "hotaru-theme";
@@ -158,6 +160,9 @@ export default function App() {
   const [searchQuery, setSearchQuery] = useState("");
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [hasSearchSelection, setHasSearchSelection] = useState(false);
+  const [vaultSearchMode, setVaultSearchMode] = useState<VaultSearchMode>("files");
+  const [vaultContentResults, setVaultContentResults] = useState<VaultSearchMatch[]>([]);
+  const [isVaultContentSearching, setIsVaultContentSearching] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isDraggingVaultSidebar, setIsDraggingVaultSidebar] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -243,8 +248,11 @@ export default function App() {
       disabled.add("file.delete");
       disabled.add("file.duplicate");
     }
+    if (!vaultPath) {
+      disabled.add("search.vault");
+    }
     return disabled;
-  }, [currentFile]);
+  }, [currentFile, vaultPath]);
 
   const showError = useCallback((title: string, message: string) => {
     setError({ title, message });
@@ -483,6 +491,63 @@ export default function App() {
     }
   }, [content, refreshVaultFiles, showError, vaultPath]);
 
+  const handleExportHtml = useCallback(async () => {
+    try {
+      const fallbackName = currentVaultFile?.name
+        ?? (currentFile ? currentFile.split(/[\\/]/).pop() : null)
+        ?? "hotaru-note.md";
+      const defaultName = fallbackName.replace(/\.(md|markdown|txt)$/i, "") || "hotaru-note";
+      const selected = await save({
+        defaultPath: `${defaultName}.html`,
+        filters: [
+          { name: "HTML", extensions: ["html", "htm"] },
+          { name: "All Files", extensions: ["*"] },
+        ],
+      });
+
+      if (!selected) {
+        return;
+      }
+
+      await writeTextFile(selected, buildStandaloneHtml({
+        title: defaultName,
+        bodyHtml: markdownToHtml(content),
+      }));
+      setError(null);
+    } catch (exportError) {
+      showError("HTML export failed", exportError instanceof Error ? exportError.message : String(exportError));
+    }
+  }, [content, currentFile, currentVaultFile?.name, showError]);
+
+  const openVaultContentSearch = useCallback(() => {
+    if (!vaultPath) {
+      showError("Vault search unavailable", "Choose a vault before searching note contents.");
+      return;
+    }
+    setIsSidebarCollapsed(false);
+    setVaultSearchMode("contents");
+    window.setTimeout(() => {
+      vaultSearchInputRef.current?.focus();
+      vaultSearchInputRef.current?.select();
+    }, 0);
+  }, [showError, vaultPath]);
+
+  const clearVaultSearch = useCallback(() => {
+    setVaultFilter("");
+    setVaultSearchMode("files");
+    setVaultContentResults([]);
+    setIsVaultContentSearching(false);
+  }, []);
+
+  const openVaultSearchResult = useCallback(async (result: VaultSearchMatch) => {
+    await openFilePath(result.path);
+    setSearchQuery(vaultFilter);
+    setHasSearchSelection(true);
+    window.setTimeout(() => {
+      editorRef.current?.selectRange(result.matchStart, result.matchEnd);
+    }, 0);
+  }, [openFilePath, vaultFilter]);
+
   const handleShowFileProperties = useCallback(async () => {
     if (!currentFile) {
       showError("File properties unavailable", "Save or open a file before viewing file properties.");
@@ -655,6 +720,9 @@ export default function App() {
       case "file.saveAs":
         void handleSaveAs();
         break;
+      case "file.exportHtml":
+        void handleExportHtml();
+        break;
       case "file.rename":
         void handleRenameVaultFile();
         break;
@@ -681,8 +749,7 @@ export default function App() {
         searchInputRef.current?.select();
         break;
       case "search.vault":
-        setIsSidebarCollapsed(false);
-        vaultSearchInputRef.current?.focus();
+        openVaultContentSearch();
         break;
       case "format.bold":
         editorRef.current?.wrapSelection("**", "**", "bold text");
@@ -700,12 +767,14 @@ export default function App() {
   }, [
     handleDeleteVaultFile,
     handleDuplicateVaultFile,
+    handleExportHtml,
     handleFormatJson,
     handleNew,
     handleOpen,
     handleRenameVaultFile,
     handleSave,
     handleSaveAs,
+    openVaultContentSearch,
   ]);
 
   const updateSplitFromPointer = useCallback((clientX: number) => {
@@ -766,6 +835,48 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(VAULT_SIDEBAR_WIDTH_STORAGE_KEY, String(vaultSidebarWidth));
   }, [vaultSidebarWidth]);
+
+  useEffect(() => {
+    if (vaultSearchMode !== "contents" || !vaultPath) {
+      setVaultContentResults([]);
+      setIsVaultContentSearching(false);
+      return;
+    }
+
+    const query = vaultFilter.trim();
+    if (!query) {
+      setVaultContentResults([]);
+      setIsVaultContentSearching(false);
+      return;
+    }
+
+    let cancelled = false;
+    setIsVaultContentSearching(true);
+    const timer = window.setTimeout(() => {
+      void searchVaultText(vaultPath, query, 200)
+        .then((results) => {
+          if (!cancelled) {
+            setVaultContentResults(results);
+            setError(null);
+          }
+        })
+        .catch((searchError: unknown) => {
+          if (!cancelled) {
+            showError("Vault search failed", searchError instanceof Error ? searchError.message : String(searchError));
+          }
+        })
+        .finally(() => {
+          if (!cancelled) {
+            setIsVaultContentSearching(false);
+          }
+        });
+    }, 250);
+
+    return () => {
+      cancelled = true;
+      window.clearTimeout(timer);
+    };
+  }, [showError, vaultFilter, vaultPath, vaultSearchMode]);
 
   useEffect(() => {
     if (startupVaultInitializationStarted) {
@@ -1083,6 +1194,7 @@ export default function App() {
               <button role="menuitem" onClick={() => runMenuAction(handleOpenInNewInstance)}>Open in New Instance...</button>
               <button role="menuitem" onClick={() => runMenuAction(handleSave)}>Save <kbd>Ctrl+S</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleSaveAs)}>Save As...</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>Export as HTML...</button>
               <button role="menuitem" onClick={() => runMenuAction(() => handleRenameVaultFile())} disabled={!currentVaultFile}>Rename...</button>
               <button role="menuitem" onClick={() => runMenuAction(() => handleDuplicateVaultFile())} disabled={!currentVaultFile}>Duplicate</button>
               <button role="menuitem" onClick={() => runMenuAction(() => handleDeleteVaultFile())} disabled={!currentVaultFile}>Delete...</button>
@@ -1122,6 +1234,14 @@ export default function App() {
           <button className="menu-title preview-toggle" type="button" aria-pressed={isCommandPaletteOpen} onClick={() => setIsCommandPaletteOpen(true)}>
             Command <kbd>Ctrl+K</kbd>
           </button>
+
+          <div className="menu-root" data-open={activeMenu === "search"} onMouseEnter={() => activeMenu && setActiveMenu("search")}>
+            <button className="menu-title" aria-expanded={activeMenu === "search"} onClick={() => setActiveMenu((menu) => (menu === "search" ? null : "search"))}>Search</button>
+            <div className="menu-popover" role="menu">
+              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("search.note"))}>Find in Note <kbd>Ctrl+F</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(openVaultContentSearch)} disabled={!vaultPath}>Search Vault Contents <kbd>Ctrl+Shift+F</kbd></button>
+            </div>
+          </div>
 
           <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
             <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>Format</button>
@@ -1163,20 +1283,26 @@ export default function App() {
         <VaultSidebar
           vaultPath={vaultPath}
           files={filteredVaultFiles}
+          contentResults={vaultContentResults}
           backlinks={backlinks}
           currentFile={currentFile}
           currentTags={currentVaultFile?.tags ?? []}
           filter={vaultFilter}
           filterInputRef={vaultSearchInputRef}
+          searchMode={vaultSearchMode}
           sort={vaultSort}
           isCollapsed={isSidebarCollapsed}
           isLoading={isVaultFilesLoading}
+          isContentSearching={isVaultContentSearching}
           onFilterChange={setVaultFilter}
+          onClearFilter={clearVaultSearch}
+          onSearchModeChange={setVaultSearchMode}
           onSortChange={setVaultSort}
           onToggleCollapsed={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
           onRefresh={() => void refreshVaultFiles()}
           onNewNote={() => void handleNew()}
           onOpenFile={(path) => void openFilePath(path)}
+          onOpenSearchResult={(result) => void openVaultSearchResult(result)}
           onOpenInNewInstance={(path) => void handleOpenVaultFileInNewInstance(path)}
           onRenameFile={(file) => void handleRenameVaultFile(file)}
           onDuplicateFile={(file) => void handleDuplicateVaultFile(file)}

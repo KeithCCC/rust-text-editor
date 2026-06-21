@@ -1,6 +1,6 @@
 [package]
 name = "hotaru"
-version = "0.1.2"
+version = "0.1.3"
 description = "Markdown editor with Mermaid and Excalidraw previews"
 authors = ["Hotaru"]
 edition = "2024"

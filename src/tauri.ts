@@ -31,6 +31,18 @@ export type Backlink = {
   matches: string[];
 };
 
+export type VaultSearchMatch = {
+  path: string;
+  relativePath: string;
+  name: string;
+  lineNumber: number;
+  lineText: string;
+  lineMatchStart: number;
+  lineMatchEnd: number;
+  matchStart: number;
+  matchEnd: number;
+};
+
 export function readTextFile(path: string) {
   return invoke<TextFile>("read_text_file", { path });
 }
@@ -77,6 +89,10 @@ export function duplicateVaultFile(vaultPath: string, path: string) {
 
 export function getVaultBacklinks(vaultPath: string, currentPath: string) {
   return invoke<Backlink[]>("get_vault_backlinks", { vaultPath, currentPath });
+}
+
+export function searchVaultText(vaultPath: string, query: string, limit?: number) {
+  return invoke<VaultSearchMatch[]>("search_vault_text", { vaultPath, query, limit });
 }
 
 export function openFileInNewInstance(path: string) {

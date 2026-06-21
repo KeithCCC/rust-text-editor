@@ -3,6 +3,7 @@ export type CommandId =
   | "file.open"
   | "file.save"
   | "file.saveAs"
+  | "file.exportHtml"
   | "file.rename"
   | "file.delete"
   | "file.duplicate"
@@ -28,6 +29,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "file.open", label: "Open File", shortcut: "Ctrl+O" },
   { id: "file.save", label: "Save", shortcut: "Ctrl+S" },
   { id: "file.saveAs", label: "Save As" },
+  { id: "file.exportHtml", label: "Export as HTML" },
   { id: "file.rename", label: "Rename Current Note" },
   { id: "file.delete", label: "Delete Current Note" },
   { id: "file.duplicate", label: "Duplicate Current Note" },

@@ -449,13 +449,15 @@ kbd {
 
 .vault-actions {
   display: grid;
-  grid-template-columns: 1fr 1fr;
+  grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) minmax(88px, auto);
   gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
 }
 
 .vault-actions button,
+.vault-actions select,
+.vault-controls button,
 .vault-file-menu-popover button,
 .backlinks-panel button {
   border-radius: 5px;
@@ -465,14 +467,15 @@ kbd {
 
 .vault-controls {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) auto auto;
   gap: 6px;
   padding: 8px 10px;
   border-bottom: 1px solid var(--border);
 }
 
+.vault-actions select,
 .vault-controls input,
-.vault-controls select,
+.vault-controls button,
 .command-palette input {
   min-width: 0;
   border: 1px solid var(--strong-border);
@@ -481,6 +484,15 @@ kbd {
   color: var(--text);
   font: 400 var(--ui-font-size)/1.2 inherit;
   padding: 7px 8px;
+}
+
+.vault-search-mode[aria-pressed="true"] {
+  border-color: var(--preview-link);
+  color: var(--preview-link);
+}
+
+.vault-clear-search:disabled {
+  opacity: 0.55;
 }
 
 .vault-file-list {
@@ -526,6 +538,31 @@ kbd {
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+.vault-search-row {
+  grid-template-columns: minmax(0, 1fr);
+  min-height: 42px;
+}
+
+.vault-search-main {
+  display: grid;
+  gap: 2px;
+}
+
+.vault-search-main small {
+  min-width: 0;
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.vault-search-main mark {
+  border-radius: 3px;
+  background: color-mix(in srgb, var(--preview-link) 34%, transparent);
+  color: var(--text);
 }
 
 .vault-file-menu summary,

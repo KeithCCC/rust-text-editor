@@ -47,6 +47,20 @@ struct Backlink {
     matches: Vec<String>,
 }
 
+#[derive(Serialize)]
+#[serde(rename_all = "camelCase")]
+struct VaultSearchMatch {
+    path: String,
+    relative_path: String,
+    name: String,
+    line_number: usize,
+    line_text: String,
+    line_match_start: usize,
+    line_match_end: usize,
+    match_start: usize,
+    match_end: usize,
+}
+
 #[tauri::command]
 fn read_text_file(path: String) -> Result<TextFile, String> {
     let content = fs::read_to_string(&path)
@@ -273,6 +287,13 @@ fn get_vault_backlinks(vault_path: String, current_path: String) -> Result<Vec<B
         .map_err(|error| format!("Failed to resolve vault path '{}': {}", vault_path, error))?;
     let current = resolve_existing_vault_file(&vault, &current_path)?;
     scan_vault_backlinks(&vault, &current)
+}
+
+#[tauri::command]
+fn search_vault_text(vault_path: String, query: String, limit: Option<usize>) -> Result<Vec<VaultSearchMatch>, String> {
+    let vault = normalize_path(PathBuf::from(&vault_path))
+        .map_err(|error| format!("Failed to resolve vault path '{}': {}", vault_path, error))?;
+    scan_vault_text(&vault, &query, limit.unwrap_or(200))
 }
 
 #[tauri::command]
@@ -672,6 +693,81 @@ fn scan_vault_backlinks(vault: &Path, current_path: &Path) -> Result<Vec<Backlin
     Ok(backlinks)
 }
 
+fn scan_vault_text(vault: &Path, query: &str, limit: usize) -> Result<Vec<VaultSearchMatch>, String> {
+    let trimmed_query = query.trim();
+    if trimmed_query.is_empty() {
+        return Err("Vault search query cannot be empty".to_string());
+    }
+
+    let vault = normalize_path(vault.to_path_buf())
+        .map_err(|error| format!("Failed to resolve vault path '{}': {}", vault.display(), error))?;
+    let normalized_query = trimmed_query.to_lowercase();
+    let max_results = limit.clamp(1, 500);
+    let mut files = Vec::new();
+    collect_markdown_files(&vault, &mut files)?;
+    files.sort_by_key(|file| file.to_string_lossy().to_lowercase());
+
+    let mut results = Vec::new();
+    for file in files {
+        if results.len() >= max_results {
+            break;
+        }
+
+        let normalized = normalize_path(file.clone())
+            .map_err(|error| format!("Failed to resolve vault file '{}': {}", file.display(), error))?;
+        let content = fs::read_to_string(&normalized)
+            .map_err(|error| format!("Failed to read vault file '{}': {}", normalized.display(), error))?;
+        let relative_path = normalized
+            .strip_prefix(&vault)
+            .unwrap_or(normalized.as_path())
+            .to_string_lossy()
+            .to_string();
+        let name = normalized
+            .file_name()
+            .and_then(|name| name.to_str())
+            .unwrap_or(&relative_path)
+            .to_string();
+
+        let mut absolute_line_start = 0usize;
+        for (line_index, line) in content.lines().enumerate() {
+            if results.len() >= max_results {
+                break;
+            }
+
+            let lower_line = line.to_lowercase();
+            let mut search_from_byte = 0usize;
+            while results.len() < max_results {
+                let Some(found_byte) = lower_line[search_from_byte..].find(&normalized_query) else {
+                    break;
+                };
+                let line_match_start_byte = search_from_byte + found_byte;
+                let line_match_end_byte = line_match_start_byte + normalized_query.len();
+                let line_match_start = line[..line_match_start_byte].chars().count();
+                let line_match_end = line[..line_match_end_byte].chars().count();
+                let match_start = absolute_line_start + line_match_start;
+                let match_end = absolute_line_start + line_match_end;
+
+                results.push(VaultSearchMatch {
+                    path: normalized.to_string_lossy().to_string(),
+                    relative_path: relative_path.clone(),
+                    name: name.clone(),
+                    line_number: line_index + 1,
+                    line_text: line.to_string(),
+                    line_match_start,
+                    line_match_end,
+                    match_start,
+                    match_end,
+                });
+                search_from_byte = line_match_end_byte;
+            }
+
+            absolute_line_start += line.chars().count() + 1;
+        }
+    }
+
+    Ok(results)
+}
+
 fn collect_markdown_files(current: &Path, files: &mut Vec<PathBuf>) -> Result<(), String> {
     for entry in fs::read_dir(current)
         .map_err(|error| format!("Failed to list vault folder '{}': {}", current.display(), error))?
@@ -824,6 +920,7 @@ pub fn run() {
             delete_vault_file,
             duplicate_vault_file,
             get_vault_backlinks,
+            search_vault_text,
             open_file_in_new_instance,
             get_startup_file_path,
             read_excalidraw_file,
@@ -943,6 +1040,48 @@ Body #meeting #inbox/processing #1984 #meeting.
 
         assert_eq!(backlinks.len(), 1);
         assert_eq!(backlinks[0].relative_path, "Daily.md");
+        let _ = fs::remove_dir_all(vault);
+    }
+
+    #[test]
+    fn vault_text_search_finds_markdown_matches_with_line_snippets() {
+        let vault = unique_temp_vault();
+        fs::create_dir_all(vault.join("nested")).expect("nested vault folder should be created");
+        fs::write(vault.join("Project.md"), "# Project\nAlpha target line\nNo match")
+            .expect("project note should be written");
+        fs::write(vault.join("nested").join("Daily.md"), "another TARGET mention\n")
+            .expect("daily note should be written");
+        fs::write(vault.join("ignored.txt"), "target outside markdown")
+            .expect("text file should be written");
+
+        let matches = scan_vault_text(&vault, "target", 20).expect("vault search should succeed");
+
+        assert_eq!(matches.len(), 2);
+        let project_match = matches
+            .iter()
+            .find(|result| result.relative_path == "Project.md")
+            .expect("project result should be present");
+        assert_eq!(project_match.line_number, 2);
+        assert_eq!(project_match.line_text, "Alpha target line");
+        assert_eq!(project_match.line_match_start, 6);
+        assert_eq!(project_match.line_match_end, 12);
+        assert_eq!(project_match.match_start, 16);
+        assert_eq!(project_match.match_end, 22);
+        let daily_match = matches
+            .iter()
+            .find(|result| result.relative_path == "nested\\Daily.md")
+            .expect("nested result should be present");
+        assert_eq!(daily_match.line_number, 1);
+        let _ = fs::remove_dir_all(vault);
+    }
+
+    #[test]
+    fn vault_text_search_rejects_empty_queries() {
+        let vault = unique_temp_vault();
+
+        let result = scan_vault_text(&vault, "  ", 20);
+
+        assert!(result.is_err());
         let _ = fs::remove_dir_all(vault);
     }
 }
