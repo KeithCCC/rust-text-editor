@@ -1,5 +1,5 @@
 export const BUILD_INFO = {
-  version: "0.1.0",
-  buildNumber: "20260621.162428",
-  updatedAt: "2026-06-21 16:24:28",
+  version: "0.1.2",
+  buildNumber: "20260621.180524",
+  updatedAt: "2026-06-21 18:05:24",
 } as const;
