@@ -5,7 +5,6 @@ import { json } from "@codemirror/lang-json";
 import { EditorSelection, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, keymap, WidgetType } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
-import { searchKeymap } from "@codemirror/search";
 import {
   deleteTableColumn,
   deleteTableRow,
@@ -530,6 +529,35 @@ function livePreviewExtension() {
   return livePreviewDecorations;
 }
 
+function buildSourceHeadingDecorations(state: EditorState) {
+  const decorations: Range<Decoration>[] = [];
+  for (let lineNumber = 1; lineNumber <= state.doc.lines; lineNumber += 1) {
+    const line = state.doc.line(lineNumber);
+    const heading = /^(#{1,4})\s+/.exec(line.text);
+    if (heading) {
+      decorations.push(
+        Decoration.line({ class: `hotaru-source-heading hotaru-source-h${heading[1].length}` }).range(line.from),
+      );
+    }
+  }
+
+  return Decoration.set(decorations);
+}
+
+function sourceHeadingExtension() {
+  const sourceHeadingDecorations = StateField.define({
+    create(state) {
+      return buildSourceHeadingDecorations(state);
+    },
+    update(decorations, transaction) {
+      return transaction.docChanged ? buildSourceHeadingDecorations(transaction.state) : decorations;
+    },
+    provide: (field) => EditorView.decorations.from(field),
+  });
+
+  return sourceHeadingDecorations;
+}
+
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor(
   { value, mode, themeMode, onChange },
   ref,
@@ -541,9 +569,9 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       history(),
       markdown(),
       json(),
-      keymap.of([...defaultKeymap, ...historyKeymap, ...searchKeymap]),
+      keymap.of([...defaultKeymap, ...historyKeymap]),
       EditorView.lineWrapping,
-      mode === "live" ? livePreviewExtension() : [],
+      mode === "live" ? livePreviewExtension() : sourceHeadingExtension(),
     ],
     [mode],
   );

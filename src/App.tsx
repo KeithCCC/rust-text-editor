@@ -70,6 +70,9 @@ const PREVIEW_LINE_HEIGHT_STORAGE_KEY = "hotaru-preview-line-height";
 const UI_FONT_SIZE_STORAGE_KEY = "hotaru-ui-font-size";
 const VAULT_FILE_FONT_SIZE_STORAGE_KEY = "hotaru-vault-file-font-size";
 const VAULT_SIDEBAR_WIDTH_STORAGE_KEY = "hotaru-vault-sidebar-width";
+const PREVIEW_UPDATE_DELAY_MS = 350;
+const LARGE_DOCUMENT_PREVIEW_UPDATE_DELAY_MS = 700;
+const LARGE_DOCUMENT_CHAR_THRESHOLD = 120_000;
 
 let startupVaultInitializationStarted = false;
 
@@ -116,6 +119,24 @@ function cycleEditorMode(mode: EditorMode): EditorMode {
   return mode === "split" ? "source" : "split";
 }
 
+function getDocumentStats(markdown: string) {
+  if (markdown.length === 0) {
+    return { lines: 0, chars: 0 };
+  }
+
+  let lines = 1;
+  for (let index = 0; index < markdown.length; index += 1) {
+    const char = markdown[index];
+    if (char === "\n") {
+      lines += 1;
+    } else if (char === "\r" && markdown[index + 1] !== "\n") {
+      lines += 1;
+    }
+  }
+
+  return { lines, chars: markdown.length };
+}
+
 export default function App() {
   const [content, setContent] = useState(EMPTY_DOCUMENT);
   const [currentFile, setCurrentFile] = useState<string | null>(null);
@@ -133,7 +154,9 @@ export default function App() {
   const [isVaultFilesLoading, setIsVaultFilesLoading] = useState(false);
   const [vaultFilter, setVaultFilter] = useState("");
   const [vaultSort, setVaultSort] = useState<VaultSort>("modified");
-  const [previewRevision, setPreviewRevision] = useState(0);
+  const [previewContent, setPreviewContent] = useState(EMPTY_DOCUMENT);
+  const [isPreviewPending, setIsPreviewPending] = useState(false);
+  const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [editorMode, setEditorMode] = useState<EditorMode>(() => {
     const saved = window.localStorage.getItem(EDITOR_MODE_STORAGE_KEY);
     return saved === "source" || saved === "split" ? saved : "split";
@@ -163,6 +186,7 @@ export default function App() {
   const [vaultSearchMode, setVaultSearchMode] = useState<VaultSearchMode>("files");
   const [vaultContentResults, setVaultContentResults] = useState<VaultSearchMatch[]>([]);
   const [isVaultContentSearching, setIsVaultContentSearching] = useState(false);
+  const [stats, setStats] = useState(() => getDocumentStats(EMPTY_DOCUMENT));
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [isDraggingVaultSidebar, setIsDraggingVaultSidebar] = useState(false);
   const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
@@ -176,13 +200,6 @@ export default function App() {
   const isSyncingScrollRef = useRef(false);
   const syncScrollFrameRef = useRef<number | null>(null);
 
-  const stats = useMemo(
-    () => ({
-      lines: content.length === 0 ? 0 : content.split(/\r\n|\r|\n/).length,
-      chars: content.length,
-    }),
-    [content],
-  );
   const appStyle = useMemo(() => ({
     "--editor-font-size": `${editorFontSize}px`,
     "--editor-line-height": String(editorLineHeight),
@@ -236,6 +253,7 @@ export default function App() {
     return matches;
   }, [content, searchQuery]);
   const isSplitMode = editorMode === "split";
+  const wasSplitModeRef = useRef(isSplitMode);
 
   useEffect(() => {
     document.title = `Hotaru build ${BUILD_INFO.buildNumber} updated ${BUILD_INFO.updatedAt}`;
@@ -302,6 +320,10 @@ export default function App() {
       isSyncingScrollRef.current = false;
       syncScrollFrameRef.current = null;
     });
+  }, []);
+
+  const handleOpenExcalidrawPreview = useCallback((path: string, scene: ExcalidrawScene | null) => {
+    setExcalidrawSession({ path, scene });
   }, []);
 
   const refreshVaultFiles = useCallback(async (path = vaultPath) => {
@@ -653,6 +675,10 @@ export default function App() {
     }
   }, [ensureVaultReady, openFilePath, refreshVaultFiles, showError, vaultFiles]);
 
+  const handleOpenWikiLinkPreview = useCallback((name: string) => {
+    void handleWikiLink(name);
+  }, [handleWikiLink]);
+
   const handleFormatJson = useCallback(() => {
     try {
       const parsed = JSON.parse(content);
@@ -691,7 +717,7 @@ export default function App() {
   }, [modified, openVaultFolderPicker, refreshVaultFiles, showError, vaultPath]);
 
   const handleExcalidrawSaved = useCallback(() => {
-    setPreviewRevision((revision) => revision + 1);
+    setPreviewRefreshToken((token) => token + 1);
   }, []);
 
   const handleExit = useCallback(async () => {
@@ -970,6 +996,47 @@ export default function App() {
   }, [content, currentFile, isVaultInitializing, refreshVaultFiles, showError, vaultPath]);
 
   useEffect(() => {
+    setPreviewContent(content);
+    setIsPreviewPending(false);
+    setStats(getDocumentStats(content));
+  }, [currentFile]);
+
+  useEffect(() => {
+    const delay = content.length >= LARGE_DOCUMENT_CHAR_THRESHOLD ? 500 : 120;
+    const timer = window.setTimeout(() => {
+      setStats(getDocumentStats(content));
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [content]);
+
+  useEffect(() => {
+    if (!isSplitMode || previewContent === content) {
+      setIsPreviewPending(false);
+      return;
+    }
+
+    setIsPreviewPending(true);
+    const delay = content.length >= LARGE_DOCUMENT_CHAR_THRESHOLD
+      ? LARGE_DOCUMENT_PREVIEW_UPDATE_DELAY_MS
+      : PREVIEW_UPDATE_DELAY_MS;
+    const timer = window.setTimeout(() => {
+      setPreviewContent(content);
+      setIsPreviewPending(false);
+    }, delay);
+
+    return () => window.clearTimeout(timer);
+  }, [content, isSplitMode, previewContent]);
+
+  useEffect(() => {
+    if (isSplitMode && !wasSplitModeRef.current) {
+      setPreviewContent(content);
+      setIsPreviewPending(false);
+    }
+    wasSplitModeRef.current = isSplitMode;
+  }, [content, isSplitMode]);
+
+  useEffect(() => {
     setActiveSearchIndex(0);
     setHasSearchSelection(false);
   }, [searchMatches]);
@@ -1004,7 +1071,7 @@ export default function App() {
       editorElement.removeEventListener("scroll", handleEditorScroll);
       previewElement.removeEventListener("scroll", handlePreviewScroll);
     };
-  }, [content, isSplitMode, syncScrollPosition]);
+  }, [isSplitMode, previewContent, syncScrollPosition]);
 
   useEffect(() => {
     function handlePointerDown(event: PointerEvent) {
@@ -1353,28 +1420,46 @@ export default function App() {
                 <span>Editor</span>
                 <small>{currentVaultFile?.relativePath ?? currentFile ?? "Untitled"}</small>
               </div>
-              <div className="search-box" role="search">
-                <input
-                  ref={searchInputRef}
-                  type="search"
-                  value={searchQuery}
-                  onChange={(event) => setSearchQuery(event.target.value)}
-                  onKeyDown={(event) => {
-                    if (event.key === "Enter") {
-                      event.preventDefault();
-                      moveSearch(event.shiftKey ? -1 : 1);
-                    } else if (event.key === "Escape") {
+              <div className="note-search" role="search" aria-label="Find in current note">
+                <label htmlFor="note-search-input">Find in note</label>
+                <div className="note-search-controls">
+                  <input
+                    id="note-search-input"
+                    ref={searchInputRef}
+                    type="search"
+                    value={searchQuery}
+                    onChange={(event) => setSearchQuery(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        moveSearch(event.shiftKey ? -1 : 1);
+                      } else if (event.key === "Escape") {
+                        setSearchQuery("");
+                        setHasSearchSelection(false);
+                        editorRef.current?.focus();
+                      }
+                    }}
+                    placeholder="Find text in this note"
+                    aria-label="Find text in this note"
+                  />
+                  <span aria-live="polite" className="note-search-count">
+                    {searchQuery ? `${hasSearchSelection ? activeSearchIndex + 1 : 0} of ${searchMatches.length}` : "No search"}
+                  </span>
+                  <button type="button" onClick={() => moveSearch(-1)} disabled={searchMatches.length === 0} aria-label="Previous note match">Previous</button>
+                  <button type="button" onClick={() => moveSearch(1)} disabled={searchMatches.length === 0} aria-label="Next note match">Next</button>
+                  <button
+                    type="button"
+                    onClick={() => {
                       setSearchQuery("");
                       setHasSearchSelection(false);
                       editorRef.current?.focus();
-                    }
-                  }}
-                  placeholder="Search note"
-                  aria-label="Search editor text"
-                />
-                <button type="button" onClick={() => moveSearch(-1)} disabled={searchMatches.length === 0} aria-label="Previous match">Prev</button>
-                <button type="button" onClick={() => moveSearch(1)} disabled={searchMatches.length === 0} aria-label="Next match">Next</button>
-                <span aria-live="polite">{searchQuery ? `${hasSearchSelection ? activeSearchIndex + 1 : 0}/${searchMatches.length}` : "0/0"}</span>
+                    }}
+                    disabled={!searchQuery}
+                    aria-label="Clear note search"
+                  >
+                    Clear
+                  </button>
+                </div>
               </div>
             </header>
             <MarkdownEditor
@@ -1414,16 +1499,16 @@ export default function App() {
               <article className="preview-pane">
                 <header className="pane-header">
                   <span>Preview</span>
-                  <small>Markdown, Mermaid, Excalidraw, wiki links</small>
+                  <small>{isPreviewPending ? "Updating..." : "Markdown, Mermaid, Excalidraw, wiki links"}</small>
                 </header>
                 <MarkdownPreview
-                  key={previewRevision}
+                  key={previewRefreshToken}
                   ref={previewRef}
-                  markdown={content}
+                  markdown={previewContent}
                   currentFile={currentFile}
                   themeMode={themeMode}
-                  onOpenExcalidraw={(path, scene) => setExcalidrawSession({ path, scene })}
-                  onOpenWikiLink={(name) => void handleWikiLink(name)}
+                  onOpenExcalidraw={handleOpenExcalidrawPreview}
+                  onOpenWikiLink={handleOpenWikiLinkPreview}
                 />
               </article>
             </>

@@ -720,6 +720,7 @@ kbd {
 
 .pane-header {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
   gap: 12px;
@@ -731,7 +732,8 @@ kbd {
 .pane-title {
   display: flex;
   align-items: baseline;
-  min-width: 0;
+  flex: 1 1 auto;
+  min-width: 180px;
   gap: 10px;
 }
 
@@ -746,43 +748,88 @@ kbd {
   white-space: nowrap;
 }
 
-.search-box {
-  display: flex;
+.note-search {
+  display: grid;
+  grid-template-columns: auto minmax(360px, 1fr);
   align-items: center;
-  flex: 0 0 auto;
-  gap: 4px;
+  flex: 0 1 680px;
+  gap: 8px;
+  min-width: 420px;
+}
+
+.note-search label {
+  color: var(--muted);
+  font-size: 12px;
+  font-weight: 700;
+  white-space: nowrap;
+}
+
+.note-search-controls {
+  display: grid;
+  grid-template-columns: minmax(220px, 1fr) minmax(68px, auto) auto auto auto;
+  align-items: center;
+  gap: 5px;
   min-width: 0;
 }
 
-.search-box input {
-  width: clamp(130px, 18vw, 240px);
+.note-search input {
+  width: 100%;
   min-width: 0;
   border: 1px solid var(--strong-border);
   border-radius: 6px;
-  padding: 5px 8px;
+  padding: 7px 9px;
   background: var(--pane-bg);
   color: var(--text);
   font: 400 var(--ui-font-size)/1.2 inherit;
 }
 
-.search-box button {
-  min-width: 44px;
-  height: 28px;
+.note-search button {
+  min-width: 58px;
+  height: 32px;
   padding: 0 8px;
   border-radius: 6px;
   line-height: 1;
 }
 
-.search-box button:disabled {
+.note-search button:disabled {
   cursor: default;
   opacity: 0.45;
 }
 
-.search-box span {
-  min-width: 44px;
+.note-search-count {
+  min-width: 68px;
   color: var(--muted);
-  text-align: right;
+  font-size: 12px;
   font-weight: 600;
+  text-align: center;
+  white-space: nowrap;
+}
+
+@media (max-width: 1180px) {
+  .note-search {
+    grid-template-columns: 1fr;
+    flex-basis: 100%;
+    min-width: 0;
+  }
+
+  .note-search-controls {
+    grid-template-columns: minmax(180px, 1fr) minmax(68px, auto) auto auto auto;
+  }
+}
+
+@media (max-width: 760px) {
+  .note-search-controls {
+    grid-template-columns: minmax(160px, 1fr) minmax(58px, auto) auto auto;
+  }
+
+  .note-search button {
+    min-width: 48px;
+    padding: 0 6px;
+  }
+
+  .note-search button:last-child {
+    grid-column: 1 / -1;
+  }
 }
 
 textarea {
@@ -831,6 +878,43 @@ textarea {
 
 .markdown-editor .cm-focused {
   outline: none;
+}
+
+.markdown-editor[data-editor-mode="source"] .hotaru-source-heading,
+.markdown-editor[data-editor-mode="split"] .hotaru-source-heading {
+  color: var(--preview-heading);
+  font-weight: 760;
+  letter-spacing: 0;
+}
+
+.markdown-editor[data-editor-mode="source"] .hotaru-source-h1,
+.markdown-editor[data-editor-mode="split"] .hotaru-source-h1 {
+  padding: 0.28em 0 0.22em;
+  border-bottom: 1px solid var(--preview-rule);
+  font-size: calc(var(--editor-font-size) * 1.45);
+  line-height: 1.28;
+}
+
+.markdown-editor[data-editor-mode="source"] .hotaru-source-h2,
+.markdown-editor[data-editor-mode="split"] .hotaru-source-h2 {
+  padding-top: 0.18em;
+  color: var(--preview-link);
+  font-size: calc(var(--editor-font-size) * 1.28);
+  line-height: 1.32;
+}
+
+.markdown-editor[data-editor-mode="source"] .hotaru-source-h3,
+.markdown-editor[data-editor-mode="split"] .hotaru-source-h3 {
+  color: color-mix(in srgb, var(--preview-heading) 78%, var(--text));
+  font-size: calc(var(--editor-font-size) * 1.16);
+  line-height: 1.36;
+}
+
+.markdown-editor[data-editor-mode="source"] .hotaru-source-h4,
+.markdown-editor[data-editor-mode="split"] .hotaru-source-h4 {
+  color: color-mix(in srgb, var(--preview-link) 72%, var(--text));
+  font-size: calc(var(--editor-font-size) * 1.08);
+  line-height: 1.4;
 }
 
 .markdown-editor[data-editor-mode="live"] .cm-editor {

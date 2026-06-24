@@ -1,4 +1,4 @@
-import { forwardRef, isValidElement, type ReactNode } from "react";
+import { forwardRef, isValidElement, memo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -27,7 +27,7 @@ function getPreCodeLanguage(children: ReactNode) {
   return getCodeLanguage(children.props.className);
 }
 
-export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(function MarkdownPreview(
+const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps>(function MarkdownPreview(
   { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenWikiLink },
   ref,
 ) {
@@ -101,3 +101,5 @@ export const MarkdownPreview = forwardRef<HTMLDivElement, MarkdownPreviewProps>(
     </div>
   );
 });
+
+export const MarkdownPreview = memo(MarkdownPreviewComponent);
