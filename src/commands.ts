@@ -11,6 +11,11 @@ export type CommandId =
   | "view.cycleEditorMode"
   | "view.togglePreview"
   | "view.commandPalette"
+  | "theme.system"
+  | "theme.light"
+  | "theme.dark"
+  | "language.en"
+  | "language.ja"
   | "search.note"
   | "search.vault"
   | "format.bold"
@@ -25,7 +30,7 @@ export type CommandDefinition = {
 };
 
 export const COMMAND_DEFINITIONS: CommandDefinition[] = [
-  { id: "file.new", label: "New Vault Note", shortcut: "Ctrl+N" },
+  { id: "file.new", label: "New Note", shortcut: "Ctrl+N" },
   { id: "file.open", label: "Open File", shortcut: "Ctrl+O" },
   { id: "file.save", label: "Save", shortcut: "Ctrl+S" },
   { id: "file.saveAs", label: "Save As" },
@@ -37,6 +42,11 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "view.cycleEditorMode", label: "Toggle Preview Pane", shortcut: "Ctrl+Shift+V" },
   { id: "view.togglePreview", label: "Toggle Preview Pane" },
   { id: "view.commandPalette", label: "Command Palette", shortcut: "Ctrl+K" },
+  { id: "theme.system", label: "Use System Theme" },
+  { id: "theme.light", label: "Use Light Theme" },
+  { id: "theme.dark", label: "Use Dark Theme" },
+  { id: "language.en", label: "Use English UI" },
+  { id: "language.ja", label: "Use Japanese UI" },
   { id: "search.note", label: "Find in Note", shortcut: "Ctrl+F" },
   { id: "search.vault", label: "Find in Vault", shortcut: "Ctrl+Shift+F" },
   { id: "format.bold", label: "Bold", shortcut: "Ctrl+B" },

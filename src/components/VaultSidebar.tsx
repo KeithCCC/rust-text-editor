@@ -4,6 +4,37 @@ import type { Backlink, VaultFile, VaultSearchMatch } from "../tauri";
 type VaultSort = "modified" | "name" | "size";
 type VaultSearchMode = "files" | "contents";
 
+type VaultSidebarLabels = {
+  vault: string;
+  noVaultSelected: string;
+  newNote: string;
+  refresh: string;
+  refreshing: string;
+  modified: string;
+  name: string;
+  size: string;
+  searchNoteText: string;
+  filterFiles: string;
+  files: string;
+  text: string;
+  clear: string;
+  searchingNoteText: string;
+  noTextMatches: string;
+  chooseVault: string;
+  noMatchingFiles: string;
+  line: string;
+  open: string;
+  openInNewInstance: string;
+  rename: string;
+  duplicate: string;
+  delete: string;
+  fileActions: string;
+  currentNoteTags: string;
+  filterByTag: string;
+  backlinks: string;
+  noLinkedMentions: string;
+};
+
 type VaultSidebarProps = {
   vaultPath: string | null;
   files: VaultFile[];
@@ -15,6 +46,7 @@ type VaultSidebarProps = {
   filterInputRef?: RefObject<HTMLInputElement>;
   searchMode: VaultSearchMode;
   sort: VaultSort;
+  labels: VaultSidebarLabels;
   isCollapsed: boolean;
   isLoading: boolean;
   isContentSearching: boolean;
@@ -22,7 +54,6 @@ type VaultSidebarProps = {
   onClearFilter: () => void;
   onSearchModeChange: (value: VaultSearchMode) => void;
   onSortChange: (value: VaultSort) => void;
-  onToggleCollapsed: () => void;
   onRefresh: () => void;
   onNewNote: () => void;
   onOpenFile: (path: string) => void;
@@ -35,7 +66,7 @@ type VaultSidebarProps = {
   onTagClick: (tag: string) => void;
 };
 
-export type { VaultSearchMode, VaultSort };
+export type { VaultSearchMode, VaultSort, VaultSidebarLabels };
 
 export function VaultSidebar({
   vaultPath,
@@ -48,6 +79,7 @@ export function VaultSidebar({
   filterInputRef,
   searchMode,
   sort,
+  labels,
   isCollapsed,
   isLoading,
   isContentSearching,
@@ -55,7 +87,6 @@ export function VaultSidebar({
   onClearFilter,
   onSearchModeChange,
   onSortChange,
-  onToggleCollapsed,
   onRefresh,
   onNewNote,
   onOpenFile,
@@ -68,36 +99,27 @@ export function VaultSidebar({
   onTagClick,
 }: VaultSidebarProps) {
   if (isCollapsed) {
-    return (
-      <aside className="vault-sidebar collapsed" aria-label="Vault">
-        <button type="button" onClick={onToggleCollapsed} title="Show Vault (Ctrl+\\)">
-          Vault
-        </button>
-      </aside>
-    );
+    return null;
   }
 
   return (
     <aside className="vault-sidebar" aria-label="Vault files">
       <header className="vault-sidebar-header">
         <div>
-          <strong>Vault</strong>
-          <span title={vaultPath ?? "No vault selected"}>{vaultPath ?? "No vault selected"}</span>
+          <strong>{labels.vault}</strong>
+          <span title={vaultPath ?? labels.noVaultSelected}>{vaultPath ?? labels.noVaultSelected}</span>
         </div>
-        <button type="button" onClick={onToggleCollapsed} title="Hide Vault (Ctrl+\\)" aria-label="Hide Vault">
-          Hide
-        </button>
       </header>
 
       <div className="vault-actions">
-        <button type="button" onClick={onNewNote}>New</button>
+        <button type="button" onClick={onNewNote}>{labels.newNote}</button>
         <button type="button" onClick={onRefresh} disabled={!vaultPath || isLoading}>
-          {isLoading ? "Refreshing" : "Refresh"}
+          {isLoading ? labels.refreshing : labels.refresh}
         </button>
         <select value={sort} onChange={(event) => onSortChange(event.target.value as VaultSort)} aria-label="Sort vault files" title="Sort vault files">
-          <option value="modified">Modified</option>
-          <option value="name">Name</option>
-          <option value="size">Size</option>
+          <option value="modified">{labels.modified}</option>
+          <option value="name">{labels.name}</option>
+          <option value="size">{labels.size}</option>
         </select>
       </div>
 
@@ -107,28 +129,28 @@ export function VaultSidebar({
           type="search"
           value={filter}
           onChange={(event) => onFilterChange(event.target.value)}
-          placeholder={searchMode === "contents" ? "Search note text" : "Filter files or #tags"}
-          aria-label={searchMode === "contents" ? "Search vault note contents" : "Filter vault files"}
+          placeholder={searchMode === "contents" ? labels.searchNoteText : labels.filterFiles}
+          aria-label={searchMode === "contents" ? labels.searchNoteText : labels.filterFiles}
         />
         <button
           type="button"
           className="vault-search-mode"
           onClick={() => onSearchModeChange(searchMode === "contents" ? "files" : "contents")}
           aria-pressed={searchMode === "contents"}
-          title={searchMode === "contents" ? "Search file names and tags" : "Search inside Markdown files"}
+          title={searchMode === "contents" ? labels.filterFiles : labels.searchNoteText}
         >
-          {searchMode === "contents" ? "Text" : "Files"}
+          {searchMode === "contents" ? labels.text : labels.files}
         </button>
-        <button type="button" className="vault-clear-search" onClick={onClearFilter} disabled={!filter && searchMode === "files"} title="Clear search">
-          Clear
+        <button type="button" className="vault-clear-search" onClick={onClearFilter} disabled={!filter && searchMode === "files"} title={labels.clear}>
+          {labels.clear}
         </button>
       </div>
 
-      <div className="vault-file-list" role="listbox" aria-label="Vault files">
+      <div className="vault-file-list" role="listbox" aria-label={labels.vault}>
         {searchMode === "contents" && filter.trim() ? (
           <>
-            {isContentSearching && <div className="vault-empty">Searching note text...</div>}
-            {!isContentSearching && contentResults.length === 0 && <div className="vault-empty">{vaultPath ? "No text matches" : "Choose a vault to begin"}</div>}
+            {isContentSearching && <div className="vault-empty">{labels.searchingNoteText}</div>}
+            {!isContentSearching && contentResults.length === 0 && <div className="vault-empty">{vaultPath ? labels.noTextMatches : labels.chooseVault}</div>}
             {contentResults.map((result, index) => {
               const isActive = currentFile === result.path;
               const before = result.lineText.slice(0, result.lineMatchStart);
@@ -140,7 +162,7 @@ export function VaultSidebar({
                   <button type="button" className="vault-file-main vault-search-main" onClick={() => onOpenSearchResult(result)} title={`${result.relativePath}:${result.lineNumber}`}>
                     <span>{result.name}</span>
                     <small>
-                      Line {result.lineNumber}: {before}<mark>{match}</mark>{after}
+                      {labels.line} {result.lineNumber}: {before}<mark>{match}</mark>{after}
                     </small>
                   </button>
                 </article>
@@ -149,7 +171,7 @@ export function VaultSidebar({
           </>
         ) : (
           <>
-            {files.length === 0 && <div className="vault-empty">{vaultPath ? "No matching files" : "Choose a vault to begin"}</div>}
+            {files.length === 0 && <div className="vault-empty">{vaultPath ? labels.noMatchingFiles : labels.chooseVault}</div>}
             {files.map((file) => {
           const isActive = currentFile === file.path;
 
@@ -159,13 +181,13 @@ export function VaultSidebar({
                 <span>{file.name}</span>
               </button>
               <details className="vault-file-menu">
-                <summary aria-label={`Actions for ${file.name}`} title="File actions">...</summary>
+                <summary aria-label={`${labels.fileActions}: ${file.name}`} title={labels.fileActions}>...</summary>
                 <div className="vault-file-menu-popover" role="menu">
-                  <button type="button" role="menuitem" onClick={() => onOpenFile(file.path)}>Open</button>
-                  <button type="button" role="menuitem" onClick={() => onOpenInNewInstance(file.path)}>Open in New Instance</button>
-                  <button type="button" role="menuitem" onClick={() => onRenameFile(file)}>Rename</button>
-                  <button type="button" role="menuitem" onClick={() => onDuplicateFile(file)}>Duplicate</button>
-                  <button type="button" role="menuitem" onClick={() => onDeleteFile(file)}>Delete</button>
+                  <button type="button" role="menuitem" onClick={() => onOpenFile(file.path)}>{labels.open}</button>
+                  <button type="button" role="menuitem" onClick={() => onOpenInNewInstance(file.path)}>{labels.openInNewInstance}</button>
+                  <button type="button" role="menuitem" onClick={() => onRenameFile(file)}>{labels.rename}</button>
+                  <button type="button" role="menuitem" onClick={() => onDuplicateFile(file)}>{labels.duplicate}</button>
+                  <button type="button" role="menuitem" onClick={() => onDeleteFile(file)}>{labels.delete}</button>
                 </div>
               </details>
             </article>
@@ -175,21 +197,21 @@ export function VaultSidebar({
         )}
       </div>
 
-      <section className="backlinks-panel" aria-label="Backlinks">
+      <section className="backlinks-panel" aria-label={labels.backlinks}>
         {currentTags.length > 0 && (
-          <div className="current-tags" aria-label="Current note tags">
+          <div className="current-tags" aria-label={labels.currentNoteTags}>
             {currentTags.map((tag) => (
-              <button key={tag} type="button" onClick={() => onTagClick(tag)} title={`Filter by #${tag}`}>
+              <button key={tag} type="button" onClick={() => onTagClick(tag)} title={`${labels.filterByTag} #${tag}`}>
                 #{tag}
               </button>
             ))}
           </div>
         )}
         <header>
-          <strong>Backlinks</strong>
+          <strong>{labels.backlinks}</strong>
           <span>{backlinks.length}</span>
         </header>
-        {backlinks.length === 0 && <div className="vault-empty">No linked mentions</div>}
+        {backlinks.length === 0 && <div className="vault-empty">{labels.noLinkedMentions}</div>}
         {backlinks.map((backlink) => (
           <button key={backlink.path} type="button" onClick={() => onOpenBacklink(backlink.path)} title={backlink.path}>
             <span>{backlink.relativePath}</span>

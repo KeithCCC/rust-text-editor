@@ -4,6 +4,7 @@ import {
   PhysicalSize,
 } from "@tauri-apps/api/window";
 import { logDebug } from "./debugLog";
+import { isTauriRuntime } from "./tauriRuntime";
 
 type SavedWindowState = {
   width: number;
@@ -79,6 +80,10 @@ export async function saveCurrentWindowState() {
 }
 
 export async function installWindowStatePersistence() {
+  if (!isTauriRuntime()) {
+    return;
+  }
+
   const appWindow = getCurrentWindow();
 
   try {
@@ -95,6 +100,8 @@ export async function installWindowStatePersistence() {
       "failed to restore window state",
       error instanceof Error ? error.stack ?? error.message : String(error),
     );
+  } finally {
+    await appWindow.show();
   }
 
   let saveTimer: number | undefined;

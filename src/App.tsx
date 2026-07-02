@@ -15,8 +15,9 @@ import { BUILD_INFO } from "./buildInfo";
 import { CommandPalette } from "./components/CommandPalette";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
-import { VaultSidebar, type VaultSearchMode, type VaultSort } from "./components/VaultSidebar";
+import { VaultSidebar, type VaultSearchMode, type VaultSidebarLabels, type VaultSort } from "./components/VaultSidebar";
 import { logDebug } from "./debugLog";
+import { isTauriRuntime } from "./tauriRuntime";
 import {
   createNamedVaultNote,
   createVaultNote,
@@ -52,11 +53,13 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
+type AppLanguage = "en" | "ja";
 type MenuId = "file" | "view" | "settings" | "search" | "format";
 
 const EMPTY_DOCUMENT = "";
 const THEME_STORAGE_KEY = "hotaru-theme";
 const LEGACY_THEME_STORAGE_KEY = "rust-text-editor-theme";
+const LANGUAGE_STORAGE_KEY = "hotaru-language";
 const SPLIT_STORAGE_KEY = "hotaru-split";
 const LEGACY_SPLIT_STORAGE_KEY = "rust-text-editor-split";
 const VAULT_STORAGE_KEY = "hotaru-vault-path";
@@ -73,6 +76,121 @@ const VAULT_SIDEBAR_WIDTH_STORAGE_KEY = "hotaru-vault-sidebar-width";
 const PREVIEW_UPDATE_DELAY_MS = 350;
 const LARGE_DOCUMENT_PREVIEW_UPDATE_DELAY_MS = 700;
 const LARGE_DOCUMENT_CHAR_THRESHOLD = 120_000;
+
+const UI_TEXT = {
+  en: {
+    file: "File",
+    view: "View",
+    settings: "Settings",
+    command: "Command",
+    search: "Search",
+    format: "Format",
+    newNote: "New Note",
+    open: "Open...",
+    openInNewInstance: "Open in New Instance...",
+    save: "Save",
+    saveAs: "Save As...",
+    exportHtml: "Export as HTML...",
+    rename: "Rename...",
+    duplicate: "Duplicate",
+    delete: "Delete...",
+    fileProperties: "File Properties...",
+    vaultSettings: "Vault...",
+    exit: "Exit",
+    systemTheme: "System Theme",
+    lightTheme: "Light Theme",
+    darkTheme: "Dark Theme",
+    englishUi: "English UI",
+    japaneseUi: "Japanese UI",
+    previewPane: "Preview Pane",
+    toggleVault: "Toggle Vault",
+    resetSplit: "Reset Split",
+    appearance: "Appearance...",
+    refreshVaultFiles: "Refresh Vault Files",
+    refreshingVault: "Refreshing Vault...",
+    findInNote: "Find in Note",
+    searchVaultContents: "Search Vault Contents",
+    bold: "Bold",
+    italic: "Italic",
+    insertLink: "Insert Link",
+    formatJson: "Format JSON",
+    editor: "Editor",
+    preview: "Preview",
+    untitled: "Untitled",
+    previewDescription: "Markdown, Mermaid, Excalidraw, wiki links",
+    updating: "Updating...",
+    vaultNotesCaption: "Vault notes, Markdown, Mermaid, Excalidraw",
+    fileStatus: "File:",
+    vaultStatus: "Vault:",
+    notSet: "Not set",
+    saved: "Saved",
+    unsaved: "Unsaved",
+    previewOn: "Preview: On",
+    previewOff: "Preview: Off",
+    lines: "Lines:",
+    chars: "Chars:",
+    showVault: "Show Vault",
+    hideVault: "Hide Vault",
+    showPreview: "Show Preview",
+    hidePreview: "Hide Preview",
+  },
+  ja: {
+    file: "ファイル",
+    view: "表示",
+    settings: "設定",
+    command: "コマンド",
+    search: "検索",
+    format: "書式",
+    newNote: "新規ノート",
+    open: "開く...",
+    openInNewInstance: "新しいウィンドウで開く...",
+    save: "保存",
+    saveAs: "名前を付けて保存...",
+    exportHtml: "HTMLとしてエクスポート...",
+    rename: "名前を変更...",
+    duplicate: "複製",
+    delete: "削除...",
+    fileProperties: "ファイル情報...",
+    vaultSettings: "Vault...",
+    exit: "終了",
+    systemTheme: "システムテーマ",
+    lightTheme: "ライトテーマ",
+    darkTheme: "ダークテーマ",
+    englishUi: "英語UI",
+    japaneseUi: "日本語UI",
+    previewPane: "プレビュー",
+    toggleVault: "Vault表示切替",
+    resetSplit: "分割をリセット",
+    appearance: "外観...",
+    refreshVaultFiles: "Vaultファイルを更新",
+    refreshingVault: "Vault更新中...",
+    findInNote: "ノート内検索",
+    searchVaultContents: "Vault本文検索",
+    bold: "太字",
+    italic: "斜体",
+    insertLink: "リンクを挿入",
+    formatJson: "JSON整形",
+    editor: "エディタ",
+    preview: "プレビュー",
+    untitled: "無題",
+    previewDescription: "Markdown、Mermaid、Excalidraw、Wikiリンク",
+    updating: "更新中...",
+    vaultNotesCaption: "Vaultノート、Markdown、Mermaid、Excalidraw",
+    fileStatus: "ファイル:",
+    vaultStatus: "Vault:",
+    notSet: "未設定",
+    saved: "保存済み",
+    unsaved: "未保存",
+    previewOn: "プレビュー: オン",
+    previewOff: "プレビュー: オフ",
+    lines: "行:",
+    chars: "文字:",
+    showVault: "Vaultを表示",
+    hideVault: "Vaultを隠す",
+    showPreview: "プレビューを表示",
+    hidePreview: "プレビューを隠す",
+  },
+} as const;
 
 let startupVaultInitializationStarted = false;
 
@@ -168,6 +286,10 @@ export default function App() {
     const saved = readStoredValue(THEME_STORAGE_KEY, LEGACY_THEME_STORAGE_KEY);
     return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
   });
+  const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => {
+    const saved = window.localStorage.getItem(LANGUAGE_STORAGE_KEY);
+    return saved === "ja" ? "ja" : "en";
+  });
   const [editorFontSize, setEditorFontSize] = useState(() => readStoredNumber(EDITOR_FONT_SIZE_STORAGE_KEY, 14, 10, 28));
   const [editorLineHeight, setEditorLineHeight] = useState(() => readStoredNumber(EDITOR_LINE_HEIGHT_STORAGE_KEY, 1.55, 1.1, 2.4));
   const [previewFontSize, setPreviewFontSize] = useState(() => readStoredNumber(PREVIEW_FONT_SIZE_STORAGE_KEY, 16, 10, 30));
@@ -181,6 +303,7 @@ export default function App() {
   });
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
+  const [isNoteSearchVisible, setIsNoteSearchVisible] = useState(false);
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [hasSearchSelection, setHasSearchSelection] = useState(false);
   const [vaultSearchMode, setVaultSearchMode] = useState<VaultSearchMode>("files");
@@ -254,6 +377,69 @@ export default function App() {
   }, [content, searchQuery]);
   const isSplitMode = editorMode === "split";
   const wasSplitModeRef = useRef(isSplitMode);
+  const text = UI_TEXT[appLanguage];
+  const vaultSidebarLabels = useMemo<VaultSidebarLabels>(() => ({
+    vault: "Vault",
+    noVaultSelected: appLanguage === "ja" ? "Vault未選択" : "No vault selected",
+    newNote: text.newNote,
+    refresh: appLanguage === "ja" ? "更新" : "Refresh",
+    refreshing: appLanguage === "ja" ? "更新中" : "Refreshing",
+    modified: appLanguage === "ja" ? "更新順" : "Modified",
+    name: appLanguage === "ja" ? "名前" : "Name",
+    size: appLanguage === "ja" ? "サイズ" : "Size",
+    searchNoteText: appLanguage === "ja" ? "ノート本文を検索" : "Search note text",
+    filterFiles: appLanguage === "ja" ? "ファイルまたは#タグ" : "Filter files or #tags",
+    files: appLanguage === "ja" ? "ファイル" : "Files",
+    text: appLanguage === "ja" ? "本文" : "Text",
+    clear: appLanguage === "ja" ? "クリア" : "Clear",
+    searchingNoteText: appLanguage === "ja" ? "ノート本文を検索中..." : "Searching note text...",
+    noTextMatches: appLanguage === "ja" ? "本文の一致なし" : "No text matches",
+    chooseVault: appLanguage === "ja" ? "Vaultを選択してください" : "Choose a vault to begin",
+    noMatchingFiles: appLanguage === "ja" ? "一致するファイルなし" : "No matching files",
+    line: appLanguage === "ja" ? "行" : "Line",
+    open: appLanguage === "ja" ? "開く" : "Open",
+    openInNewInstance: text.openInNewInstance.replace("...", ""),
+    rename: text.rename.replace("...", ""),
+    duplicate: text.duplicate,
+    delete: text.delete.replace("...", ""),
+    fileActions: appLanguage === "ja" ? "ファイル操作" : "File actions",
+    currentNoteTags: appLanguage === "ja" ? "現在のノートタグ" : "Current note tags",
+    filterByTag: appLanguage === "ja" ? "タグで絞り込み" : "Filter by",
+    backlinks: appLanguage === "ja" ? "バックリンク" : "Backlinks",
+    noLinkedMentions: appLanguage === "ja" ? "リンクされた言及なし" : "No linked mentions",
+  }), [appLanguage, text]);
+  const commandDefinitions = useMemo(() => {
+    const labels: Partial<Record<CommandId, string>> = {
+      "file.new": text.newNote,
+      "file.open": appLanguage === "ja" ? "ファイルを開く" : "Open File",
+      "file.save": text.save,
+      "file.saveAs": appLanguage === "ja" ? "名前を付けて保存" : "Save As",
+      "file.exportHtml": appLanguage === "ja" ? "HTMLとしてエクスポート" : "Export as HTML",
+      "file.rename": appLanguage === "ja" ? "現在のノート名を変更" : "Rename Current Note",
+      "file.delete": appLanguage === "ja" ? "現在のノートを削除" : "Delete Current Note",
+      "file.duplicate": appLanguage === "ja" ? "現在のノートを複製" : "Duplicate Current Note",
+      "view.toggleSidebar": text.toggleVault,
+      "view.cycleEditorMode": text.previewPane,
+      "view.togglePreview": text.previewPane,
+      "view.commandPalette": text.command,
+      "theme.system": text.systemTheme,
+      "theme.light": text.lightTheme,
+      "theme.dark": text.darkTheme,
+      "language.en": text.englishUi,
+      "language.ja": text.japaneseUi,
+      "search.note": text.findInNote,
+      "search.vault": appLanguage === "ja" ? "Vault内検索" : "Find in Vault",
+      "format.bold": text.bold,
+      "format.italic": text.italic,
+      "format.link": text.insertLink,
+      "format.json": text.formatJson,
+    };
+
+    return COMMAND_DEFINITIONS.map((command) => ({
+      ...command,
+      label: labels[command.id] ?? command.label,
+    }));
+  }, [appLanguage, text]);
 
   useEffect(() => {
     document.title = `Hotaru build ${BUILD_INFO.buildNumber} updated ${BUILD_INFO.updatedAt}`;
@@ -304,6 +490,21 @@ export default function App() {
     setHasSearchSelection(true);
     selectSearchMatch(next);
   }, [activeSearchIndex, hasSearchSelection, searchMatches.length, selectSearchMatch]);
+
+  const openNoteSearch = useCallback(() => {
+    setIsNoteSearchVisible(true);
+    window.requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }, []);
+
+  const closeNoteSearch = useCallback(() => {
+    setSearchQuery("");
+    setHasSearchSelection(false);
+    setIsNoteSearchVisible(false);
+    editorRef.current?.focus();
+  }, []);
 
   const syncScrollPosition = useCallback((source: HTMLElement, target: HTMLElement) => {
     const sourceMax = source.scrollHeight - source.clientHeight;
@@ -770,9 +971,23 @@ export default function App() {
       case "view.commandPalette":
         setIsCommandPaletteOpen(true);
         break;
+      case "theme.system":
+        setThemeMode("system");
+        break;
+      case "theme.light":
+        setThemeMode("light");
+        break;
+      case "theme.dark":
+        setThemeMode("dark");
+        break;
+      case "language.en":
+        setAppLanguage("en");
+        break;
+      case "language.ja":
+        setAppLanguage("ja");
+        break;
       case "search.note":
-        searchInputRef.current?.focus();
-        searchInputRef.current?.select();
+        openNoteSearch();
         break;
       case "search.vault":
         openVaultContentSearch();
@@ -800,6 +1015,7 @@ export default function App() {
     handleRenameVaultFile,
     handleSave,
     handleSaveAs,
+    openNoteSearch,
     openVaultContentSearch,
   ]);
 
@@ -821,6 +1037,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
+
+  useEffect(() => {
+    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, appLanguage);
+  }, [appLanguage]);
 
   useEffect(() => {
     window.localStorage.setItem(SPLIT_STORAGE_KEY, String(splitPercent));
@@ -909,6 +1129,11 @@ export default function App() {
       return;
     }
     startupVaultInitializationStarted = true;
+
+    if (!isTauriRuntime()) {
+      setIsVaultInitializing(false);
+      return;
+    }
 
     async function initializeVaultAndDocument() {
       try {
@@ -1143,6 +1368,9 @@ export default function App() {
       if (event.key === "Escape") {
         setActiveMenu(null);
         setIsCommandPaletteOpen(false);
+        if (isNoteSearchVisible) {
+          closeNoteSearch();
+        }
       }
     }
 
@@ -1152,9 +1380,13 @@ export default function App() {
       window.removeEventListener("pointerdown", handlePointerDown);
       window.removeEventListener("keydown", handleKeyDown);
     };
-  }, [isCommandPaletteOpen, moveSearch, runCommand]);
+  }, [closeNoteSearch, isCommandPaletteOpen, isNoteSearchVisible, moveSearch, runCommand]);
 
   useEffect(() => {
+    if (!isTauriRuntime()) {
+      return;
+    }
+
     let cancelled = false;
     let unlisten: (() => void) | null = null;
 
@@ -1253,70 +1485,103 @@ export default function App() {
     <main className="app-shell" data-theme={themeMode} data-file-drag-over={isFileDragOver} style={appStyle}>
       <header className="menubar-shell">
         <nav className="menubar" aria-label="Application menu" ref={menubarRef}>
+          <button
+            type="button"
+            className="menubar-icon-button vault-toggle-button"
+            data-sidebar-visible={!isSidebarCollapsed}
+            onClick={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
+            title={`${isSidebarCollapsed ? text.showVault : text.hideVault} (Ctrl+\\)`}
+            aria-label={isSidebarCollapsed ? text.showVault : text.hideVault}
+            aria-pressed={!isSidebarCollapsed}
+          >
+            <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+              <rect x="2.75" y="3.25" width="12.5" height="11.5" rx="1.5" />
+              {!isSidebarCollapsed && <path className="vault-toggle-panel" d="M4.25 4.75h2.75v8.5h-2.75z" />}
+              <line x1={isSidebarCollapsed ? 5.25 : 7.5} y1="4.75" x2={isSidebarCollapsed ? 5.25 : 7.5} y2="13.25" />
+            </svg>
+          </button>
+          <button
+            type="button"
+            className="menubar-icon-button preview-pane-toggle-button"
+            onClick={() => setEditorMode((mode) => (mode === "split" ? "source" : "split"))}
+            title={`${isSplitMode ? text.hidePreview : text.showPreview} (Ctrl+Shift+V)`}
+            aria-label={isSplitMode ? text.hidePreview : text.showPreview}
+            aria-pressed={isSplitMode}
+          >
+            <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+              <rect x="2.75" y="3.25" width="12.5" height="11.5" rx="1.5" />
+              <line x1="9.5" y1="4.75" x2="9.5" y2="13.25" />
+              {isSplitMode && <path className="preview-toggle-panel" d="M10.85 4.75h2.9c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1h-2.9z" />}
+              <circle cx="12.8" cy="9" r="1.45" />
+            </svg>
+          </button>
           <div className="menu-root" data-open={activeMenu === "file"} onMouseEnter={() => activeMenu && setActiveMenu("file")}>
-            <button className="menu-title" aria-expanded={activeMenu === "file"} onClick={() => setActiveMenu((menu) => (menu === "file" ? null : "file"))}>File</button>
+            <button className="menu-title" aria-expanded={activeMenu === "file"} onClick={() => setActiveMenu((menu) => (menu === "file" ? null : "file"))}>{text.file}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(handleNew)}>New Vault Note <kbd>Ctrl+N</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>Open... <kbd>Ctrl+O</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleOpenInNewInstance)}>Open in New Instance...</button>
-              <button role="menuitem" onClick={() => runMenuAction(handleSave)}>Save <kbd>Ctrl+S</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleSaveAs)}>Save As...</button>
-              <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>Export as HTML...</button>
-              <button role="menuitem" onClick={() => runMenuAction(() => handleRenameVaultFile())} disabled={!currentVaultFile}>Rename...</button>
-              <button role="menuitem" onClick={() => runMenuAction(() => handleDuplicateVaultFile())} disabled={!currentVaultFile}>Duplicate</button>
-              <button role="menuitem" onClick={() => runMenuAction(() => handleDeleteVaultFile())} disabled={!currentVaultFile}>Delete...</button>
-              <button role="menuitem" onClick={() => runMenuAction(handleShowFileProperties)} disabled={!currentFile}>File Properties...</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleNew)}>{text.newNote} <kbd>Ctrl+N</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>{text.open} <kbd>Ctrl+O</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleOpenInNewInstance)}>{text.openInNewInstance}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSave)}>{text.save} <kbd>Ctrl+S</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSaveAs)}>{text.saveAs}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>{text.exportHtml}</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => handleRenameVaultFile())} disabled={!currentVaultFile}>{text.rename}</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => handleDuplicateVaultFile())} disabled={!currentVaultFile}>{text.duplicate}</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => handleDeleteVaultFile())} disabled={!currentVaultFile}>{text.delete}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleShowFileProperties)} disabled={!currentFile}>{text.fileProperties}</button>
               <div className="menu-separator" />
-              <button role="menuitem" onClick={() => runMenuAction(() => setIsVaultSettingsOpen(true))}>Vault...</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => setIsVaultSettingsOpen(true))}>{text.vaultSettings}</button>
               <div className="menu-separator" />
-              <button role="menuitem" onClick={() => runMenuAction(handleExit)}>Exit</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleExit)}>{text.exit}</button>
             </div>
           </div>
 
           <div className="menu-root" data-open={activeMenu === "view"} onMouseEnter={() => activeMenu && setActiveMenu("view")}>
-            <button className="menu-title" aria-expanded={activeMenu === "view"} onClick={() => setActiveMenu((menu) => (menu === "view" ? null : "view"))}>View</button>
+            <button className="menu-title" aria-expanded={activeMenu === "view"} onClick={() => setActiveMenu((menu) => (menu === "view" ? null : "view"))}>{text.view}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitemradio" aria-checked={themeMode === "system"} onClick={() => runMenuAction(() => setThemeMode("system"))}>{themeMode === "system" ? "[x] " : ""}System Theme</button>
-              <button role="menuitemradio" aria-checked={themeMode === "light"} onClick={() => runMenuAction(() => setThemeMode("light"))}>{themeMode === "light" ? "[x] " : ""}Light Theme</button>
-              <button role="menuitemradio" aria-checked={themeMode === "dark"} onClick={() => runMenuAction(() => setThemeMode("dark"))}>{themeMode === "dark" ? "[x] " : ""}Dark Theme</button>
+              <button role="menuitemradio" aria-checked={themeMode === "system"} onClick={() => runMenuAction(() => setThemeMode("system"))}>{themeMode === "system" ? "[x] " : ""}{text.systemTheme}</button>
+              <button role="menuitemradio" aria-checked={themeMode === "light"} onClick={() => runMenuAction(() => setThemeMode("light"))}>{themeMode === "light" ? "[x] " : ""}{text.lightTheme}</button>
+              <button role="menuitemradio" aria-checked={themeMode === "dark"} onClick={() => runMenuAction(() => setThemeMode("dark"))}>{themeMode === "dark" ? "[x] " : ""}{text.darkTheme}</button>
+              <div className="menu-separator" />
+              <button role="menuitemradio" aria-checked={appLanguage === "en"} onClick={() => runMenuAction(() => setAppLanguage("en"))}>{appLanguage === "en" ? "[x] " : ""}{text.englishUi}</button>
+              <button role="menuitemradio" aria-checked={appLanguage === "ja"} onClick={() => runMenuAction(() => setAppLanguage("ja"))}>{appLanguage === "ja" ? "[x] " : ""}{text.japaneseUi}</button>
               <div className="menu-separator" />
               <button role="menuitemcheckbox" aria-checked={isSplitMode} onClick={() => runMenuAction(() => setEditorMode((mode) => (mode === "split" ? "source" : "split")))}>
-                {isSplitMode ? "[x] " : ""}Preview Pane <kbd>Ctrl+Shift+V</kbd>
+                {isSplitMode ? "[x] " : ""}{text.previewPane} <kbd>Ctrl+Shift+V</kbd>
               </button>
-              <button role="menuitem" onClick={() => runMenuAction(() => setIsSidebarCollapsed((collapsed) => !collapsed))}>Toggle Vault <kbd>Ctrl+\</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>Reset Split</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => setIsSidebarCollapsed((collapsed) => !collapsed))}>{text.toggleVault} <kbd>Ctrl+\</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
             </div>
           </div>
 
           <div className="menu-root" data-open={activeMenu === "settings"} onMouseEnter={() => activeMenu && setActiveMenu("settings")}>
-            <button className="menu-title" aria-expanded={activeMenu === "settings"} onClick={() => setActiveMenu((menu) => (menu === "settings" ? null : "settings"))}>Settings</button>
+            <button className="menu-title" aria-expanded={activeMenu === "settings"} onClick={() => setActiveMenu((menu) => (menu === "settings" ? null : "settings"))}>{text.settings}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => setIsAppearanceSettingsOpen(true))}>Appearance...</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => setIsAppearanceSettingsOpen(true))}>{text.appearance}</button>
               <button role="menuitem" onClick={() => runMenuAction(() => refreshVaultFiles())} disabled={!vaultPath || isVaultFilesLoading}>
-                {isVaultFilesLoading ? "Refreshing Vault..." : "Refresh Vault Files"}
+                {isVaultFilesLoading ? text.refreshingVault : text.refreshVaultFiles}
               </button>
             </div>
           </div>
 
           <button className="menu-title preview-toggle" type="button" aria-pressed={isCommandPaletteOpen} onClick={() => setIsCommandPaletteOpen(true)}>
-            Command <kbd>Ctrl+K</kbd>
+            {text.command} <kbd>Ctrl+K</kbd>
           </button>
 
           <div className="menu-root" data-open={activeMenu === "search"} onMouseEnter={() => activeMenu && setActiveMenu("search")}>
-            <button className="menu-title" aria-expanded={activeMenu === "search"} onClick={() => setActiveMenu((menu) => (menu === "search" ? null : "search"))}>Search</button>
+            <button className="menu-title" aria-expanded={activeMenu === "search"} onClick={() => setActiveMenu((menu) => (menu === "search" ? null : "search"))}>{text.search}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("search.note"))}>Find in Note <kbd>Ctrl+F</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(openVaultContentSearch)} disabled={!vaultPath}>Search Vault Contents <kbd>Ctrl+Shift+F</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("search.note"))}>{text.findInNote} <kbd>Ctrl+F</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(openVaultContentSearch)} disabled={!vaultPath}>{text.searchVaultContents} <kbd>Ctrl+Shift+F</kbd></button>
             </div>
           </div>
 
           <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
-            <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>Format</button>
+            <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.bold"))}>Bold <kbd>Ctrl+B</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.italic"))}>Italic <kbd>Ctrl+I</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.link"))}>Insert Link</button>
-              <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>Format JSON</button>
+              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.bold"))}>{text.bold} <kbd>Ctrl+B</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.italic"))}>{text.italic} <kbd>Ctrl+I</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.link"))}>{text.insertLink}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>{text.formatJson}</button>
             </div>
           </div>
         </nav>
@@ -1325,7 +1590,7 @@ export default function App() {
           <strong>Hotaru</strong>
           <span className="build-badge">build {BUILD_INFO.buildNumber}</span>
           <span className="build-updated">updated {BUILD_INFO.updatedAt}</span>
-          <span>Vault notes, Markdown, Mermaid, Excalidraw</span>
+          <span>{text.vaultNotesCaption}</span>
         </div>
       </header>
 
@@ -1346,7 +1611,7 @@ export default function App() {
         </section>
       )}
 
-      <section className="app-body">
+      <section className="app-body" data-sidebar-collapsed={isSidebarCollapsed}>
         <VaultSidebar
           vaultPath={vaultPath}
           files={filteredVaultFiles}
@@ -1358,6 +1623,7 @@ export default function App() {
           filterInputRef={vaultSearchInputRef}
           searchMode={vaultSearchMode}
           sort={vaultSort}
+          labels={vaultSidebarLabels}
           isCollapsed={isSidebarCollapsed}
           isLoading={isVaultFilesLoading}
           isContentSearching={isVaultContentSearching}
@@ -1365,7 +1631,6 @@ export default function App() {
           onClearFilter={clearVaultSearch}
           onSearchModeChange={setVaultSearchMode}
           onSortChange={setVaultSort}
-          onToggleCollapsed={() => setIsSidebarCollapsed((collapsed) => !collapsed)}
           onRefresh={() => void refreshVaultFiles()}
           onNewNote={() => void handleNew()}
           onOpenFile={(path) => void openFilePath(path)}
@@ -1378,32 +1643,30 @@ export default function App() {
           onTagClick={(tag) => setVaultFilter(`#${tag}`)}
         />
 
-        <div
-          className="vault-sidebar-resizer"
-          data-disabled={isSidebarCollapsed}
-          role="separator"
-          aria-label="Resize vault file list"
-          aria-orientation="vertical"
-          aria-valuemin={220}
-          aria-valuemax={520}
-          aria-valuenow={Math.round(vaultSidebarWidth)}
-          tabIndex={isSidebarCollapsed ? -1 : 0}
-          onPointerDown={(event) => {
-            if (isSidebarCollapsed) {
-              return;
-            }
-            event.currentTarget.setPointerCapture(event.pointerId);
-            setIsDraggingVaultSidebar(true);
-            updateVaultSidebarWidthFromPointer(event.clientX);
-          }}
-          onKeyDown={(event) => {
-            if (event.key === "ArrowLeft") {
-              setVaultSidebarWidth((width) => Math.max(220, width - 12));
-            } else if (event.key === "ArrowRight") {
-              setVaultSidebarWidth((width) => Math.min(520, width + 12));
-            }
-          }}
-        />
+        {!isSidebarCollapsed && (
+          <div
+            className="vault-sidebar-resizer"
+            role="separator"
+            aria-label="Resize vault file list"
+            aria-orientation="vertical"
+            aria-valuemin={220}
+            aria-valuemax={520}
+            aria-valuenow={Math.round(vaultSidebarWidth)}
+            tabIndex={0}
+            onPointerDown={(event) => {
+              event.currentTarget.setPointerCapture(event.pointerId);
+              setIsDraggingVaultSidebar(true);
+              updateVaultSidebarWidthFromPointer(event.clientX);
+            }}
+            onKeyDown={(event) => {
+              if (event.key === "ArrowLeft") {
+                setVaultSidebarWidth((width) => Math.max(220, width - 12));
+              } else if (event.key === "ArrowRight") {
+                setVaultSidebarWidth((width) => Math.min(520, width + 12));
+              }
+            }}
+          />
+        )}
 
         <section
           className="workspace"
@@ -1417,50 +1680,53 @@ export default function App() {
           <article className="editor-pane">
             <header className="pane-header">
               <div className="pane-title">
-                <span>Editor</span>
-                <small>{currentVaultFile?.relativePath ?? currentFile ?? "Untitled"}</small>
+                <span>{text.editor}</span>
+                <small>{currentVaultFile?.relativePath ?? currentFile ?? text.untitled}</small>
               </div>
-              <div className="note-search" role="search" aria-label="Find in current note">
-                <label htmlFor="note-search-input">Find in note</label>
-                <div className="note-search-controls">
-                  <input
-                    id="note-search-input"
-                    ref={searchInputRef}
-                    type="search"
-                    value={searchQuery}
-                    onChange={(event) => setSearchQuery(event.target.value)}
-                    onKeyDown={(event) => {
-                      if (event.key === "Enter") {
-                        event.preventDefault();
-                        moveSearch(event.shiftKey ? -1 : 1);
-                      } else if (event.key === "Escape") {
+              {isNoteSearchVisible && (
+                <div className="note-search" role="search" aria-label={text.findInNote}>
+                  <label htmlFor="note-search-input">{text.findInNote}</label>
+                  <div className="note-search-controls">
+                    <input
+                      id="note-search-input"
+                      ref={searchInputRef}
+                      type="search"
+                      value={searchQuery}
+                      onChange={(event) => setSearchQuery(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter") {
+                          event.preventDefault();
+                          moveSearch(event.shiftKey ? -1 : 1);
+                        } else if (event.key === "Escape") {
+                          closeNoteSearch();
+                        }
+                      }}
+                      placeholder={appLanguage === "ja" ? "検索語" : "Find text"}
+                      aria-label={text.findInNote}
+                    />
+                    <span aria-live="polite" className="note-search-count">
+                      {searchQuery ? `${hasSearchSelection ? activeSearchIndex + 1 : 0} / ${searchMatches.length}` : appLanguage === "ja" ? "検索なし" : "No search"}
+                    </span>
+                    <button type="button" onClick={() => moveSearch(-1)} disabled={searchMatches.length === 0} aria-label={appLanguage === "ja" ? "前の一致" : "Previous note match"}>{appLanguage === "ja" ? "前へ" : "Previous"}</button>
+                    <button type="button" onClick={() => moveSearch(1)} disabled={searchMatches.length === 0} aria-label={appLanguage === "ja" ? "次の一致" : "Next note match"}>{appLanguage === "ja" ? "次へ" : "Next"}</button>
+                    <button
+                      type="button"
+                      onClick={() => {
                         setSearchQuery("");
                         setHasSearchSelection(false);
-                        editorRef.current?.focus();
-                      }
-                    }}
-                    placeholder="Find text in this note"
-                    aria-label="Find text in this note"
-                  />
-                  <span aria-live="polite" className="note-search-count">
-                    {searchQuery ? `${hasSearchSelection ? activeSearchIndex + 1 : 0} of ${searchMatches.length}` : "No search"}
-                  </span>
-                  <button type="button" onClick={() => moveSearch(-1)} disabled={searchMatches.length === 0} aria-label="Previous note match">Previous</button>
-                  <button type="button" onClick={() => moveSearch(1)} disabled={searchMatches.length === 0} aria-label="Next note match">Next</button>
-                  <button
-                    type="button"
-                    onClick={() => {
-                      setSearchQuery("");
-                      setHasSearchSelection(false);
-                      editorRef.current?.focus();
-                    }}
-                    disabled={!searchQuery}
-                    aria-label="Clear note search"
-                  >
-                    Clear
-                  </button>
+                        searchInputRef.current?.focus();
+                      }}
+                      disabled={!searchQuery}
+                      aria-label={appLanguage === "ja" ? "検索をクリア" : "Clear note search"}
+                    >
+                      {appLanguage === "ja" ? "クリア" : "Clear"}
+                    </button>
+                    <button type="button" onClick={closeNoteSearch} aria-label={appLanguage === "ja" ? "検索を閉じる" : "Close note search"}>
+                      {appLanguage === "ja" ? "閉じる" : "Close"}
+                    </button>
+                  </div>
                 </div>
-              </div>
+              )}
             </header>
             <MarkdownEditor
               ref={editorRef}
@@ -1498,8 +1764,8 @@ export default function App() {
 
               <article className="preview-pane">
                 <header className="pane-header">
-                  <span>Preview</span>
-                  <small>{isPreviewPending ? "Updating..." : "Markdown, Mermaid, Excalidraw, wiki links"}</small>
+                  <span>{text.preview}</span>
+                  <small>{isPreviewPending ? text.updating : text.previewDescription}</small>
                 </header>
                 <MarkdownPreview
                   key={previewRefreshToken}
@@ -1517,19 +1783,21 @@ export default function App() {
       </section>
 
       <footer className="statusbar">
-        <span>{currentFile ? `File: ${currentFile}` : "File: Untitled"}</span>
-        <span>{vaultPath ? `Vault: ${vaultPath}` : "Vault: Not set"}</span>
-        <span>{modified ? "Modified" : "Saved"}</span>
-        <span>{isSplitMode ? "Preview: On" : "Preview: Off"}</span>
-        <span>Lines: {stats.lines}</span>
-        <span>Chars: {stats.chars}</span>
+        <span>{currentFile ? `${text.fileStatus} ${currentFile}` : `${text.fileStatus} ${text.untitled}`}</span>
+        <span>{vaultPath ? `${text.vaultStatus} ${vaultPath}` : `${text.vaultStatus} ${text.notSet}`}</span>
+        <span>{modified ? text.unsaved : text.saved}</span>
+        <span>{isSplitMode ? text.previewOn : text.previewOff}</span>
+        <span>{text.lines} {stats.lines}</span>
+        <span>{text.chars} {stats.chars}</span>
       </footer>
 
       <CommandPalette
         isOpen={isCommandPaletteOpen}
         query={commandQuery}
-        commands={COMMAND_DEFINITIONS}
+        commands={commandDefinitions}
         disabledCommands={disabledCommands}
+        placeholder={appLanguage === "ja" ? "コマンドを実行" : "Run command"}
+        cancelLabel={appLanguage === "ja" ? "キャンセル" : "Cancel"}
         onQueryChange={setCommandQuery}
         onClose={() => setIsCommandPaletteOpen(false)}
         onRun={runCommand}

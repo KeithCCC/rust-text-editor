@@ -7,6 +7,8 @@ type CommandPaletteProps = {
   query: string;
   commands: CommandDefinition[];
   disabledCommands: Set<CommandId>;
+  placeholder: string;
+  cancelLabel: string;
   onQueryChange: (value: string) => void;
   onClose: () => void;
   onRun: (id: CommandId) => void;
@@ -17,6 +19,8 @@ export function CommandPalette({
   query,
   commands,
   disabledCommands,
+  placeholder,
+  cancelLabel,
   onQueryChange,
   onClose,
   onRun,
@@ -61,8 +65,8 @@ export function CommandPalette({
               }
             }
           }}
-          placeholder="Run command"
-          aria-label="Run command"
+          placeholder={placeholder}
+          aria-label={placeholder}
         />
         <div className="command-list">
           {filtered.length === 0 && <div className="command-empty">No commands</div>}
@@ -81,6 +85,11 @@ export function CommandPalette({
               </button>
             );
           })}
+        </div>
+        <div className="command-palette-actions">
+          <button type="button" onClick={onClose}>
+            {cancelLabel}
+          </button>
         </div>
       </div>
     </section>
