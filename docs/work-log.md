@@ -1,5 +1,33 @@
 # Work Log
 
+## 2026-07-08 03:00:00 +09:00 - master
+
+### Summary
+
+Converted the desktop app into Koharu, a single-file Notepad-like Markdown editor, while preserving the vault implementation in a separate worktree for future Hotaru/Vault work.
+
+### Notable Changes
+
+- Renamed package, Tauri metadata, icon assets, and build output to Koharu.
+- Removed the vault sidebar from the Koharu UI and disabled vault commands from the Tauri invoke handler.
+- Reworked the main shell around single-file open/save/save-as/export/file-properties flows.
+- Restored Japanese UI switching, changed Koharu's dark theme palette, and used `asset/koharu.png` for app icons.
+- Fixed menu dismissal when clicking into the editor and made the native window close button exit cleanly through Koharu's close flow.
+- Added tests for document title/default save path, menu dismissal, and close confirmation behavior.
+
+### Validation
+
+- `npm test` passed with 15 tests.
+- `npm run build` passed.
+- Rendered browser QA verified Japanese UI, dark theme, preview toggle visibility, and menu dismissal on editor click.
+- Desktop smoke test launched `target/release/koharu.exe`, sent a normal window close request, and verified the process exited.
+- `npm run tauri build` passed and rebuilt `target/release/koharu.exe`, MSI, and NSIS installers.
+
+### Risks And Follow-Ups
+
+- The Rust backend still contains unused vault helper functions for now, so release builds report dead-code warnings.
+- GitHub release/download assets still need a release update if Koharu should be publicly downloadable from GitHub Releases.
+
 ## 2026-05-18 07:45:50 +09:00 - master
 
 ### Summary

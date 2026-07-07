@@ -65,77 +65,77 @@ body {
 }
 
 .app-shell[data-theme="dark"] {
-  --app-bg: #171b22;
-  --bar-bg: #202631;
-  --pane-bg: #1c222c;
-  --editor-bg: #151a21;
-  --preview-bg: #181e27;
+  --app-bg: #101915;
+  --bar-bg: #17231d;
+  --pane-bg: #14211b;
+  --editor-bg: #0d1612;
+  --preview-bg: #111d18;
   --preview-text: #e7eef7;
-  --preview-heading: #9ed0ff;
-  --preview-link: #80bdff;
-  --preview-link-hover: #b7d9ff;
-  --preview-rule: #39485b;
-  --preview-code-bg: #111821;
-  --preview-code-text: #eaf2fb;
-  --preview-code-border: #405168;
-  --preview-table-head: #222c39;
-  --surface-bg: #202733;
-  --hover-bg: #2b3442;
-  --active-bg: #31445a;
-  --text: #e6edf5;
-  --muted: #9aa8ba;
-  --border: #323b49;
-  --strong-border: #475365;
-  --code-bg: #252d39;
-  --json-key: #7cb7ff;
-  --json-string: #72d58b;
-  --json-number: #f5b76b;
-  --json-literal: #c79dff;
-  --json-punctuation: #9aa8ba;
-  --quote: #b7c4d4;
-  --danger-bg: #3a1d22;
-  --danger-border: #7d3541;
-  --danger-text: #ffd9df;
-  --warning-bg: #332817;
-  --warning-text: #f4d18b;
+  --preview-heading: #a7f3d0;
+  --preview-link: #5eead4;
+  --preview-link-hover: #99f6e4;
+  --preview-rule: #315244;
+  --preview-code-bg: #0b211a;
+  --preview-code-text: #ecfdf5;
+  --preview-code-border: #2f6b58;
+  --preview-table-head: #1b352b;
+  --surface-bg: #1a2b23;
+  --hover-bg: #24392f;
+  --active-bg: #285244;
+  --text: #e9f8f1;
+  --muted: #9bc2b4;
+  --border: #294139;
+  --strong-border: #3e6d5c;
+  --code-bg: #1d3329;
+  --json-key: #67e8f9;
+  --json-string: #86efac;
+  --json-number: #facc15;
+  --json-literal: #c4b5fd;
+  --json-punctuation: #9bc2b4;
+  --quote: #b7decf;
+  --danger-bg: #3a1c1d;
+  --danger-border: #884242;
+  --danger-text: #ffdada;
+  --warning-bg: #342a12;
+  --warning-text: #fde68a;
   --shadow: rgb(0 0 0 / 45%);
 }
 
 @media (prefers-color-scheme: dark) {
   .app-shell[data-theme="system"] {
-    --app-bg: #171b22;
-    --bar-bg: #202631;
-    --pane-bg: #1c222c;
-    --editor-bg: #151a21;
-    --preview-bg: #181e27;
+    --app-bg: #101915;
+    --bar-bg: #17231d;
+    --pane-bg: #14211b;
+    --editor-bg: #0d1612;
+    --preview-bg: #111d18;
     --preview-text: #e7eef7;
-    --preview-heading: #9ed0ff;
-    --preview-link: #80bdff;
-    --preview-link-hover: #b7d9ff;
-    --preview-rule: #39485b;
-    --preview-code-bg: #111821;
-    --preview-code-text: #eaf2fb;
-    --preview-code-border: #405168;
-    --preview-table-head: #222c39;
-    --surface-bg: #202733;
-    --hover-bg: #2b3442;
-    --active-bg: #31445a;
-    --text: #e6edf5;
-    --muted: #9aa8ba;
-    --border: #323b49;
-    --strong-border: #475365;
-    --code-bg: #252d39;
-    --json-key: #7cb7ff;
-    --json-string: #72d58b;
-    --json-number: #f5b76b;
-    --json-literal: #c79dff;
-    --json-punctuation: #9aa8ba;
-    --quote: #b7c4d4;
-    --danger-bg: #3a1d22;
-    --danger-border: #7d3541;
-    --danger-text: #ffd9df;
-    --warning-bg: #332817;
-    --warning-text: #f4d18b;
+    --preview-heading: #a7f3d0;
+    --preview-link: #5eead4;
+    --preview-link-hover: #99f6e4;
+    --preview-rule: #315244;
+    --preview-code-bg: #0b211a;
+    --preview-code-text: #ecfdf5;
+    --preview-code-border: #2f6b58;
+    --preview-table-head: #1b352b;
+    --surface-bg: #1a2b23;
+    --hover-bg: #24392f;
+    --active-bg: #285244;
+    --text: #e9f8f1;
+    --muted: #9bc2b4;
+    --border: #294139;
+    --strong-border: #3e6d5c;
+    --code-bg: #1d3329;
+    --json-key: #67e8f9;
+    --json-string: #86efac;
+    --json-number: #facc15;
+    --json-literal: #c4b5fd;
+    --json-punctuation: #9bc2b4;
+    --quote: #b7decf;
+    --danger-bg: #3a1c1d;
+    --danger-border: #884242;
+    --danger-text: #ffdada;
+    --warning-bg: #342a12;
+    --warning-text: #fde68a;
     --shadow: rgb(0 0 0 / 45%);
   }
 }
@@ -167,6 +167,15 @@ button:hover {
   min-width: 720px;
   background: var(--app-bg);
   color: var(--text);
+}
+
+.app-header {
+  grid-area: menu;
+  display: grid;
+  grid-template-rows: 32px auto;
+  min-width: 0;
+  border-bottom: 1px solid var(--border);
+  background: var(--bar-bg);
 }
 
 .app-body {
@@ -227,14 +236,14 @@ button:hover {
 }
 
 .menubar-shell {
-  grid-area: menu;
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 14px;
-  padding: 0 12px;
+  justify-content: flex-start;
+  gap: 0;
+  padding: 0 8px;
   border-bottom: 1px solid var(--border);
-  min-height: 32px;
+  min-width: 0;
+  min-height: 0;
 }
 
 .menubar {
@@ -263,11 +272,11 @@ button:hover {
   background: var(--hover-bg);
 }
 
-.preview-toggle[aria-pressed="true"] {
+.command-menu-button[aria-pressed="true"] {
   background: var(--active-bg);
 }
 
-.preview-toggle:focus-visible {
+.command-menu-button:focus-visible {
   outline: 2px solid var(--strong-border);
   outline-offset: -2px;
 }
@@ -353,6 +362,7 @@ kbd {
   align-items: baseline;
   min-width: 0;
   gap: 8px;
+  padding: 3px 12px 4px;
   color: var(--muted);
 }
 

@@ -4,10 +4,6 @@ export type CommandId =
   | "file.save"
   | "file.saveAs"
   | "file.exportHtml"
-  | "file.rename"
-  | "file.delete"
-  | "file.duplicate"
-  | "view.toggleSidebar"
   | "view.cycleEditorMode"
   | "view.togglePreview"
   | "view.commandPalette"
@@ -17,7 +13,6 @@ export type CommandId =
   | "language.en"
   | "language.ja"
   | "search.note"
-  | "search.vault"
   | "format.bold"
   | "format.italic"
   | "format.link"
@@ -30,15 +25,11 @@ export type CommandDefinition = {
 };
 
 export const COMMAND_DEFINITIONS: CommandDefinition[] = [
-  { id: "file.new", label: "New Note", shortcut: "Ctrl+N" },
+  { id: "file.new", label: "New", shortcut: "Ctrl+N" },
   { id: "file.open", label: "Open File", shortcut: "Ctrl+O" },
   { id: "file.save", label: "Save", shortcut: "Ctrl+S" },
   { id: "file.saveAs", label: "Save As" },
   { id: "file.exportHtml", label: "Export as HTML" },
-  { id: "file.rename", label: "Rename Current Note" },
-  { id: "file.delete", label: "Delete Current Note" },
-  { id: "file.duplicate", label: "Duplicate Current Note" },
-  { id: "view.toggleSidebar", label: "Toggle Vault Sidebar", shortcut: "Ctrl+\\" },
   { id: "view.cycleEditorMode", label: "Toggle Preview Pane", shortcut: "Ctrl+Shift+V" },
   { id: "view.togglePreview", label: "Toggle Preview Pane" },
   { id: "view.commandPalette", label: "Command Palette", shortcut: "Ctrl+K" },
@@ -47,8 +38,7 @@ export const COMMAND_DEFINITIONS: CommandDefinition[] = [
   { id: "theme.dark", label: "Use Dark Theme" },
   { id: "language.en", label: "Use English UI" },
   { id: "language.ja", label: "Use Japanese UI" },
-  { id: "search.note", label: "Find in Note", shortcut: "Ctrl+F" },
-  { id: "search.vault", label: "Find in Vault", shortcut: "Ctrl+Shift+F" },
+  { id: "search.note", label: "Find", shortcut: "Ctrl+F" },
   { id: "format.bold", label: "Bold", shortcut: "Ctrl+B" },
   { id: "format.italic", label: "Italic", shortcut: "Ctrl+I" },
   { id: "format.link", label: "Insert Link" },
