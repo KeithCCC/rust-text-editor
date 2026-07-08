@@ -11,9 +11,9 @@ describe("file document behavior", () => {
   });
 
   test("formats titles like a simple file editor", () => {
-    expect(formatDocumentTitle(null, false)).toBe("Untitled - Koharu");
-    expect(formatDocumentTitle("C:\\notes\\todo.txt", false)).toBe("todo.txt - Koharu");
-    expect(formatDocumentTitle("C:\\notes\\todo.txt", true)).toBe("*todo.txt - Koharu");
+    expect(formatDocumentTitle(null, false)).toBe("Untitled - Koharu markdown editor");
+    expect(formatDocumentTitle("C:\\notes\\todo.txt", false)).toBe("todo.txt - Koharu markdown editor");
+    expect(formatDocumentTitle("C:\\notes\\todo.txt", true)).toBe("*todo.txt - Koharu markdown editor");
   });
 
   test("defaults new files to markdown when saving as", () => {
