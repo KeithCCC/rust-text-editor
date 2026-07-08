@@ -2,6 +2,7 @@ type StandaloneHtmlOptions = {
   title: string;
   bodyHtml: string;
   css?: string;
+  mermaidRuntime?: string;
 };
 
 const DEFAULT_EXPORT_CSS = `
@@ -37,7 +38,52 @@ code {
 a {
   color: #7cc7ff;
 }
+.mermaid {
+  background: #18202b;
+  border: 1px solid #354151;
+  border-radius: 8px;
+  color: #f4f7fb;
+  padding: 18px;
+  text-align: center;
+}
+.mermaid svg {
+  max-width: 100%;
+  height: auto;
+}
 `;
+
+const MERMAID_EXPORT_INIT = `
+<script>
+mermaid.initialize({
+  startOnLoad: true,
+  securityLevel: "strict",
+  theme: "base",
+  themeVariables: {
+    background: "#18202b",
+    primaryColor: "#243448",
+    primaryTextColor: "#f4f8fc",
+    primaryBorderColor: "#6ea8ff",
+    lineColor: "#8fb8e8",
+    secondaryColor: "#263c33",
+    tertiaryColor: "#2d263d",
+    clusterBkg: "#202a36",
+    clusterBorder: "#536071",
+    edgeLabelBackground: "#18202b",
+    fontFamily: "Inter, Segoe UI, sans-serif"
+  }
+});
+</script>`;
+
+async function getMermaidExportScripts(bodyHtml: string, providedRuntime?: string) {
+  if (!bodyHtml.includes('class="mermaid"')) {
+    return "";
+  }
+
+  const mermaidRuntime = providedRuntime ?? (await import("mermaid/dist/mermaid.min.js?raw")).default;
+  return `
+<script>${escapeScript(mermaidRuntime)}</script>
+${MERMAID_EXPORT_INIT}`;
+}
 
 function escapeHtml(value: string) {
   return value
@@ -45,6 +91,14 @@ function escapeHtml(value: string) {
     .replace(/</g, "&lt;")
     .replace(/>/g, "&gt;")
     .replace(/"/g, "&quot;");
+}
+
+function escapeScript(value: string) {
+  return value.replace(/<\/script/gi, "<\\/script");
+}
+
+function getFenceLanguage(info: string) {
+  return info.trim().split(/\s+/)[0]?.toLowerCase() ?? "";
 }
 
 function renderInlineMarkdown(value: string) {
@@ -112,6 +166,7 @@ export function markdownToHtml(markdown: string) {
     if (trimmed.startsWith("```")) {
       flushParagraph();
       const language = trimmed.slice(3).trim();
+      const fenceLanguage = getFenceLanguage(language);
       const code: string[] = [];
       index += 1;
       while (index < lines.length && !lines[index].trim().startsWith("```")) {
@@ -119,6 +174,10 @@ export function markdownToHtml(markdown: string) {
         index += 1;
       }
       index += index < lines.length ? 1 : 0;
+      if (fenceLanguage === "mermaid") {
+        html.push(`<pre class="mermaid">${escapeHtml(code.join("\n"))}</pre>`);
+        continue;
+      }
       html.push(`<pre><code${language ? ` class="language-${escapeHtml(language)}"` : ""}>${escapeHtml(code.join("\n"))}</code></pre>`);
       continue;
     }
@@ -148,7 +207,9 @@ export function markdownToHtml(markdown: string) {
   return html.join("\n");
 }
 
-export function buildStandaloneHtml({ title, bodyHtml, css }: StandaloneHtmlOptions) {
+export async function buildStandaloneHtml({ title, bodyHtml, css, mermaidRuntime }: StandaloneHtmlOptions) {
+  const mermaidScripts = await getMermaidExportScripts(bodyHtml, mermaidRuntime);
+
   return `<!doctype html>
 <html lang="en">
 <head>
@@ -161,6 +222,7 @@ export function buildStandaloneHtml({ title, bodyHtml, css }: StandaloneHtmlOpti
   <main class="preview-body">
 ${bodyHtml}
   </main>
+${mermaidScripts}
 </body>
 </html>
 `;

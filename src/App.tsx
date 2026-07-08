@@ -31,7 +31,7 @@ import {
 } from "./tauri";
 import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
-import { canCloseWindow } from "./windowCloseBehavior";
+import { canCloseWindow, handleCloseRequested } from "./windowCloseBehavior";
 import { saveCurrentWindowState } from "./windowState";
 
 const ExcalidrawEditor = lazy(() =>
@@ -429,6 +429,35 @@ export default function App() {
     }
   }, [modified, text.unsavedExit]);
 
+  useEffect(() => {
+    if (!isTauriRuntime()) {
+      return undefined;
+    }
+
+    let unlistenClose: (() => void) | undefined;
+    let cancelled = false;
+
+    getCurrentWindow().onCloseRequested(async (event) => {
+      await handleCloseRequested({
+        modified,
+        confirmClose: () => window.confirm(text.unsavedExit),
+        preventDefault: () => event.preventDefault(),
+        saveWindowState: saveCurrentWindowState,
+      });
+    }).then((unlisten) => {
+      if (cancelled) {
+        unlisten();
+        return;
+      }
+      unlistenClose = unlisten;
+    });
+
+    return () => {
+      cancelled = true;
+      unlistenClose?.();
+    };
+  }, [modified, text.unsavedExit]);
+
   const openFilePath = useCallback(async (path: string) => {
     try {
       const file = await readTextFile(path);
@@ -516,7 +545,7 @@ export default function App() {
     }
 
     try {
-      await writeTextFile(selected, buildStandaloneHtml({
+      await writeTextFile(selected, await buildStandaloneHtml({
         title: fileNameFromPath(currentFile),
         bodyHtml: markdownToHtml(content),
       }));
