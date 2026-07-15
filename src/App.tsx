@@ -11,8 +11,7 @@ import type { CSSProperties } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BUILD_INFO } from "./buildInfo";
-import { COMMAND_DEFINITIONS, isPrimaryShortcut, type CommandId } from "./commands";
-import { CommandPalette } from "./components/CommandPalette";
+import { isPrimaryShortcut } from "./keyboardShortcuts";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { logDebug } from "./debugLog";
@@ -69,7 +68,6 @@ const UI_TEXT = {
     file: "File",
     view: "View",
     settings: "Settings",
-    command: "Command",
     search: "Search",
     format: "Format",
     new: "New",
@@ -105,8 +103,6 @@ const UI_TEXT = {
     previewOff: "Preview: Off",
     lines: "Lines:",
     chars: "Chars:",
-    runCommand: "Run command",
-    cancel: "Cancel",
     showPreview: "Show Preview",
     hidePreview: "Hide Preview",
     dropToOpen: "Drop to open",
@@ -125,6 +121,7 @@ const UI_TEXT = {
     exportFailed: "Export failed",
     filePropertiesUnavailable: "File properties unavailable",
     saveBeforeProperties: "Save the file before viewing file properties.",
+    saveBeforeOpeningLink: "Save this document before opening a relative Markdown link.",
     filePropertiesFailed: "File properties failed",
     jsonFormatFailed: "JSON format failed",
     linkOpenFailed: "Link open failed",
@@ -146,14 +143,11 @@ const UI_TEXT = {
     size: "Size",
     unavailable: "Unavailable",
     bytes: "bytes",
-    useEnglishCommand: "Use English UI",
-    useJapaneseCommand: "Use Japanese UI",
   },
   ja: {
     file: "ファイル",
     view: "表示",
     settings: "設定",
-    command: "コマンド",
     search: "検索",
     format: "書式",
     new: "新規",
@@ -189,8 +183,6 @@ const UI_TEXT = {
     previewOff: "プレビュー: オフ",
     lines: "行:",
     chars: "文字:",
-    runCommand: "コマンドを実行",
-    cancel: "キャンセル",
     showPreview: "プレビューを表示",
     hidePreview: "プレビューを隠す",
     dropToOpen: "ドロップして開く",
@@ -209,6 +201,7 @@ const UI_TEXT = {
     exportFailed: "エクスポートに失敗しました",
     filePropertiesUnavailable: "ファイル情報を表示できません",
     saveBeforeProperties: "ファイル情報を見る前に保存してください。",
+    saveBeforeOpeningLink: "相対Markdownリンクを開く前に、この文書を保存してください。",
     filePropertiesFailed: "ファイル情報の取得に失敗しました",
     jsonFormatFailed: "JSON整形に失敗しました",
     linkOpenFailed: "リンクを開けませんでした",
@@ -230,8 +223,6 @@ const UI_TEXT = {
     size: "サイズ",
     unavailable: "利用不可",
     bytes: "バイト",
-    useEnglishCommand: "英語UIに切り替え",
-    useJapaneseCommand: "日本語UIに切り替え",
   },
 } as const;
 
@@ -322,8 +313,6 @@ export default function App() {
   const [activeSearchIndex, setActiveSearchIndex] = useState(0);
   const [hasSearchSelection, setHasSearchSelection] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
-  const [isCommandPaletteOpen, setIsCommandPaletteOpen] = useState(false);
-  const [commandQuery, setCommandQuery] = useState("");
   const [excalidrawSession, setExcalidrawSession] = useState<ExcalidrawSession | null>(null);
   const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
@@ -358,34 +347,6 @@ export default function App() {
     }
     return matches;
   }, [content, searchQuery]);
-  const disabledCommands = useMemo(() => new Set<CommandId>(), []);
-  const commandDefinitions = useMemo(() => {
-    const labels: Partial<Record<CommandId, string>> = {
-      "file.new": text.new,
-      "file.open": text.open.replace("...", ""),
-      "file.save": text.save,
-      "file.saveAs": text.saveAs.replace("...", ""),
-      "file.exportHtml": text.exportHtml.replace("...", ""),
-      "view.cycleEditorMode": text.previewPane,
-      "view.togglePreview": text.previewPane,
-      "view.commandPalette": text.command,
-      "theme.system": text.systemTheme,
-      "theme.light": text.lightTheme,
-      "theme.dark": text.darkTheme,
-      "language.en": text.useEnglishCommand,
-      "language.ja": text.useJapaneseCommand,
-      "search.note": text.find,
-      "format.bold": text.bold,
-      "format.italic": text.italic,
-      "format.link": text.insertLink,
-      "format.json": text.formatJson,
-    };
-
-    return COMMAND_DEFINITIONS.map((command) => ({
-      ...command,
-      label: labels[command.id] ?? command.label,
-    }));
-  }, [text]);
 
   const showError = useCallback((title: string, message: string) => {
     setError({ title, message });
@@ -607,16 +568,19 @@ export default function App() {
     setExcalidrawSession({ path, scene });
   }, []);
 
-  const handleOpenWikiLinkPreview = useCallback((name: string) => {
+  const handleOpenRelativeMarkdownLink = useCallback((relativePath: string) => {
     if (!currentFile) {
+      showError(text.linkOpenFailed, text.saveBeforeOpeningLink);
+      return;
+    }
+    if (!confirmDiscardChanges()) {
       return;
     }
 
-    const target = `${name}.md`;
-    void resolveRelativePath(currentFile, target)
+    void resolveRelativePath(currentFile, relativePath)
       .then((path) => openFilePath(path))
       .catch((linkError) => showError(text.linkOpenFailed, linkError instanceof Error ? linkError.message : String(linkError)));
-  }, [currentFile, openFilePath, showError, text.linkOpenFailed]);
+  }, [confirmDiscardChanges, currentFile, openFilePath, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
 
   const handleExcalidrawSaved = useCallback(async (path: string) => {
     if (path === currentFile) {
@@ -629,69 +593,25 @@ export default function App() {
     }
   }, [currentFile, loadDocument, showError, text.reloadFailed]);
 
-  const runCommand = useCallback((id: CommandId) => {
-    setIsCommandPaletteOpen(false);
-    setCommandQuery("");
+  const openNoteSearch = useCallback(() => {
+    setIsNoteSearchVisible(true);
+    requestAnimationFrame(() => {
+      searchInputRef.current?.focus();
+      searchInputRef.current?.select();
+    });
+  }, []);
 
-    switch (id) {
-      case "file.new":
-        handleNew();
-        break;
-      case "file.open":
-        void handleOpen();
-        break;
-      case "file.save":
-        void handleSave();
-        break;
-      case "file.saveAs":
-        void handleSaveAs();
-        break;
-      case "file.exportHtml":
-        void handleExportHtml();
-        break;
-      case "view.cycleEditorMode":
-      case "view.togglePreview":
-        setEditorMode((mode) => cycleEditorMode(mode));
-        break;
-      case "view.commandPalette":
-        setIsCommandPaletteOpen(true);
-        break;
-      case "theme.system":
-        setThemeMode("system");
-        break;
-      case "theme.light":
-        setThemeMode("light");
-        break;
-      case "theme.dark":
-        setThemeMode("dark");
-        break;
-      case "language.en":
-        setAppLanguage("en");
-        break;
-      case "language.ja":
-        setAppLanguage("ja");
-        break;
-      case "search.note":
-        setIsNoteSearchVisible(true);
-        requestAnimationFrame(() => {
-          searchInputRef.current?.focus();
-          searchInputRef.current?.select();
-        });
-        break;
-      case "format.bold":
-        editorRef.current?.wrapSelection("**", "**", "bold text");
-        break;
-      case "format.italic":
-        editorRef.current?.wrapSelection("_", "_", "italic text");
-        break;
-      case "format.link":
-        editorRef.current?.wrapSelection("[", "](url)", "link text");
-        break;
-      case "format.json":
-        handleFormatJson();
-        break;
-    }
-  }, [handleExportHtml, handleFormatJson, handleNew, handleOpen, handleSave, handleSaveAs]);
+  const handleBold = useCallback(() => {
+    editorRef.current?.wrapSelection("**", "**", "bold text");
+  }, []);
+
+  const handleItalic = useCallback(() => {
+    editorRef.current?.wrapSelection("_", "_", "italic text");
+  }, []);
+
+  const handleInsertLink = useCallback(() => {
+    editorRef.current?.wrapSelection("[", "](url)", "link text");
+  }, []);
 
   const runMenuAction = useCallback((action: () => void | Promise<unknown>) => {
     setActiveMenu(null);
@@ -825,10 +745,10 @@ export default function App() {
 
       if (isPrimaryShortcut(event, "n")) {
         event.preventDefault();
-        runCommand("file.new");
+        handleNew();
       } else if (isPrimaryShortcut(event, "o")) {
         event.preventDefault();
-        runCommand("file.open");
+        void handleOpen();
       } else if (isPrimaryShortcut(event, "s")) {
         event.preventDefault();
         if (event.shiftKey) {
@@ -838,28 +758,24 @@ export default function App() {
         }
       } else if (isPrimaryShortcut(event, "f")) {
         event.preventDefault();
-        runCommand("search.note");
-      } else if (isPrimaryShortcut(event, "k")) {
-        event.preventDefault();
-        setIsCommandPaletteOpen(true);
+        openNoteSearch();
       } else if (isPrimaryShortcut(event, "b")) {
         event.preventDefault();
-        runCommand("format.bold");
+        handleBold();
       } else if (isPrimaryShortcut(event, "i")) {
         event.preventDefault();
-        runCommand("format.italic");
+        handleItalic();
       } else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "v") {
         event.preventDefault();
         setEditorMode((mode) => cycleEditorMode(mode));
       } else if (event.key === "Escape") {
         setActiveMenu(null);
-        setIsCommandPaletteOpen(false);
       }
     };
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleSave, handleSaveAs, runCommand]);
+  }, [handleBold, handleItalic, handleNew, handleOpen, handleSave, handleSaveAs, openNoteSearch]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -998,23 +914,19 @@ export default function App() {
             </div>
           </div>
 
-          <button className="menu-title command-menu-button" type="button" aria-pressed={isCommandPaletteOpen} onClick={() => setIsCommandPaletteOpen(true)}>
-            {text.command} <kbd>Ctrl+K</kbd>
-          </button>
-
           <div className="menu-root" data-open={activeMenu === "search"} onMouseEnter={() => activeMenu && setActiveMenu("search")}>
             <button className="menu-title" aria-expanded={activeMenu === "search"} onClick={() => setActiveMenu((menu) => (menu === "search" ? null : "search"))}>{text.search}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("search.note"))}>{text.find} <kbd>Ctrl+F</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(openNoteSearch)}>{text.find} <kbd>Ctrl+F</kbd></button>
             </div>
           </div>
 
           <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
             <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.bold"))}>{text.bold} <kbd>Ctrl+B</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.italic"))}>{text.italic} <kbd>Ctrl+I</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(() => runCommand("format.link"))}>{text.insertLink}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleBold)}>{text.bold} <kbd>Ctrl+B</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleItalic)}>{text.italic} <kbd>Ctrl+I</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleInsertLink)}>{text.insertLink}</button>
               <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>{text.formatJson}</button>
             </div>
           </div>
@@ -1045,7 +957,7 @@ export default function App() {
         </section>
       )}
 
-      <section className="app-body" data-sidebar-collapsed="true">
+      <section className="app-body">
         <section
           className="workspace"
           ref={workspaceRef}
@@ -1150,7 +1062,7 @@ export default function App() {
                   currentFile={currentFile}
                   themeMode={themeMode}
                   onOpenExcalidraw={handleOpenExcalidrawPreview}
-                  onOpenWikiLink={handleOpenWikiLinkPreview}
+                  onOpenRelativeMarkdownLink={handleOpenRelativeMarkdownLink}
                 />
               </article>
             </>
@@ -1165,18 +1077,6 @@ export default function App() {
         <span>{text.lines} {stats.lines}</span>
         <span>{text.chars} {stats.chars}</span>
       </footer>
-
-      <CommandPalette
-        isOpen={isCommandPaletteOpen}
-        query={commandQuery}
-        commands={commandDefinitions}
-        disabledCommands={disabledCommands}
-        placeholder={text.runCommand}
-        cancelLabel={text.cancel}
-        onQueryChange={setCommandQuery}
-        onClose={() => setIsCommandPaletteOpen(false)}
-        onRun={runCommand}
-      />
 
       {fileProperties && (
         <section className="modal-backdrop" role="dialog" aria-modal="true" aria-labelledby="file-properties-title">

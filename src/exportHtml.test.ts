@@ -33,6 +33,12 @@ describe("markdownToHtml", () => {
     expect(html).toContain("<pre><code class=\"language-js\">");
     expect(html).toContain("console.log('&lt;safe&gt;')");
   });
+
+  it("keeps former wiki syntax as ordinary text", () => {
+    const html = markdownToHtml("See [[Project Plan]].");
+
+    expect(html).toContain("<p>See [[Project Plan]].</p>");
+  });
 });
 
 describe("buildStandaloneHtml", () => {
