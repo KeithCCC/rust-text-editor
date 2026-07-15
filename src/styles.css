@@ -219,7 +219,7 @@ button:hover {
 }
 
 .preview-pane-toggle-button {
-  margin-right: 4px;
+  margin-left: auto;
 }
 
 .menubar-shell,
@@ -285,7 +285,8 @@ button:hover {
   flex-direction: column;
 }
 
-.menu-popover button {
+.menu-popover button,
+.menu-choice-item {
   display: flex;
   justify-content: space-between;
   gap: 18px;
@@ -296,6 +297,21 @@ button:hover {
   padding: 7px 20px 7px 10px;
   text-align: left;
   font: 400 var(--ui-font-size)/1.2 inherit;
+}
+
+.menu-choice-item {
+  align-items: center;
+  justify-content: flex-start;
+  cursor: pointer;
+}
+
+.menu-choice-item input {
+  margin: 0;
+  accent-color: var(--preview-link);
+}
+
+.menu-choice-item kbd {
+  margin-left: auto;
 }
 
 kbd {
@@ -309,7 +325,9 @@ kbd {
 }
 
 .menu-popover button:hover,
-.menu-popover button:focus-visible {
+.menu-popover button:focus-visible,
+.menu-choice-item:hover,
+.menu-choice-item:focus-within {
   background: var(--active-bg);
   outline: none;
 }

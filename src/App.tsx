@@ -14,6 +14,7 @@ import { BUILD_INFO } from "./buildInfo";
 import { isPrimaryShortcut } from "./keyboardShortcuts";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
+import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
 import { logDebug } from "./debugLog";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
@@ -859,22 +860,6 @@ export default function App() {
     >
       <header className="app-header">
         <nav className="menubar-shell" aria-label="Application menu" ref={menubarRef}>
-          <button
-            type="button"
-            className="menubar-icon-button preview-pane-toggle-button"
-            onClick={() => setEditorMode((mode) => cycleEditorMode(mode))}
-            title={`${isSplitMode ? text.hidePreview : text.showPreview} (Ctrl+Shift+V)`}
-            aria-label={isSplitMode ? text.hidePreview : text.showPreview}
-            aria-pressed={isSplitMode}
-          >
-            <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
-              <rect x="2.75" y="3.25" width="12.5" height="11.5" rx="1.5" />
-              <line x1="9.5" y1="4.75" x2="9.5" y2="13.25" />
-              {isSplitMode && <path className="preview-toggle-panel" d="M10.85 4.75h2.9c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1h-2.9z" />}
-              <circle cx="12.8" cy="9" r="1.45" />
-            </svg>
-          </button>
-
           <div className="menu-root" data-open={activeMenu === "file"} onMouseEnter={() => activeMenu && setActiveMenu("file")}>
             <button className="menu-title" aria-expanded={activeMenu === "file"} onClick={() => setActiveMenu((menu) => (menu === "file" ? null : "file"))}>{text.file}</button>
             <div className="menu-popover" role="menu">
@@ -893,16 +878,19 @@ export default function App() {
           <div className="menu-root" data-open={activeMenu === "view"} onMouseEnter={() => activeMenu && setActiveMenu("view")}>
             <button className="menu-title" aria-expanded={activeMenu === "view"} onClick={() => setActiveMenu((menu) => (menu === "view" ? null : "view"))}>{text.view}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitemradio" aria-checked={themeMode === "system"} onClick={() => runMenuAction(() => setThemeMode("system"))}>{themeMode === "system" ? "[x] " : ""}{text.systemTheme}</button>
-              <button role="menuitemradio" aria-checked={themeMode === "light"} onClick={() => runMenuAction(() => setThemeMode("light"))}>{themeMode === "light" ? "[x] " : ""}{text.lightTheme}</button>
-              <button role="menuitemradio" aria-checked={themeMode === "dark"} onClick={() => runMenuAction(() => setThemeMode("dark"))}>{themeMode === "dark" ? "[x] " : ""}{text.darkTheme}</button>
+              <MenuRadioItem name="theme" value="system" checked={themeMode === "system"} label={text.systemTheme} onSelect={() => runMenuAction(() => setThemeMode("system"))} />
+              <MenuRadioItem name="theme" value="light" checked={themeMode === "light"} label={text.lightTheme} onSelect={() => runMenuAction(() => setThemeMode("light"))} />
+              <MenuRadioItem name="theme" value="dark" checked={themeMode === "dark"} label={text.darkTheme} onSelect={() => runMenuAction(() => setThemeMode("dark"))} />
               <div className="menu-separator" />
-              <button role="menuitemradio" aria-checked={appLanguage === "en"} onClick={() => runMenuAction(() => setAppLanguage("en"))}>{appLanguage === "en" ? "[x] " : ""}{text.englishUi}</button>
-              <button role="menuitemradio" aria-checked={appLanguage === "ja"} onClick={() => runMenuAction(() => setAppLanguage("ja"))}>{appLanguage === "ja" ? "[x] " : ""}{text.japaneseUi}</button>
+              <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
+              <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
               <div className="menu-separator" />
-              <button role="menuitemcheckbox" aria-checked={isSplitMode} onClick={() => runMenuAction(() => setEditorMode((mode) => cycleEditorMode(mode)))}>
-                {isSplitMode ? "[x] " : ""}{text.previewPane} <kbd>Ctrl+Shift+V</kbd>
-              </button>
+              <MenuCheckboxItem
+                checked={isSplitMode}
+                label={text.previewPane}
+                shortcut="Ctrl+Shift+V"
+                onToggle={() => runMenuAction(() => setEditorMode((mode) => cycleEditorMode(mode)))}
+              />
               <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
             </div>
           </div>
@@ -930,6 +918,22 @@ export default function App() {
               <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>{text.formatJson}</button>
             </div>
           </div>
+
+          <button
+            type="button"
+            className="menubar-icon-button preview-pane-toggle-button"
+            onClick={() => setEditorMode((mode) => cycleEditorMode(mode))}
+            title={`${isSplitMode ? text.hidePreview : text.showPreview} (Ctrl+Shift+V)`}
+            aria-label={isSplitMode ? text.hidePreview : text.showPreview}
+            aria-pressed={isSplitMode}
+          >
+            <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
+              <rect x="2.75" y="3.25" width="12.5" height="11.5" rx="1.5" />
+              <line x1="9.5" y1="4.75" x2="9.5" y2="13.25" />
+              {isSplitMode && <path className="preview-toggle-panel" d="M10.85 4.75h2.9c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1h-2.9z" />}
+              <circle cx="12.8" cy="9" r="1.45" />
+            </svg>
+          </button>
         </nav>
 
         <div className="window-caption">
