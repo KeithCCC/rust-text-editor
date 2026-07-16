@@ -17,6 +17,7 @@ type HelpContent = {
   title: string;
   introduction: string;
   close: string;
+  closeLabel: string;
   shortcutsTitle: string;
   actionHeading: string;
   shortcutHeading: string;
@@ -29,6 +30,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
     title: "How to use Koharu",
     introduction: "The essentials for writing and saving a Markdown document.",
     close: "Close",
+    closeLabel: "Close How to use Koharu",
     shortcutsTitle: "Keyboard shortcuts",
     actionHeading: "Action",
     shortcutHeading: "Shortcut",
@@ -67,12 +69,14 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       { action: "Find", keys: "Ctrl+F" },
       { action: "Bold", keys: "Ctrl+B" },
       { action: "Italic", keys: "Ctrl+I" },
+      { action: "Toggle preview", keys: "Ctrl+Shift+V" },
     ],
   },
   ja: {
     title: "Koharuの使い方",
     introduction: "Markdown文書を書いて保存するための、基本的な使い方です。",
     close: "閉じる",
+    closeLabel: "Koharuの使い方を閉じる",
     shortcutsTitle: "キーボードショートカット",
     actionHeading: "操作",
     shortcutHeading: "ショートカット",
@@ -111,6 +115,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       { action: "検索", keys: "Ctrl+F" },
       { action: "太字", keys: "Ctrl+B" },
       { action: "斜体", keys: "Ctrl+I" },
+      { action: "プレビューを切り替える", keys: "Ctrl+Shift+V" },
     ],
   },
 };
@@ -146,7 +151,7 @@ export function HelpDialog({ language, onClose }: HelpDialogProps) {
             <strong id="help-dialog-title">{content.title}</strong>
             <span>{content.introduction}</span>
           </div>
-          <button type="button" aria-label={content.close} onClick={onClose}>×</button>
+          <button type="button" aria-label={content.closeLabel} onClick={onClose}>×</button>
         </header>
 
         <div className="help-dialog-body">

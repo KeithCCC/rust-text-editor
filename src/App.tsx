@@ -12,6 +12,7 @@ import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BUILD_INFO } from "./buildInfo";
 import { isPrimaryShortcut } from "./keyboardShortcuts";
+import { HelpDialog } from "./components/HelpDialog";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
@@ -47,7 +48,7 @@ type ExcalidrawSession = {
 
 type ThemeMode = "system" | "light" | "dark";
 type AppLanguage = "en" | "ja";
-type MenuId = "file" | "view" | "settings" | "search" | "format";
+type MenuId = "file" | "view" | "settings" | "search" | "format" | "help";
 
 const THEME_STORAGE_KEY = "koharu-theme";
 const LEGACY_THEME_STORAGE_KEY = "hotaru-theme";
@@ -66,6 +67,8 @@ const LARGE_DOCUMENT_CHAR_THRESHOLD = 120_000;
 
 const UI_TEXT = {
   en: {
+    help: "Help",
+    howToUseKoharu: "How to use Koharu",
     file: "File",
     view: "View",
     settings: "Settings",
@@ -146,6 +149,8 @@ const UI_TEXT = {
     bytes: "bytes",
   },
   ja: {
+    help: "ヘルプ",
+    howToUseKoharu: "Koharuの使い方",
     file: "ファイル",
     view: "表示",
     settings: "設定",
@@ -285,6 +290,7 @@ export default function App() {
   const [isFileDragOver, setIsFileDragOver] = useState(false);
   const [fileProperties, setFileProperties] = useState<FileProperties | null>(null);
   const [isAppearanceSettingsOpen, setIsAppearanceSettingsOpen] = useState(false);
+  const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [previewContent, setPreviewContent] = useState(initialDocument.content);
   const [isPreviewPending, setIsPreviewPending] = useState(false);
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
@@ -744,6 +750,10 @@ export default function App() {
         return;
       }
 
+      if (isHelpOpen) {
+        return;
+      }
+
       if (isPrimaryShortcut(event, "n")) {
         event.preventDefault();
         handleNew();
@@ -776,7 +786,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleBold, handleItalic, handleNew, handleOpen, handleSave, handleSaveAs, openNoteSearch]);
+  }, [handleBold, handleItalic, handleNew, handleOpen, handleSave, handleSaveAs, isHelpOpen, openNoteSearch]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -916,6 +926,13 @@ export default function App() {
               <button role="menuitem" onClick={() => runMenuAction(handleItalic)}>{text.italic} <kbd>Ctrl+I</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleInsertLink)}>{text.insertLink}</button>
               <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>{text.formatJson}</button>
+            </div>
+          </div>
+
+          <div className="menu-root" data-open={activeMenu === "help"} onMouseEnter={() => activeMenu && setActiveMenu("help")}>
+            <button className="menu-title" aria-expanded={activeMenu === "help"} onClick={() => setActiveMenu((menu) => (menu === "help" ? null : "help"))}>{text.help}</button>
+            <div className="menu-popover" role="menu">
+              <button role="menuitem" onClick={() => runMenuAction(() => setIsHelpOpen(true))}>{text.howToUseKoharu}</button>
             </div>
           </div>
 
@@ -1104,6 +1121,10 @@ export default function App() {
             </dl>
           </div>
         </section>
+      )}
+
+      {isHelpOpen && (
+        <HelpDialog language={appLanguage} onClose={() => setIsHelpOpen(false)} />
       )}
 
       {isAppearanceSettingsOpen && (

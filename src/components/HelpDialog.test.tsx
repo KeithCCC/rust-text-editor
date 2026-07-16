@@ -12,8 +12,11 @@ describe("HelpDialog", () => {
     expect(html).toContain("ファイルを作る・開く・保存する");
     expect(html).toContain("Markdownの書き方");
     expect(html).toContain("Ctrl+S");
+    expect(html).toContain("プレビューを切り替える");
+    expect(html).toContain("Ctrl+Shift+V");
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
+    expect(html).toContain('aria-label="Koharuの使い方を閉じる"');
   });
 
   it("renders beginner help in English", () => {
@@ -25,6 +28,8 @@ describe("HelpDialog", () => {
     expect(html).toContain("Create, open, and save files");
     expect(html).toContain("Markdown basics");
     expect(html).toContain("Ctrl+F");
+    expect(html).toContain("Toggle preview");
+    expect(html).toContain("Close How to use Koharu");
   });
 
   it("closes only for Escape", () => {
