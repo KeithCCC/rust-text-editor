@@ -11,6 +11,7 @@ import type { CSSProperties } from "react";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BUILD_INFO } from "./buildInfo";
+import { formatBuildLabel } from "./buildLabel";
 import { isPrimaryShortcut } from "./keyboardShortcuts";
 import { HelpDialog } from "./components/HelpDialog";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
@@ -97,7 +98,6 @@ const UI_TEXT = {
     editor: "Editor",
     preview: "Preview",
     untitled: "Untitled",
-    singleFileCaption: "Single-file text editor",
     updating: "Updating...",
     markdownPreview: "Markdown preview",
     fileStatus: "File:",
@@ -179,7 +179,6 @@ const UI_TEXT = {
     editor: "エディタ",
     preview: "プレビュー",
     untitled: "無題",
-    singleFileCaption: "単一ファイルテキストエディタ",
     updating: "更新中...",
     markdownPreview: "Markdownプレビュー",
     fileStatus: "ファイル:",
@@ -953,12 +952,6 @@ export default function App() {
           </button>
         </nav>
 
-        <div className="window-caption">
-          <strong>Koharu</strong>
-          <span className="build-badge">build {BUILD_INFO.buildNumber}</span>
-          <span className="build-updated">updated {BUILD_INFO.updatedAt}</span>
-          <span>{text.singleFileCaption}</span>
-        </div>
       </header>
 
       {error && (
@@ -1097,6 +1090,7 @@ export default function App() {
         <span>{isSplitMode ? text.previewOn : text.previewOff}</span>
         <span>{text.lines} {stats.lines}</span>
         <span>{text.chars} {stats.chars}</span>
+        <span className="statusbar-build">{formatBuildLabel(BUILD_INFO.buildNumber)}</span>
       </footer>
 
       {fileProperties && (

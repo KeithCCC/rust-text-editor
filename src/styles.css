@@ -172,9 +172,7 @@ button:hover {
 .app-header {
   grid-area: menu;
   display: grid;
-  grid-template-rows: 32px auto;
   min-width: 0;
-  border-bottom: 1px solid var(--border);
   background: var(--bar-bg);
 }
 
@@ -355,40 +353,11 @@ kbd {
   background: var(--border);
 }
 
-.window-caption {
-  display: flex;
-  align-items: baseline;
-  min-width: 0;
-  gap: 8px;
-  padding: 3px 12px 4px;
-  color: var(--muted);
-}
-
-.window-caption strong {
-  color: var(--text);
-  font-size: var(--ui-font-size);
-}
-
-.window-caption span,
 .pane-header small,
 .statusbar,
 .excalidraw-card small {
   color: var(--muted);
   font-size: 12px;
-}
-
-.window-caption .build-badge {
-  padding: 1px 6px;
-  border: 1px solid var(--strong-border);
-  border-radius: 999px;
-  background: var(--surface-bg);
-  color: var(--preview-link);
-  font-weight: 700;
-}
-
-.window-caption .build-updated {
-  color: var(--text);
-  font-weight: 600;
 }
 
 .error-banner {
@@ -1106,6 +1075,11 @@ textarea {
   white-space: nowrap;
 }
 
+.statusbar-build {
+  flex: 0 0 auto;
+  white-space: nowrap;
+}
+
 .modal-backdrop {
   position: fixed;
   inset: 0;
@@ -1426,12 +1400,6 @@ textarea {
     width: 100%;
     height: 6px;
     cursor: row-resize;
-  }
-
-  .window-caption {
-    width: 100%;
-    padding: 7px 12px;
-    border-top: 1px solid var(--border);
   }
 
   .preview-pane {
