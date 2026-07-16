@@ -1,4 +1,4 @@
-# drive.drop Skill 設計
+# drive-drop Skill 設計
 
 ## 目的
 
@@ -6,9 +6,9 @@
 
 ## スキル名と呼び出し
 
-- スキル名は `drive.drop` とする。
+- スキル名は `drive-drop` とする。
 - 表示名は `Drive Drop` とする。
-- `$drive.drop このファイルをコピーして` のように呼び出せるようにする。
+- `$drive-drop このファイルをコピーして` のように呼び出せるようにする。
 - 1ファイルと複数ファイルの両方を受け付ける。
 
 ## コピー先
@@ -54,10 +54,10 @@ ZIP、Markdown、PDF、画像、Officeファイルなど、Google Driveへ通常
 
 ## 構成と配布
 
-スキルはユーザーのCodexスキル領域へ `drive.drop` フォルダーとして作成する。最低限、次を含める。
+スキルはユーザーのCodexスキル領域へ `drive-drop` フォルダーとして作成する。最低限、次を含める。
 
 ```text
-drive.drop/
+drive-drop/
 ├── SKILL.md
 └── agents/
     └── openai.yaml
@@ -76,7 +76,7 @@ drive.drop/
 
 ## 完了条件
 
-- `drive.drop`スキルがCodexから認識できる構成で作成されている。
+- `drive-drop`スキルがCodexから認識できる構成で作成されている。
 - 指定ファイルを固定の「0.Drop」へ新規追加または安全に更新できる手順になっている。
 - 結果をDriveメタデータで検証し、ユーザーへリンク付きで報告する。
 - ZIPとREADMEを使って別PCへ移行できる。
