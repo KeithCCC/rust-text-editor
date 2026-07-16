@@ -107,7 +107,6 @@ function renderInlineMarkdown(value: string) {
     .replace(/\*\*([^*]+)\*\*/g, "<strong>$1</strong>")
     .replace(/_([^_\n]+)_/g, "<em>$1</em>")
     .replace(/`([^`\n]+)`/g, "<code>$1</code>")
-    .replace(/\[\[([^\]]+)\]\]/g, "<span class=\"wiki-link\">$1</span>")
     .replace(/\[([^\]]+)\]\(([^)]+)\)/g, (_match, label: string, href: string) => {
       return `<a href="${escapeHtml(href)}">${label}</a>`;
     });

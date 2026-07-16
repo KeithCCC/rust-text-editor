@@ -270,7 +270,7 @@ function appendText(parent: HTMLElement, text: string) {
 }
 
 function appendInlinePreview(parent: HTMLElement, source: string) {
-  const tokenPattern = /(<br\s*\/?>|\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\[\[([^\]]+)\]\]|\[([^\]]+)\]\(([^)]+)\))/gi;
+  const tokenPattern = /(<br\s*\/?>|\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/gi;
   let lastIndex = 0;
 
   for (const match of source.matchAll(tokenPattern)) {
@@ -289,13 +289,8 @@ function appendInlinePreview(parent: HTMLElement, source: string) {
       parent.append(code);
     } else if (match[5]) {
       const span = document.createElement("span");
-      span.className = "hotaru-live-wiki-link";
-      span.textContent = match[5].trim();
-      parent.append(span);
-    } else if (match[6]) {
-      const span = document.createElement("span");
       span.className = "hotaru-live-link";
-      span.textContent = match[6];
+      span.textContent = match[5];
       parent.append(span);
     }
 
@@ -626,7 +621,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         onCreateEditor={(view) => {
           viewRef.current = view;
         }}
-        placeholder="Write Markdown here. Use #tags, [[wiki links]], fenced ```mermaid blocks, and image links to .excalidraw files."
+        placeholder="Write Markdown here."
       />
     </div>
   );

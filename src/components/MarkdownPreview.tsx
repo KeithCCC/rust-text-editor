@@ -5,6 +5,7 @@ import rehypeRaw from "rehype-raw";
 import { MermaidBlock } from "./MermaidBlock";
 import { ExcalidrawEmbed } from "./ExcalidrawEmbed";
 import { JsonCodeBlock } from "./JsonCodeBlock";
+import { getRelativeMarkdownPath } from "../markdownLinks";
 import type { ExcalidrawScene } from "../types";
 
 type MarkdownPreviewProps = {
@@ -12,7 +13,7 @@ type MarkdownPreviewProps = {
   currentFile: string | null;
   themeMode: "system" | "light" | "dark";
   onOpenExcalidraw: (path: string, scene: ExcalidrawScene | null) => void;
-  onOpenWikiLink?: (name: string) => void;
+  onOpenRelativeMarkdownLink: (path: string) => void;
 };
 
 function getCodeLanguage(className: string | undefined) {
@@ -28,14 +29,9 @@ function getPreCodeLanguage(children: ReactNode) {
 }
 
 const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps>(function MarkdownPreview(
-  { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenWikiLink },
+  { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenRelativeMarkdownLink },
   ref,
 ) {
-  const renderedMarkdown = markdown.replace(/\[\[([^\]]+)\]\]/g, (_match, rawName: string) => {
-    const name = rawName.trim();
-    return name ? `[[${name}]](hotaru-wiki://${encodeURIComponent(name)})` : _match;
-  });
-
   return (
     <div className="preview-body" ref={ref}>
       <ReactMarkdown
@@ -43,12 +39,19 @@ const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps
         rehypePlugins={[rehypeRaw]}
         components={{
           a({ href, children, ...props }) {
-            if (href?.startsWith("hotaru-wiki://")) {
-              const name = decodeURIComponent(href.replace("hotaru-wiki://", ""));
+            const relativeMarkdownPath = href ? getRelativeMarkdownPath(href) : null;
+            if (relativeMarkdownPath) {
               return (
-                <button type="button" className="wiki-link" onClick={() => onOpenWikiLink?.(name)}>
+                <a
+                  href={href}
+                  {...props}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onOpenRelativeMarkdownLink(relativeMarkdownPath);
+                  }}
+                >
                   {children}
-                </button>
+                </a>
               );
             }
 
@@ -96,7 +99,7 @@ const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps
           },
         }}
       >
-        {renderedMarkdown}
+        {markdown}
       </ReactMarkdown>
     </div>
   );
