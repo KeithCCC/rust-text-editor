@@ -1,5 +1,9 @@
 import { describe, expect, test, vi } from "vitest";
-import { runDocumentTransition, type UnsavedDecision } from "./documentLifecycle";
+import {
+  runApplicationCloseTransition,
+  runDocumentTransition,
+  type UnsavedDecision,
+} from "./documentLifecycle";
 
 function setup(modified: boolean) {
   return {
@@ -59,6 +63,81 @@ describe("runDocumentTransition", () => {
     expect(await runDocumentTransition(options)).toBe(false);
     expect(options.save).not.toHaveBeenCalled();
     expect(options.discardRecovery).not.toHaveBeenCalled();
+    expect(options.proceed).not.toHaveBeenCalled();
+  });
+});
+
+function setupApplicationClose(markdownModified: boolean, diagramDirty: boolean) {
+  return {
+    markdownModified,
+    diagramDirty,
+    requestDecision: vi.fn<() => Promise<UnsavedDecision>>(async () => "cancel"),
+    saveDiagram: vi.fn(async () => true),
+    saveMarkdown: vi.fn(async () => true),
+    discardMarkdownRecovery: vi.fn(async () => undefined),
+    proceed: vi.fn(async () => undefined),
+  };
+}
+
+describe("runApplicationCloseTransition", () => {
+  test("prompts for a dirty Excalidraw diagram and saves it before closing", async () => {
+    const options = setupApplicationClose(false, true);
+    options.requestDecision.mockResolvedValue("save");
+
+    await expect(runApplicationCloseTransition(options)).resolves.toBe(true);
+
+    expect(options.requestDecision).toHaveBeenCalledTimes(1);
+    expect(options.saveDiagram).toHaveBeenCalledTimes(1);
+    expect(options.saveMarkdown).not.toHaveBeenCalled();
+    expect(options.proceed).toHaveBeenCalledTimes(1);
+  });
+
+  test("uses one decision to save both a dirty diagram and Markdown document", async () => {
+    const order: string[] = [];
+    const options = setupApplicationClose(true, true);
+    options.requestDecision.mockResolvedValue("save");
+    options.saveDiagram.mockImplementation(async () => { order.push("diagram"); return true; });
+    options.saveMarkdown.mockImplementation(async () => { order.push("markdown"); return true; });
+    options.proceed.mockImplementation(async () => { order.push("close"); });
+
+    await expect(runApplicationCloseTransition(options)).resolves.toBe(true);
+
+    expect(options.requestDecision).toHaveBeenCalledTimes(1);
+    expect(order).toEqual(["diagram", "markdown", "close"]);
+  });
+
+  test("does not close when saving the diagram fails", async () => {
+    const options = setupApplicationClose(true, true);
+    options.requestDecision.mockResolvedValue("save");
+    options.saveDiagram.mockResolvedValue(false);
+
+    await expect(runApplicationCloseTransition(options)).resolves.toBe(false);
+
+    expect(options.saveMarkdown).not.toHaveBeenCalled();
+    expect(options.proceed).not.toHaveBeenCalled();
+  });
+
+  test("discards both dirty resources with one decision", async () => {
+    const options = setupApplicationClose(true, true);
+    options.requestDecision.mockResolvedValue("discard");
+
+    await expect(runApplicationCloseTransition(options)).resolves.toBe(true);
+
+    expect(options.requestDecision).toHaveBeenCalledTimes(1);
+    expect(options.saveDiagram).not.toHaveBeenCalled();
+    expect(options.saveMarkdown).not.toHaveBeenCalled();
+    expect(options.discardMarkdownRecovery).toHaveBeenCalledTimes(1);
+    expect(options.proceed).toHaveBeenCalledTimes(1);
+  });
+
+  test("keeps both editors open when closing is canceled", async () => {
+    const options = setupApplicationClose(true, true);
+
+    await expect(runApplicationCloseTransition(options)).resolves.toBe(false);
+
+    expect(options.saveDiagram).not.toHaveBeenCalled();
+    expect(options.saveMarkdown).not.toHaveBeenCalled();
+    expect(options.discardMarkdownRecovery).not.toHaveBeenCalled();
     expect(options.proceed).not.toHaveBeenCalled();
   });
 });

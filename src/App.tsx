@@ -26,11 +26,16 @@ import {
 } from "./appSafety";
 import { HelpDialog } from "./components/HelpDialog";
 import { DecisionDialog } from "./components/DecisionDialog";
+import type { ExcalidrawEditorHandle } from "./components/ExcalidrawEditor";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
 import { logDebug } from "./debugLog";
-import { runDocumentTransition, type UnsavedDecision } from "./documentLifecycle";
+import {
+  runApplicationCloseTransition,
+  runDocumentTransition,
+  type UnsavedDecision,
+} from "./documentLifecycle";
 import { getDocumentSafetyText } from "./documentSafetyText";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
@@ -338,6 +343,7 @@ export default function App() {
   const [hasSearchSelection, setHasSearchSelection] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [excalidrawSession, setExcalidrawSession] = useState<ExcalidrawSession | null>(null);
+  const [excalidrawDirty, setExcalidrawDirty] = useState(false);
   const [isUnsavedPromptOpen, setIsUnsavedPromptOpen] = useState(false);
   const [startupRecoveryDraft, setStartupRecoveryDraft] = useState<RecoveryDraft | null>(null);
   const [pendingStartupPath, setPendingStartupPath] = useState<string | null>(null);
@@ -349,6 +355,7 @@ export default function App() {
   const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<MarkdownEditorHandle | null>(null);
+  const excalidrawEditorRef = useRef<ExcalidrawEditorHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
   const previewRef = useRef<HTMLDivElement | null>(null);
   const isSyncingScrollRef = useRef(false);
@@ -367,6 +374,7 @@ export default function App() {
     new DocumentActionGate(isTauriRuntime() ? ["startup"] : []),
   );
   const latestDocumentRef = useRef(new LatestValue({ content, currentFile, modified }));
+  const latestExcalidrawDirtyRef = useRef(false);
   const latestCloseRequestRef = useRef<() => Promise<unknown>>(async () => false);
   const closeErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
   const latestDroppedPathOpenRef = useRef<(path: string) => Promise<unknown>>(async () => false);
@@ -376,7 +384,14 @@ export default function App() {
   const isNativeRuntime = isTauriRuntime();
   const isSplitMode = editorMode === "split";
   const text = UI_TEXT[appLanguage];
-  const safetyText = getDocumentSafetyText(appLanguage, fileNameFromPath(currentFile));
+  const unsavedResourceNames = [
+    ...(modified ? [fileNameFromPath(currentFile)] : []),
+    ...(excalidrawDirty && excalidrawSession ? [fileNameFromPath(excalidrawSession.path)] : []),
+  ].filter((name, index, names) => names.indexOf(name) === index);
+  const safetyText = getDocumentSafetyText(
+    appLanguage,
+    unsavedResourceNames.join(" / ") || fileNameFromPath(currentFile),
+  );
   const isDocumentSafetyActive = isStartupResolutionPending
     || isDocumentTransitionPending
     || isDirectSavePending
@@ -588,14 +603,34 @@ export default function App() {
   const requestAppClose = useCallback(() => {
     if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
     return runCloseRequestSafely(
-      () => requestDocumentTransition(async () => {
-        await saveCurrentWindowState();
-        if (isTauriRuntime()) await exitApp();
-        else window.close();
-      }),
+      async () => {
+        if (transitionInProgressRef.current) return false;
+        transitionInProgressRef.current = true;
+        actionGateRef.current.block("transition");
+        setIsDocumentTransitionPending(true);
+        try {
+          return await runApplicationCloseTransition({
+            markdownModified: latestDocumentRef.current.get().modified,
+            diagramDirty: latestExcalidrawDirtyRef.current,
+            requestDecision: requestUnsavedDecision,
+            saveDiagram: async () => excalidrawEditorRef.current?.save() ?? false,
+            saveMarkdown: handleSave,
+            discardMarkdownRecovery: () => clearRecoverySafely(true),
+            proceed: async () => {
+              await saveCurrentWindowState();
+              if (isTauriRuntime()) await exitApp();
+              else window.close();
+            },
+          });
+        } finally {
+          transitionInProgressRef.current = false;
+          actionGateRef.current.release("transition");
+          setIsDocumentTransitionPending(false);
+        }
+      },
       reportCloseError,
     );
-  }, [reportCloseError, requestDocumentTransition]);
+  }, [clearRecoverySafely, handleSave, reportCloseError, requestUnsavedDecision]);
   latestCloseRequestRef.current = requestAppClose;
   closeErrorReporterRef.current = reportCloseError;
 
@@ -706,9 +741,15 @@ export default function App() {
     }
   }, [content, showError, text.jsonFormatFailed]);
 
-  const handleOpenExcalidrawPreview = useCallback((path: string, scene: ExcalidrawScene | null) => {
-    setExcalidrawSession({ path, scene });
+  const handleExcalidrawDirtyChange = useCallback((dirty: boolean) => {
+    latestExcalidrawDirtyRef.current = dirty;
+    setExcalidrawDirty(dirty);
   }, []);
+
+  const handleOpenExcalidrawPreview = useCallback((path: string, scene: ExcalidrawScene | null) => {
+    handleExcalidrawDirtyChange(false);
+    setExcalidrawSession({ path, scene });
+  }, [handleExcalidrawDirtyChange]);
 
   const handleOpenRelativeMarkdownLink = useCallback((relativePath: string) => {
     if (actionGateRef.current.isBlocked()) return;
@@ -1472,10 +1513,15 @@ export default function App() {
       {excalidrawSession && (
         <Suspense fallback={<div className="modal-backdrop">{text.loadingExcalidraw}</div>}>
           <ExcalidrawEditor
+            ref={excalidrawEditorRef}
             path={excalidrawSession.path}
             initialScene={excalidrawSession.scene}
-            onClose={() => setExcalidrawSession(null)}
+            onClose={() => {
+              handleExcalidrawDirtyChange(false);
+              setExcalidrawSession(null);
+            }}
             onSaved={() => void handleExcalidrawSaved(excalidrawSession.path)}
+            onDirtyChange={handleExcalidrawDirtyChange}
             onError={(message) => showError(text.excalidrawSaveFailed, message)}
           />
         </Suspense>

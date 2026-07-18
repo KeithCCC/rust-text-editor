@@ -1,4 +1,12 @@
-import { useCallback, useEffect, useMemo, useRef, useState } from "react";
+import {
+  forwardRef,
+  useCallback,
+  useEffect,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  useState,
+} from "react";
 import { Excalidraw } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawScene } from "../types";
@@ -9,7 +17,12 @@ type ExcalidrawEditorProps = {
   initialScene: ExcalidrawScene | null;
   onClose: () => void;
   onSaved: () => void;
+  onDirtyChange: (dirty: boolean) => void;
   onError: (message: string) => void;
+};
+
+export type ExcalidrawEditorHandle = {
+  save: () => Promise<boolean>;
 };
 
 const EMPTY_SCENE: ExcalidrawScene = {
@@ -23,13 +36,14 @@ const EMPTY_SCENE: ExcalidrawScene = {
   files: {},
 };
 
-export function ExcalidrawEditor({
+export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEditorProps>(function ExcalidrawEditor({
   path,
   initialScene,
   onClose,
   onSaved,
+  onDirtyChange,
   onError,
-}: ExcalidrawEditorProps) {
+}, ref) {
   const apiRef = useRef<ExcalidrawImperativeAPI | null>(null);
   const [dirty, setDirty] = useState(false);
 
@@ -37,14 +51,15 @@ export function ExcalidrawEditor({
 
   useEffect(() => {
     setDirty(false);
-  }, [path]);
+    onDirtyChange(false);
+  }, [onDirtyChange, path]);
 
   const handleSave = useCallback(async () => {
     const api = apiRef.current;
 
     if (!api) {
       onError("Excalidraw is still loading. Try again in a moment.");
-      return;
+      return false;
     }
 
     const data: ExcalidrawScene = {
@@ -62,11 +77,21 @@ export function ExcalidrawEditor({
     try {
       await writeExcalidrawFile(path, JSON.stringify(data, null, 2));
       setDirty(false);
+      onDirtyChange(false);
       onSaved();
+      return true;
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
+      return false;
     }
-  }, [onError, onSaved, path]);
+  }, [onDirtyChange, onError, onSaved, path]);
+
+  useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
+
+  const markDirty = useCallback(() => {
+    setDirty(true);
+    onDirtyChange(true);
+  }, [onDirtyChange]);
 
   return (
     <div className="modal-backdrop" role="dialog" aria-modal="true">
@@ -77,7 +102,7 @@ export function ExcalidrawEditor({
             <span>{path}</span>
           </div>
           <div className="modal-actions">
-            <button onClick={handleSave}>Save Diagram</button>
+            <button onClick={() => void handleSave()}>Save Diagram</button>
             <button onClick={onClose}>{dirty ? "Close Without Saving" : "Close"}</button>
           </div>
         </header>
@@ -91,10 +116,10 @@ export function ExcalidrawEditor({
               appState: scene.appState as never,
               files: scene.files as never,
             }}
-            onChange={() => setDirty(true)}
+            onChange={markDirty}
           />
         </div>
       </section>
     </div>
   );
-}
+});

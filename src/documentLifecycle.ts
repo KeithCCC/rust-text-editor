@@ -35,3 +35,44 @@ export async function runDocumentTransition({
   await proceed();
   return true;
 }
+
+export type ApplicationCloseTransitionOptions = {
+  markdownModified: boolean;
+  diagramDirty: boolean;
+  requestDecision: () => Promise<UnsavedDecision>;
+  saveDiagram: () => Promise<boolean>;
+  saveMarkdown: () => Promise<boolean>;
+  discardMarkdownRecovery: () => Promise<void>;
+  proceed: () => Promise<void>;
+};
+
+export async function runApplicationCloseTransition({
+  markdownModified,
+  diagramDirty,
+  requestDecision,
+  saveDiagram,
+  saveMarkdown,
+  discardMarkdownRecovery,
+  proceed,
+}: ApplicationCloseTransitionOptions): Promise<boolean> {
+  if (markdownModified || diagramDirty) {
+    const decision = await requestDecision();
+    if (decision === "cancel") return false;
+
+    if (decision === "save") {
+      if (diagramDirty && !(await saveDiagram())) return false;
+      if (markdownModified && !(await saveMarkdown())) return false;
+    }
+
+    if (decision === "discard" && markdownModified) {
+      try {
+        await discardMarkdownRecovery();
+      } catch {
+        return false;
+      }
+    }
+  }
+
+  await proceed();
+  return true;
+}
