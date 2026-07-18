@@ -7,6 +7,8 @@ type ClearDraft = () => Promise<void>;
 
 export class RecoveryDraftQueue {
   private tail: Promise<void> = Promise.resolve();
+  private generation = 0;
+  private suspended = false;
 
   constructor(
     private readonly writeDraft: WriteDraft,
@@ -20,11 +22,29 @@ export class RecoveryDraftQueue {
   }
 
   write(draft: RecoveryDraft) {
-    return this.enqueue(() => this.writeDraft(draft));
+    return this.scheduleWrite(draft)();
+  }
+
+  scheduleWrite(draft: RecoveryDraft) {
+    const generation = this.generation;
+    return () => {
+      if (this.suspended || generation !== this.generation) {
+        return Promise.resolve(false);
+      }
+      return this.enqueue(() => this.writeDraft(draft)).then(() => true);
+    };
   }
 
   clear() {
+    this.suspended = true;
+    this.generation += 1;
     return this.enqueue(this.clearDraft);
+  }
+
+  resume() {
+    if (!this.suspended) return;
+    this.suspended = false;
+    this.generation += 1;
   }
 
   drain() {

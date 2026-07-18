@@ -31,8 +31,13 @@ type MarkdownEditorProps = {
   value: string;
   mode: EditorMode;
   themeMode: "system" | "light" | "dark";
+  readOnly?: boolean;
   onChange: (value: string) => void;
 };
+
+export function editorEditableExtension(readOnly: boolean) {
+  return EditorView.editable.of(!readOnly);
+}
 
 type LivePreviewContext = {
   state: EditorState;
@@ -554,7 +559,7 @@ function sourceHeadingExtension() {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor(
-  { value, mode, themeMode, onChange },
+  { value, mode, themeMode, readOnly = false, onChange },
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null);
@@ -566,9 +571,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       json(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       EditorView.lineWrapping,
+      editorEditableExtension(readOnly),
       mode === "live" ? livePreviewExtension() : sourceHeadingExtension(),
     ],
-    [mode],
+    [mode, readOnly],
   );
 
   useImperativeHandle(ref, () => ({

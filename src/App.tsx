@@ -13,6 +13,13 @@ import { open, save } from "@tauri-apps/plugin-dialog";
 import { BUILD_INFO } from "./buildInfo";
 import { formatBuildLabel } from "./buildLabel";
 import { isPrimaryShortcut } from "./keyboardShortcuts";
+import {
+  DocumentActionGate,
+  LatestValue,
+  installNativeCloseListener,
+  resolveStartupRecoveryChoice,
+  runCloseRequestSafely,
+} from "./appSafety";
 import { HelpDialog } from "./components/HelpDialog";
 import { DecisionDialog } from "./components/DecisionDialog";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
@@ -330,6 +337,8 @@ export default function App() {
   const [startupRecoveryDraft, setStartupRecoveryDraft] = useState<RecoveryDraft | null>(null);
   const [pendingStartupPath, setPendingStartupPath] = useState<string | null>(null);
   const [resumeStartupPathAfterRecovery, setResumeStartupPathAfterRecovery] = useState(false);
+  const [isStartupResolutionPending, setIsStartupResolutionPending] = useState(isTauriRuntime);
+  const [isDocumentTransitionPending, setIsDocumentTransitionPending] = useState(false);
   const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<MarkdownEditorHandle | null>(null);
@@ -347,10 +356,21 @@ export default function App() {
   const recoveryQueueRef = useRef(
     new RecoveryDraftQueue(writeRecoveryDraft, deleteRecoveryDraft),
   );
+  const actionGateRef = useRef(
+    new DocumentActionGate(isTauriRuntime() ? ["startup"] : []),
+  );
+  const latestDocumentRef = useRef(new LatestValue({ content, currentFile, modified }));
+  const latestCloseRequestRef = useRef<() => Promise<unknown>>(async () => false);
+  const closeErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
+  const startupRecoveryDecisionInProgressRef = useRef(false);
 
   const isSplitMode = editorMode === "split";
   const text = UI_TEXT[appLanguage];
   const safetyText = getDocumentSafetyText(appLanguage, fileNameFromPath(currentFile));
+  const isDocumentSafetyActive = isStartupResolutionPending
+    || isDocumentTransitionPending
+    || isUnsavedPromptOpen;
+  latestDocumentRef.current.set({ content, currentFile, modified });
   const appStyle = useMemo(() => ({
     "--editor-font-size": `${editorFontSize}px`,
     "--editor-line-height": String(editorLineHeight),
@@ -403,18 +423,21 @@ export default function App() {
   const clearRecoverySafely = useCallback(async (abortTransitionOnFailure = false) => {
     try {
       await recoveryQueueRef.current.clear();
+      lastRecoveryWriteMsRef.current = 0;
     } catch (recoveryError) {
       showError(
         safetyText.recoveryFailed,
         recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
       );
       if (abortTransitionOnFailure) {
+        recoveryQueueRef.current.resume();
         throw recoveryError;
       }
     }
   }, [safetyText.recoveryFailed, showError]);
 
   const loadDocument = useCallback((path: string, nextContent: string) => {
+    latestDocumentRef.current.set({ content: nextContent, currentFile: path, modified: false });
     setContent(nextContent);
     setPreviewContent(nextContent);
     setCurrentFile(path);
@@ -425,6 +448,7 @@ export default function App() {
 
   const resetDocument = useCallback(() => {
     const next = createUntitledDocument();
+    latestDocumentRef.current.set({ content: next.content, currentFile: next.path, modified: next.modified });
     setContent(next.content);
     setPreviewContent(next.content);
     setCurrentFile(next.path);
@@ -444,8 +468,9 @@ export default function App() {
   }, [loadDocument, showError, text.openFailed]);
 
   const handleSaveAs = useCallback(async () => {
+    const documentBeforePicker = latestDocumentRef.current.get();
     const selected = await save({
-      defaultPath: defaultSaveAsPath(currentFile),
+      defaultPath: defaultSaveAsPath(documentBeforePicker.currentFile),
       filters: [
         { name: "Markdown", extensions: ["md", "markdown"] },
         { name: "Text files", extensions: ["txt"] },
@@ -457,7 +482,9 @@ export default function App() {
     }
 
     try {
-      await writeTextFile(selected, content);
+      const latestDocument = latestDocumentRef.current.get();
+      await writeTextFile(selected, latestDocument.content);
+      latestDocumentRef.current.set({ ...latestDocument, currentFile: selected, modified: false });
       setCurrentFile(selected);
       await clearRecoverySafely();
       setModified(false);
@@ -466,15 +493,17 @@ export default function App() {
       showError(text.saveFailed, saveError instanceof Error ? saveError.message : String(saveError));
       return false;
     }
-  }, [clearRecoverySafely, content, currentFile, showError, text.saveFailed]);
+  }, [clearRecoverySafely, showError, text.saveFailed]);
 
   const handleSave = useCallback(async () => {
-    if (!currentFile) {
+    const latestDocument = latestDocumentRef.current.get();
+    if (!latestDocument.currentFile) {
       return handleSaveAs();
     }
 
     try {
-      await writeTextFile(currentFile, content);
+      await writeTextFile(latestDocument.currentFile, latestDocument.content);
+      latestDocumentRef.current.set({ ...latestDocument, modified: false });
       await clearRecoverySafely();
       setModified(false);
       return true;
@@ -482,14 +511,16 @@ export default function App() {
       showError(text.saveFailed, saveError instanceof Error ? saveError.message : String(saveError));
       return false;
     }
-  }, [clearRecoverySafely, content, currentFile, handleSaveAs, showError, text.saveFailed]);
+  }, [clearRecoverySafely, handleSaveAs, showError, text.saveFailed]);
 
   const requestDocumentTransition = useCallback(async (proceed: () => Promise<void>) => {
     if (transitionInProgressRef.current) return false;
     transitionInProgressRef.current = true;
+    actionGateRef.current.block("transition");
+    setIsDocumentTransitionPending(true);
     try {
       return await runDocumentTransition({
-        modified,
+        modified: latestDocumentRef.current.get().modified,
         requestDecision: requestUnsavedDecision,
         save: handleSave,
         discardRecovery: () => clearRecoverySafely(true),
@@ -497,10 +528,13 @@ export default function App() {
       });
     } finally {
       transitionInProgressRef.current = false;
+      actionGateRef.current.release("transition");
+      setIsDocumentTransitionPending(false);
     }
-  }, [clearRecoverySafely, handleSave, modified, requestUnsavedDecision]);
+  }, [clearRecoverySafely, handleSave, requestUnsavedDecision]);
 
   const handleNew = useCallback(async () => {
+    if (actionGateRef.current.isBlocked()) return;
     await requestDocumentTransition(async () => {
       resetDocument();
       requestAnimationFrame(() => editorRef.current?.focus());
@@ -508,6 +542,7 @@ export default function App() {
   }, [requestDocumentTransition, resetDocument]);
 
   const handleOpen = useCallback(async () => {
+    if (actionGateRef.current.isBlocked()) return;
     const selected = normalizeSelectedPath(await open({
       multiple: false,
       filters: [
@@ -520,11 +555,36 @@ export default function App() {
     }
   }, [openFilePath, requestDocumentTransition]);
 
-  const requestAppClose = useCallback(() => requestDocumentTransition(async () => {
-    await saveCurrentWindowState();
-    if (isTauriRuntime()) await exitApp();
-    else window.close();
-  }), [requestDocumentTransition]);
+  const reportCloseError = useCallback((closeError: unknown) => {
+    showError(
+      text.exit,
+      closeError instanceof Error ? closeError.message : String(closeError),
+    );
+  }, [showError, text.exit]);
+
+  const requestAppClose = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
+    return runCloseRequestSafely(
+      () => requestDocumentTransition(async () => {
+        await saveCurrentWindowState();
+        if (isTauriRuntime()) await exitApp();
+        else window.close();
+      }),
+      reportCloseError,
+    );
+  }, [reportCloseError, requestDocumentTransition]);
+  latestCloseRequestRef.current = requestAppClose;
+  closeErrorReporterRef.current = reportCloseError;
+
+  const handleSaveAction = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
+    return handleSave();
+  }, [handleSave]);
+
+  const handleSaveAsAction = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
+    return handleSaveAs();
+  }, [handleSaveAs]);
 
   const handleExit = useCallback(async () => {
     await requestAppClose();
@@ -563,6 +623,13 @@ export default function App() {
   }, [currentFile, showError, text.filePropertiesFailed, text.filePropertiesUnavailable, text.saveBeforeProperties]);
 
   const handleContentChange = useCallback((value: string) => {
+    if (actionGateRef.current.isBlocked()) return;
+    recoveryQueueRef.current.resume();
+    latestDocumentRef.current.set({
+      ...latestDocumentRef.current.get(),
+      content: value,
+      modified: true,
+    });
     setContent(value);
     setModified(true);
   }, []);
@@ -590,8 +657,16 @@ export default function App() {
   }, []);
 
   const handleFormatJson = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return;
     try {
-      setContent(JSON.stringify(JSON.parse(content), null, 2));
+      const formatted = JSON.stringify(JSON.parse(content), null, 2);
+      recoveryQueueRef.current.resume();
+      latestDocumentRef.current.set({
+        ...latestDocumentRef.current.get(),
+        content: formatted,
+        modified: true,
+      });
+      setContent(formatted);
       setModified(true);
     } catch (formatError) {
       showError(text.jsonFormatFailed, formatError instanceof Error ? formatError.message : String(formatError));
@@ -603,6 +678,7 @@ export default function App() {
   }, []);
 
   const handleOpenRelativeMarkdownLink = useCallback((relativePath: string) => {
+    if (actionGateRef.current.isBlocked()) return;
     if (!currentFile) {
       showError(text.linkOpenFailed, text.saveBeforeOpeningLink);
       return;
@@ -624,30 +700,58 @@ export default function App() {
     }
   }, [currentFile, loadDocument, showError, text.reloadFailed]);
 
+  const completeStartupResolution = useCallback(() => {
+    actionGateRef.current.release("startup");
+    setIsStartupResolutionPending(false);
+  }, []);
+
   const finishStartupRecovery = useCallback(async (recover: boolean) => {
+    if (startupRecoveryDecisionInProgressRef.current) return;
     const draft = startupRecoveryDraft;
     if (!draft) return;
-    setStartupRecoveryDraft(null);
+    startupRecoveryDecisionInProgressRef.current = true;
+    try {
+      const resolved = await resolveStartupRecoveryChoice(
+        recover,
+        () => {
+          recoveryQueueRef.current.resume();
+          latestDocumentRef.current.set({
+            content: draft.content,
+            currentFile: draft.documentPath,
+            modified: true,
+          });
+          setContent(draft.content);
+          setPreviewContent(draft.content);
+          setCurrentFile(draft.documentPath);
+          setModified(true);
+        },
+        () => clearRecoverySafely(true),
+        () => setStartupRecoveryDraft(null),
+      );
+      if (!resolved) return;
 
-    if (recover) {
-      setContent(draft.content);
-      setPreviewContent(draft.content);
-      setCurrentFile(draft.documentPath);
-      setModified(true);
-    } else {
-      await clearRecoverySafely();
-    }
-
-    if (pendingStartupPath) {
-      if (recover) {
-        setResumeStartupPathAfterRecovery(true);
+      if (pendingStartupPath) {
+        if (recover) {
+          setResumeStartupPathAfterRecovery(true);
+        } else {
+          const path = pendingStartupPath;
+          setPendingStartupPath(null);
+          await requestDocumentTransition(() => openFilePath(path));
+          completeStartupResolution();
+        }
       } else {
-        const path = pendingStartupPath;
-        setPendingStartupPath(null);
-        await openFilePath(path);
+        completeStartupResolution();
       }
+    } catch (startupError) {
+      showError(
+        text.startupOpenFailed,
+        startupError instanceof Error ? startupError.message : String(startupError),
+      );
+      completeStartupResolution();
+    } finally {
+      startupRecoveryDecisionInProgressRef.current = false;
     }
-  }, [clearRecoverySafely, openFilePath, pendingStartupPath, startupRecoveryDraft]);
+  }, [clearRecoverySafely, completeStartupResolution, openFilePath, pendingStartupPath, requestDocumentTransition, showError, startupRecoveryDraft, text.startupOpenFailed]);
 
   const openNoteSearch = useCallback(() => {
     setIsNoteSearchVisible(true);
@@ -658,19 +762,23 @@ export default function App() {
   }, []);
 
   const handleBold = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return;
     editorRef.current?.wrapSelection("**", "**", "bold text");
   }, []);
 
   const handleItalic = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return;
     editorRef.current?.wrapSelection("_", "_", "italic text");
   }, []);
 
   const handleInsertLink = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return;
     editorRef.current?.wrapSelection("[", "](url)", "link text");
   }, []);
 
   const runMenuAction = useCallback((action: () => void | Promise<unknown>) => {
     setActiveMenu(null);
+    if (actionGateRef.current.isBlocked()) return;
     void action();
   }, []);
 
@@ -750,14 +858,15 @@ export default function App() {
     }
     const elapsed = Date.now() - lastRecoveryWriteMsRef.current;
     const delay = Math.min(2000, Math.max(0, 30_000 - elapsed));
+    const scheduledWrite = recoveryQueueRef.current.scheduleWrite({
+      schemaVersion: 1,
+      documentPath: currentFile,
+      content,
+      updatedMs: Date.now(),
+    });
     const timer = window.setTimeout(() => {
-      void recoveryQueueRef.current.write({
-        schemaVersion: 1,
-        documentPath: currentFile,
-        content,
-        updatedMs: Date.now(),
-      }).then(() => {
-        lastRecoveryWriteMsRef.current = Date.now();
+      void scheduledWrite().then((wrote) => {
+        if (wrote) lastRecoveryWriteMsRef.current = Date.now();
       }, (recoveryError) => {
         showError(
           safetyText.recoveryFailed,
@@ -779,44 +888,45 @@ export default function App() {
       return null;
     });
     void Promise.all([recovery, getStartupFilePath()])
-      .then(([draft, startupPath]) => {
+      .then(async ([draft, startupPath]) => {
         setPendingStartupPath(startupPath);
-        if (draft) setStartupRecoveryDraft(draft);
-        else if (startupPath) void openFilePath(startupPath);
+        if (draft) {
+          setStartupRecoveryDraft(draft);
+          return;
+        }
+        if (startupPath) {
+          await requestDocumentTransition(() => openFilePath(startupPath));
+        }
+        completeStartupResolution();
       })
       .catch((startupError) => {
         showError(text.startupOpenFailed, startupError instanceof Error ? startupError.message : String(startupError));
+        completeStartupResolution();
       });
-  }, [openFilePath, safetyText.recoveryFailed, showError, text.startupOpenFailed]);
+  }, [completeStartupResolution, openFilePath, requestDocumentTransition, safetyText.recoveryFailed, showError, text.startupOpenFailed]);
 
   useEffect(() => {
     if (!resumeStartupPathAfterRecovery || !pendingStartupPath) return;
     const path = pendingStartupPath;
     setResumeStartupPathAfterRecovery(false);
     setPendingStartupPath(null);
-    void requestDocumentTransition(() => openFilePath(path));
-  }, [openFilePath, pendingStartupPath, requestDocumentTransition, resumeStartupPathAfterRecovery]);
+    void requestDocumentTransition(() => openFilePath(path))
+      .catch((startupError) => {
+        showError(text.startupOpenFailed, startupError instanceof Error ? startupError.message : String(startupError));
+      })
+      .finally(completeStartupResolution);
+  }, [completeStartupResolution, openFilePath, pendingStartupPath, requestDocumentTransition, resumeStartupPathAfterRecovery, showError, text.startupOpenFailed]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
       return undefined;
     }
-
-    let unlisten: (() => void) | undefined;
-    let cancelled = false;
-    void getCurrentWindow().onCloseRequested((event) => {
-      event.preventDefault();
-      void requestAppClose();
-    }).then((handler) => {
-      if (cancelled) handler();
-      else unlisten = handler;
-    });
-
-    return () => {
-      cancelled = true;
-      unlisten?.();
-    };
-  }, [requestAppClose]);
+    return installNativeCloseListener(
+      (listener) => getCurrentWindow().onCloseRequested(listener),
+      () => latestCloseRequestRef.current,
+      (closeError) => closeErrorReporterRef.current(closeError),
+    );
+  }, []);
 
   useEffect(() => {
     if (!activeMenu) {
@@ -839,6 +949,11 @@ export default function App() {
         return;
       }
 
+      if (actionGateRef.current.isBlocked()) {
+        if (event.ctrlKey || event.metaKey) event.preventDefault();
+        return;
+      }
+
       if (isHelpOpen) {
         return;
       }
@@ -852,9 +967,9 @@ export default function App() {
       } else if (isPrimaryShortcut(event, "s")) {
         event.preventDefault();
         if (event.shiftKey) {
-          void handleSaveAs();
+          void handleSaveAsAction();
         } else {
-          void handleSave();
+          void handleSaveAction();
         }
       } else if (isPrimaryShortcut(event, "f")) {
         event.preventDefault();
@@ -875,7 +990,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleBold, handleItalic, handleNew, handleOpen, handleSave, handleSaveAs, isHelpOpen, openNoteSearch]);
+  }, [handleBold, handleItalic, handleNew, handleOpen, handleSaveAction, handleSaveAsAction, isHelpOpen, openNoteSearch]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -938,6 +1053,7 @@ export default function App() {
     <main
       className="app-shell"
       data-theme={themeMode}
+      aria-busy={isDocumentSafetyActive}
       style={appStyle}
       onDragOver={(event) => {
         event.preventDefault();
@@ -947,6 +1063,7 @@ export default function App() {
       onDrop={(event) => {
         event.preventDefault();
         setIsFileDragOver(false);
+        if (actionGateRef.current.isBlocked()) return;
         const file = event.dataTransfer.files.item(0);
         const path = file ? "path" in file ? String(file.path) : "" : "";
         if (path) {
@@ -961,8 +1078,8 @@ export default function App() {
             <div className="menu-popover" role="menu">
               <button role="menuitem" onClick={() => runMenuAction(handleNew)}>{text.new} <kbd>Ctrl+N</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>{text.open} <kbd>Ctrl+O</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleSave)}>{text.save} <kbd>Ctrl+S</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleSaveAs)}>{text.saveAs}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSaveAction)}>{text.save} <kbd>Ctrl+S</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSaveAsAction)}>{text.saveAs}</button>
               <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>{text.exportHtml}</button>
               <div className="menu-separator" />
               <button role="menuitem" onClick={() => runMenuAction(handleFileProperties)} disabled={!currentFile}>{text.fileProperties}</button>
@@ -1122,6 +1239,7 @@ export default function App() {
               value={content}
               mode="source"
               themeMode={themeMode}
+              readOnly={isDocumentSafetyActive}
               onChange={handleContentChange}
             />
           </article>

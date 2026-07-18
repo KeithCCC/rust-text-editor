@@ -29,4 +29,32 @@ describe("RecoveryDraftQueue", () => {
     await queue.clear();
     expect(clear).toHaveBeenCalledTimes(1);
   });
+
+  test("clear invalidates a scheduled write that fires after clearing begins", async () => {
+    const write = vi.fn(async () => undefined);
+    const clear = vi.fn(async () => undefined);
+    const queue = new RecoveryDraftQueue(write, clear);
+    const scheduledWrite = queue.scheduleWrite(draft);
+
+    const clearing = queue.clear();
+    await expect(scheduledWrite()).resolves.toBe(false);
+    await clearing;
+
+    expect(write).not.toHaveBeenCalled();
+    expect(clear).toHaveBeenCalledTimes(1);
+  });
+
+  test("resume permits new writes without reviving invalidated scheduled writes", async () => {
+    const write = vi.fn(async () => undefined);
+    const queue = new RecoveryDraftQueue(write, async () => undefined);
+    const staleWrite = queue.scheduleWrite(draft);
+    await queue.clear();
+
+    queue.resume();
+    await expect(staleWrite()).resolves.toBe(false);
+    await expect(queue.write({ ...draft, content: "new draft" })).resolves.toBe(true);
+
+    expect(write).toHaveBeenCalledTimes(1);
+    expect(write).toHaveBeenCalledWith(expect.objectContaining({ content: "new draft" }));
+  });
 });
