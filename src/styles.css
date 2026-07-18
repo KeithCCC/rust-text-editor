@@ -1090,6 +1090,46 @@ textarea {
   background: rgb(14 24 36 / 58%);
 }
 
+.decision-dialog {
+  width: min(520px, 100%);
+  padding: 20px;
+  border: 1px solid var(--strong-border);
+  border-radius: 10px;
+  background: var(--pane-bg);
+  box-shadow: 0 22px 60px var(--shadow);
+}
+
+.decision-dialog h2 {
+  margin: 0 0 10px;
+  color: var(--text);
+  font-size: 18px;
+}
+
+.decision-dialog p {
+  margin: 0;
+  color: var(--muted);
+  line-height: 1.55;
+}
+
+.decision-dialog-actions {
+  display: flex;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  gap: 8px;
+  margin-top: 20px;
+}
+
+.decision-primary {
+  border-color: var(--preview-link);
+  background: var(--preview-link);
+  color: var(--pane-bg);
+}
+
+.decision-danger {
+  border-color: var(--danger-border);
+  color: var(--danger-text);
+}
+
 .excalidraw-modal {
   display: grid;
   grid-template-rows: auto minmax(0, 1fr);
