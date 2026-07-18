@@ -5,6 +5,8 @@ import {
   installNativeCloseListener,
   resolveStartupRecoveryChoice,
   runCloseRequestSafely,
+  runExclusiveDocumentAction,
+  runSaveOperationSafely,
 } from "./appSafety";
 
 test("LatestValue supplies the newest snapshot to a deferred operation", async () => {
@@ -25,6 +27,62 @@ test("runCloseRequestSafely reports failure and resolves false", async () => {
   )).resolves.toBe(false);
 
   expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: "exit failed" }));
+});
+
+test("runExclusiveDocumentAction blocks edits until a deferred save completes", async () => {
+  const gate = new DocumentActionGate();
+  const activeStates: boolean[] = [];
+  let finishWrite!: () => void;
+  const document = { content: "saved snapshot", modified: true };
+  const saving = runExclusiveDocumentAction(
+    gate,
+    "direct-save",
+    async () => {
+      await new Promise<void>((resolve) => { finishWrite = resolve; });
+      document.modified = false;
+      return true;
+    },
+    (active) => activeStates.push(active),
+  );
+
+  if (!gate.isBlocked()) {
+    document.content = "new edit";
+    document.modified = true;
+  }
+  expect(document).toEqual({ content: "saved snapshot", modified: true });
+
+  finishWrite();
+  await expect(saving).resolves.toBe(true);
+  expect(document).toEqual({ content: "saved snapshot", modified: false });
+  expect(gate.isBlocked()).toBe(false);
+  expect(activeStates).toEqual([true, false]);
+});
+
+test("runExclusiveDocumentAction rejects a competing action during link preflight", async () => {
+  const gate = new DocumentActionGate();
+  let finishResolution!: () => void;
+  const resolving = runExclusiveDocumentAction(gate, "relative-link", async () => {
+    await new Promise<void>((resolve) => { finishResolution = resolve; });
+    return "resolved.md";
+  });
+  const competingAction = vi.fn(async () => "other.md");
+
+  await expect(runExclusiveDocumentAction(gate, "other", competingAction)).resolves.toBeUndefined();
+  expect(competingAction).not.toHaveBeenCalled();
+
+  finishResolution();
+  await expect(resolving).resolves.toBe("resolved.md");
+});
+
+test("runSaveOperationSafely reports picker rejection and returns false", async () => {
+  const reportError = vi.fn();
+
+  await expect(runSaveOperationSafely(
+    async () => { throw new Error("picker unavailable"); },
+    reportError,
+  )).resolves.toBe(false);
+
+  expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: "picker unavailable" }));
 });
 
 describe("DocumentActionGate", () => {

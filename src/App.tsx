@@ -19,6 +19,8 @@ import {
   installNativeCloseListener,
   resolveStartupRecoveryChoice,
   runCloseRequestSafely,
+  runExclusiveDocumentAction,
+  runSaveOperationSafely,
 } from "./appSafety";
 import { HelpDialog } from "./components/HelpDialog";
 import { DecisionDialog } from "./components/DecisionDialog";
@@ -339,6 +341,8 @@ export default function App() {
   const [resumeStartupPathAfterRecovery, setResumeStartupPathAfterRecovery] = useState(false);
   const [isStartupResolutionPending, setIsStartupResolutionPending] = useState(isTauriRuntime);
   const [isDocumentTransitionPending, setIsDocumentTransitionPending] = useState(false);
+  const [isDirectSavePending, setIsDirectSavePending] = useState(false);
+  const [isRelativeLinkPreflightPending, setIsRelativeLinkPreflightPending] = useState(false);
   const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<MarkdownEditorHandle | null>(null);
@@ -369,6 +373,8 @@ export default function App() {
   const safetyText = getDocumentSafetyText(appLanguage, fileNameFromPath(currentFile));
   const isDocumentSafetyActive = isStartupResolutionPending
     || isDocumentTransitionPending
+    || isDirectSavePending
+    || isRelativeLinkPreflightPending
     || isUnsavedPromptOpen;
   latestDocumentRef.current.set({ content, currentFile, modified });
   const appStyle = useMemo(() => ({
@@ -467,7 +473,14 @@ export default function App() {
     }
   }, [loadDocument, showError, text.openFailed]);
 
-  const handleSaveAs = useCallback(async () => {
+  const reportSaveError = useCallback((saveError: unknown) => {
+    showError(
+      text.saveFailed,
+      saveError instanceof Error ? saveError.message : String(saveError),
+    );
+  }, [showError, text.saveFailed]);
+
+  const handleSaveAs = useCallback(() => runSaveOperationSafely(async () => {
     const documentBeforePicker = latestDocumentRef.current.get();
     const selected = await save({
       defaultPath: defaultSaveAsPath(documentBeforePicker.currentFile),
@@ -477,41 +490,32 @@ export default function App() {
         { name: "All files", extensions: ["*"] },
       ],
     });
-    if (!selected) {
-      return false;
-    }
+    if (!selected) return false;
 
-    try {
-      const latestDocument = latestDocumentRef.current.get();
-      await writeTextFile(selected, latestDocument.content);
-      latestDocumentRef.current.set({ ...latestDocument, currentFile: selected, modified: false });
-      setCurrentFile(selected);
-      await clearRecoverySafely();
-      setModified(false);
-      return true;
-    } catch (saveError) {
-      showError(text.saveFailed, saveError instanceof Error ? saveError.message : String(saveError));
-      return false;
-    }
-  }, [clearRecoverySafely, showError, text.saveFailed]);
+    const latestDocument = latestDocumentRef.current.get();
+    await writeTextFile(selected, latestDocument.content);
+    latestDocumentRef.current.set({ ...latestDocument, currentFile: selected, modified: false });
+    setCurrentFile(selected);
+    await clearRecoverySafely();
+    setModified(false);
+    return true;
+  }, reportSaveError), [clearRecoverySafely, reportSaveError]);
 
   const handleSave = useCallback(async () => {
     const latestDocument = latestDocumentRef.current.get();
-    if (!latestDocument.currentFile) {
+    const path = latestDocument.currentFile;
+    if (!path) {
       return handleSaveAs();
     }
 
-    try {
-      await writeTextFile(latestDocument.currentFile, latestDocument.content);
+    return runSaveOperationSafely(async () => {
+      await writeTextFile(path, latestDocument.content);
       latestDocumentRef.current.set({ ...latestDocument, modified: false });
       await clearRecoverySafely();
       setModified(false);
       return true;
-    } catch (saveError) {
-      showError(text.saveFailed, saveError instanceof Error ? saveError.message : String(saveError));
-      return false;
-    }
-  }, [clearRecoverySafely, handleSaveAs, showError, text.saveFailed]);
+    }, reportSaveError);
+  }, [clearRecoverySafely, handleSaveAs, reportSaveError]);
 
   const requestDocumentTransition = useCallback(async (proceed: () => Promise<void>) => {
     if (transitionInProgressRef.current) return false;
@@ -576,14 +580,24 @@ export default function App() {
   latestCloseRequestRef.current = requestAppClose;
   closeErrorReporterRef.current = reportCloseError;
 
-  const handleSaveAction = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
-    return handleSave();
+  const handleSaveAction = useCallback(async () => {
+    const result = await runExclusiveDocumentAction(
+      actionGateRef.current,
+      "direct-save",
+      handleSave,
+      setIsDirectSavePending,
+    );
+    return result ?? false;
   }, [handleSave]);
 
-  const handleSaveAsAction = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
-    return handleSaveAs();
+  const handleSaveAsAction = useCallback(async () => {
+    const result = await runExclusiveDocumentAction(
+      actionGateRef.current,
+      "direct-save-as",
+      handleSaveAs,
+      setIsDirectSavePending,
+    );
+    return result ?? false;
   }, [handleSaveAs]);
 
   const handleExit = useCallback(async () => {
@@ -684,9 +698,22 @@ export default function App() {
       return;
     }
 
-    void resolveRelativePath(currentFile, relativePath)
-      .then((path) => requestDocumentTransition(() => openFilePath(path)))
-      .catch((linkError) => showError(text.linkOpenFailed, linkError instanceof Error ? linkError.message : String(linkError)));
+    void runExclusiveDocumentAction(
+      actionGateRef.current,
+      "relative-link-preflight",
+      async () => {
+        try {
+          const path = await resolveRelativePath(currentFile, relativePath);
+          await requestDocumentTransition(() => openFilePath(path));
+        } catch (linkError) {
+          showError(
+            text.linkOpenFailed,
+            linkError instanceof Error ? linkError.message : String(linkError),
+          );
+        }
+      },
+      setIsRelativeLinkPreflightPending,
+    );
   }, [currentFile, openFilePath, requestDocumentTransition, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
 
   const handleExcalidrawSaved = useCallback(async (path: string) => {

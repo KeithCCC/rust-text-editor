@@ -18,6 +18,23 @@ export class DocumentActionGate {
   }
 }
 
+export async function runExclusiveDocumentAction<T>(
+  gate: DocumentActionGate,
+  reason: string,
+  action: () => Promise<T>,
+  setActive: (active: boolean) => void = () => undefined,
+) {
+  if (gate.isBlocked()) return undefined;
+  gate.block(reason);
+  try {
+    setActive(true);
+    return await action();
+  } finally {
+    gate.release(reason);
+    setActive(false);
+  }
+}
+
 export class LatestValue<T> {
   constructor(private value: T) {}
 
@@ -57,6 +74,18 @@ export async function runCloseRequestSafely<T>(
     return await requestClose();
   } catch (closeError) {
     reportError(closeError);
+    return false;
+  }
+}
+
+export async function runSaveOperationSafely(
+  saveOperation: () => Promise<boolean>,
+  reportError: (error: unknown) => void,
+) {
+  try {
+    return await saveOperation();
+  } catch (saveError) {
+    reportError(saveError);
     return false;
   }
 }
