@@ -2,6 +2,7 @@ import { describe, expect, test, vi } from "vitest";
 import {
   ExcalidrawContentBaseline,
   persistExcalidrawSnapshot,
+  projectPersistableExcalidrawAppState,
 } from "./excalidrawDirty";
 
 const originalElements = [{ id: "box", type: "rectangle", x: 10, y: 20 }];
@@ -25,10 +26,38 @@ describe("ExcalidrawContentBaseline", () => {
     )).toBe(false);
   });
 
-  test("ignores app-state-only changes by comparing content inputs only", () => {
-    const baseline = new ExcalidrawContentBaseline(originalElements, originalFiles);
+  test("marks a canvas background change dirty", () => {
+    const baseline = new ExcalidrawContentBaseline(
+      originalElements,
+      originalFiles,
+      { viewBackgroundColor: "#ffffff" },
+    );
 
-    expect(baseline.isDirty(originalElements, originalFiles)).toBe(false);
+    expect(baseline.isDirty(
+      originalElements,
+      originalFiles,
+      { viewBackgroundColor: "#ffeecc" },
+    )).toBe(true);
+  });
+
+  test("ignores volatile selection and viewport app-state changes", () => {
+    const baseline = new ExcalidrawContentBaseline(
+      originalElements,
+      originalFiles,
+      { viewBackgroundColor: "#ffffff", scrollX: 0, selectedElementIds: {} },
+    );
+
+    expect(baseline.isDirty(
+      originalElements,
+      originalFiles,
+      {
+        viewBackgroundColor: "#ffffff",
+        scrollX: 800,
+        scrollY: 400,
+        zoom: { value: 2 },
+        selectedElementIds: { box: true },
+      },
+    )).toBe(false);
   });
 
   test("marks element content changes dirty", () => {
@@ -53,6 +82,32 @@ describe("ExcalidrawContentBaseline", () => {
     expect(baseline.isDirty(savedElements, originalFiles)).toBe(true);
     baseline.reset(savedElements, originalFiles);
     expect(baseline.isDirty(savedElements, originalFiles)).toBe(false);
+  });
+});
+
+test("projects only Excalidraw's document-level persisted app state", () => {
+  expect(projectPersistableExcalidrawAppState({
+    viewBackgroundColor: "#ffeecc",
+    gridModeEnabled: true,
+    gridSize: 20,
+    gridStep: 5,
+    scrollX: 800,
+    selectedElementIds: { box: true },
+    collaborators: new Map(),
+  })).toEqual({
+    viewBackgroundColor: "#ffeecc",
+    gridModeEnabled: true,
+    gridSize: 20,
+    gridStep: 5,
+  });
+});
+
+test("normalizes a sparse scene to Excalidraw's persisted defaults", () => {
+  expect(projectPersistableExcalidrawAppState({})).toEqual({
+    viewBackgroundColor: "#ffffff",
+    gridModeEnabled: false,
+    gridSize: 20,
+    gridStep: 5,
   });
 });
 
@@ -95,6 +150,38 @@ describe("persistExcalidrawSnapshot", () => {
     await expect(saving).resolves.toBe(false);
     expect(onDirtyChange).toHaveBeenCalledWith(true);
     expect(baseline.isDirty(newerElements, originalFiles)).toBe(true);
+  });
+
+  test("returns dirty when the background changes while a save is in flight", async () => {
+    const baseline = new ExcalidrawContentBaseline(
+      originalElements,
+      originalFiles,
+      { viewBackgroundColor: "#ffffff" },
+    );
+    let currentBackground = "#ffeecc";
+    let finishWrite!: () => void;
+    const onDirtyChange = vi.fn();
+    const saving = persistExcalidrawSnapshot({
+      baseline,
+      snapshot: {
+        elements: originalElements,
+        files: originalFiles,
+        appState: { viewBackgroundColor: "#ffeecc" },
+      },
+      write: () => new Promise<void>((resolve) => { finishWrite = resolve; }),
+      getCurrent: () => ({
+        elements: originalElements,
+        files: originalFiles,
+        appState: { viewBackgroundColor: currentBackground },
+      }),
+      onDirtyChange,
+    });
+
+    currentBackground = "#ccffee";
+    finishWrite();
+
+    await expect(saving).resolves.toBe(false);
+    expect(onDirtyChange).toHaveBeenCalledWith(true);
   });
 
   test("preserves the written snapshot when a live collection mutates during writing", async () => {

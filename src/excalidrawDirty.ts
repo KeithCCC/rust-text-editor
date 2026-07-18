@@ -11,32 +11,54 @@ function normalizeContent(value: unknown): unknown {
     }, {});
 }
 
-function contentFingerprint(elements: unknown, files: unknown) {
+const PERSISTABLE_APP_STATE_DEFAULTS = {
+  viewBackgroundColor: "#ffffff",
+  gridModeEnabled: false,
+  gridSize: 20,
+  gridStep: 5,
+} as const;
+
+export function projectPersistableExcalidrawAppState(appState: unknown) {
+  const source = appState && typeof appState === "object"
+    ? appState as Record<string, unknown>
+    : {};
+  return Object.keys(PERSISTABLE_APP_STATE_DEFAULTS)
+    .reduce<Record<string, unknown>>((projected, key) => {
+      projected[key] = source[key] ?? PERSISTABLE_APP_STATE_DEFAULTS[
+        key as keyof typeof PERSISTABLE_APP_STATE_DEFAULTS
+      ];
+      return projected;
+    }, {});
+}
+
+function contentFingerprint(elements: unknown, files: unknown, appState: unknown) {
   return JSON.stringify(normalizeContent({
     elements: elements ?? [],
     files: files ?? {},
+    appState: projectPersistableExcalidrawAppState(appState),
   }));
 }
 
 export class ExcalidrawContentBaseline {
   private fingerprint: string;
 
-  constructor(elements: unknown, files: unknown) {
-    this.fingerprint = contentFingerprint(elements, files);
+  constructor(elements: unknown, files: unknown, appState?: unknown) {
+    this.fingerprint = contentFingerprint(elements, files, appState);
   }
 
-  isDirty(elements: unknown, files: unknown) {
-    return this.fingerprint !== contentFingerprint(elements, files);
+  isDirty(elements: unknown, files: unknown, appState?: unknown) {
+    return this.fingerprint !== contentFingerprint(elements, files, appState);
   }
 
-  reset(elements: unknown, files: unknown) {
-    this.fingerprint = contentFingerprint(elements, files);
+  reset(elements: unknown, files: unknown, appState?: unknown) {
+    this.fingerprint = contentFingerprint(elements, files, appState);
   }
 }
 
 type ExcalidrawContentSnapshot = {
   elements: unknown;
   files: unknown;
+  appState?: unknown;
 };
 
 type PersistExcalidrawSnapshotOptions = {
@@ -56,11 +78,12 @@ export async function persistExcalidrawSnapshot({
 }: PersistExcalidrawSnapshotOptions) {
   const persistedElements = normalizeContent(snapshot.elements ?? []);
   const persistedFiles = normalizeContent(snapshot.files ?? {});
+  const persistedAppState = projectPersistableExcalidrawAppState(snapshot.appState);
   await write();
-  baseline.reset(persistedElements, persistedFiles);
+  baseline.reset(persistedElements, persistedFiles, persistedAppState);
 
   const current = getCurrent();
-  const dirty = baseline.isDirty(current.elements, current.files);
+  const dirty = baseline.isDirty(current.elements, current.files, current.appState);
   onDirtyChange(dirty);
   return !dirty;
 }

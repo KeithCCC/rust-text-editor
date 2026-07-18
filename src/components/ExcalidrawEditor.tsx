@@ -13,6 +13,7 @@ import type { ExcalidrawScene } from "../types";
 import {
   ExcalidrawContentBaseline,
   persistExcalidrawSnapshot,
+  projectPersistableExcalidrawAppState,
 } from "../excalidrawDirty";
 import { MODAL_LAYERS } from "../modalLayers";
 import { writeExcalidrawFile } from "../tauri";
@@ -53,13 +54,17 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
   const [dirty, setDirty] = useState(false);
 
   const scene = useMemo(() => initialScene ?? EMPTY_SCENE, [initialScene]);
-  const contentBaselineRef = useRef(new ExcalidrawContentBaseline(scene.elements, scene.files));
+  const contentBaselineRef = useRef(new ExcalidrawContentBaseline(
+    scene.elements,
+    scene.files,
+    scene.appState,
+  ));
 
   useEffect(() => {
-    contentBaselineRef.current.reset(scene.elements, scene.files);
+    contentBaselineRef.current.reset(scene.elements, scene.files, scene.appState);
     setDirty(false);
     onDirtyChange(false);
-  }, [onDirtyChange, path, scene.elements, scene.files]);
+  }, [onDirtyChange, path, scene.appState, scene.elements, scene.files]);
 
   const handleSave = useCallback(async () => {
     const api = apiRef.current;
@@ -74,21 +79,23 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
       version: 2,
       source: "rust-text-editor",
       elements: api.getSceneElementsIncludingDeleted(),
-      appState: {
-        ...api.getAppState(),
-        collaborators: undefined,
-      },
+      appState: projectPersistableExcalidrawAppState(api.getAppState()),
       files: api.getFiles(),
     };
 
     try {
       const clean = await persistExcalidrawSnapshot({
         baseline: contentBaselineRef.current,
-        snapshot: { elements: data.elements, files: data.files },
+        snapshot: {
+          elements: data.elements,
+          files: data.files,
+          appState: data.appState,
+        },
         write: () => writeExcalidrawFile(path, JSON.stringify(data, null, 2)),
         getCurrent: () => ({
           elements: api.getSceneElementsIncludingDeleted(),
           files: api.getFiles(),
+          appState: api.getAppState(),
         }),
         onDirtyChange: (nextDirty) => {
           setDirty(nextDirty);
@@ -105,8 +112,8 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
 
   useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
-  const updateDirtyState = useCallback((elements: unknown, files: unknown) => {
-    const nextDirty = contentBaselineRef.current.isDirty(elements, files);
+  const updateDirtyState = useCallback((elements: unknown, files: unknown, appState: unknown) => {
+    const nextDirty = contentBaselineRef.current.isDirty(elements, files, appState);
     setDirty(nextDirty);
     onDirtyChange(nextDirty);
   }, [onDirtyChange]);
@@ -139,7 +146,7 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
               appState: scene.appState as never,
               files: scene.files as never,
             }}
-            onChange={(elements, _appState, files) => updateDirtyState(elements, files)}
+            onChange={(elements, appState, files) => updateDirtyState(elements, files, appState)}
           />
         </div>
       </section>
