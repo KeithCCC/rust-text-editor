@@ -12,12 +12,31 @@ export type FileProperties = {
   modifiedMs: number | null;
 };
 
+export type RecoveryDraft = {
+  schemaVersion: 1;
+  documentPath: string | null;
+  content: string;
+  updatedMs: number;
+};
+
 export function readTextFile(path: string) {
   return invoke<TextFile>("read_text_file", { path });
 }
 
 export function writeTextFile(path: string, content: string) {
   return invoke<void>("write_text_file", { path, content });
+}
+
+export function readRecoveryDraft() {
+  return invoke<RecoveryDraft | null>("read_recovery_draft");
+}
+
+export function writeRecoveryDraft(draft: RecoveryDraft) {
+  return invoke<void>("write_recovery_draft", { draft });
+}
+
+export function deleteRecoveryDraft() {
+  return invoke<void>("delete_recovery_draft");
 }
 
 export function getFileProperties(path: string) {
