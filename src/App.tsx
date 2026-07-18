@@ -8,6 +8,7 @@ import {
   useState,
 } from "react";
 import type { CSSProperties } from "react";
+import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BUILD_INFO } from "./buildInfo";
@@ -17,6 +18,7 @@ import {
   DocumentActionGate,
   LatestValue,
   installNativeCloseListener,
+  installNativeDragDropListener,
   resolveStartupRecoveryChoice,
   runCloseRequestSafely,
   runExclusiveDocumentAction,
@@ -366,8 +368,11 @@ export default function App() {
   const latestDocumentRef = useRef(new LatestValue({ content, currentFile, modified }));
   const latestCloseRequestRef = useRef<() => Promise<unknown>>(async () => false);
   const closeErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
+  const latestDroppedPathOpenRef = useRef<(path: string) => Promise<unknown>>(async () => false);
+  const dragDropErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
   const startupRecoveryDecisionInProgressRef = useRef(false);
 
+  const isNativeRuntime = isTauriRuntime();
   const isSplitMode = editorMode === "split";
   const text = UI_TEXT[appLanguage];
   const safetyText = getDocumentSafetyText(appLanguage, fileNameFromPath(currentFile));
@@ -536,6 +541,19 @@ export default function App() {
       setIsDocumentTransitionPending(false);
     }
   }, [clearRecoverySafely, handleSave, requestUnsavedDecision]);
+
+  const openDroppedPath = useCallback(
+    (path: string) => requestDocumentTransition(() => openFilePath(path)),
+    [openFilePath, requestDocumentTransition],
+  );
+  const reportDragDropError = useCallback((dragDropError: unknown) => {
+    showError(
+      text.openFailed,
+      dragDropError instanceof Error ? dragDropError.message : String(dragDropError),
+    );
+  }, [showError, text.openFailed]);
+  latestDroppedPathOpenRef.current = openDroppedPath;
+  dragDropErrorReporterRef.current = reportDragDropError;
 
   const handleNew = useCallback(async () => {
     if (actionGateRef.current.isBlocked()) return;
@@ -956,6 +974,19 @@ export default function App() {
   }, []);
 
   useEffect(() => {
+    if (!isTauriRuntime()) {
+      return undefined;
+    }
+    return installNativeDragDropListener(
+      (listener) => getCurrentWebview().onDragDropEvent(listener),
+      () => actionGateRef.current.isBlocked(),
+      () => latestDroppedPathOpenRef.current,
+      setIsFileDragOver,
+      (dragDropError) => dragDropErrorReporterRef.current(dragDropError),
+    );
+  }, []);
+
+  useEffect(() => {
     if (!activeMenu) {
       return undefined;
     }
@@ -1082,12 +1113,12 @@ export default function App() {
       data-theme={themeMode}
       aria-busy={isDocumentSafetyActive}
       style={appStyle}
-      onDragOver={(event) => {
+      onDragOver={isNativeRuntime ? undefined : (event) => {
         event.preventDefault();
         setIsFileDragOver(true);
       }}
-      onDragLeave={() => setIsFileDragOver(false)}
-      onDrop={(event) => {
+      onDragLeave={isNativeRuntime ? undefined : () => setIsFileDragOver(false)}
+      onDrop={isNativeRuntime ? undefined : (event) => {
         event.preventDefault();
         setIsFileDragOver(false);
         if (actionGateRef.current.isBlocked()) return;

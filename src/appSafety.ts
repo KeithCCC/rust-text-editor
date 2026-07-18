@@ -120,3 +120,66 @@ export function installNativeCloseListener(
     unlisten?.();
   };
 }
+
+export type NativeDragDropEvent = {
+  payload:
+    | { type: "enter" }
+    | { type: "over" }
+    | { type: "drop"; paths: string[] }
+    | { type: "leave" };
+};
+
+type OpenDroppedPath = (path: string) => Promise<unknown>;
+type RegisterNativeDragDropListener = (
+  listener: (event: NativeDragDropEvent) => void,
+) => Promise<() => void>;
+
+export function installNativeDragDropListener(
+  register: RegisterNativeDragDropListener,
+  isActionBlocked: () => boolean,
+  getLatestOpenPath: () => OpenDroppedPath,
+  setDragOver: (active: boolean) => void,
+  reportError: (error: unknown) => void,
+) {
+  let disposed = false;
+  let unlisten: (() => void) | undefined;
+
+  const handleEvent = (event: NativeDragDropEvent) => {
+    if (disposed) return;
+
+    try {
+      const { payload } = event;
+      if (payload.type === "enter" || payload.type === "over") {
+        setDragOver(!isActionBlocked());
+        return;
+      }
+
+      setDragOver(false);
+      if (payload.type === "leave" || isActionBlocked()) return;
+
+      const path = payload.paths[0];
+      if (!path) return;
+      void getLatestOpenPath()(path).catch(reportError);
+    } catch (eventError) {
+      reportError(eventError);
+    }
+  };
+
+  let registration: Promise<() => void>;
+  try {
+    registration = register(handleEvent);
+  } catch (registrationError) {
+    reportError(registrationError);
+    return () => { disposed = true; };
+  }
+
+  void registration.then((handler) => {
+    if (disposed) handler();
+    else unlisten = handler;
+  }, reportError);
+
+  return () => {
+    disposed = true;
+    unlisten?.();
+  };
+}

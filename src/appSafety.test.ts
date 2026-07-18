@@ -3,6 +3,7 @@ import {
   DocumentActionGate,
   LatestValue,
   installNativeCloseListener,
+  installNativeDragDropListener,
   resolveStartupRecoveryChoice,
   runCloseRequestSafely,
   runExclusiveDocumentAction,
@@ -177,5 +178,150 @@ describe("installNativeCloseListener", () => {
     await Promise.resolve();
 
     expect(reportError).toHaveBeenCalledWith(expect.objectContaining({ message: "listener unavailable" }));
+  });
+});
+
+describe("installNativeDragDropListener", () => {
+  test("shows the drop overlay while an unblocked drag is over the webview", async () => {
+    let listener: ((event: { payload: { type: "over" } }) => void) | undefined;
+    const setDragOver = vi.fn();
+    installNativeDragDropListener(
+      async (next) => { listener = next; return vi.fn<() => void>(); },
+      () => false,
+      () => vi.fn(async () => true),
+      setDragOver,
+      vi.fn(),
+    );
+    await Promise.resolve();
+
+    listener?.({ payload: { type: "over" } });
+
+    expect(setDragOver).toHaveBeenCalledWith(true);
+  });
+
+  test("hides the drop overlay when the native drag is cancelled", async () => {
+    let listener: ((event: { payload: { type: "leave" } }) => void) | undefined;
+    const setDragOver = vi.fn();
+    installNativeDragDropListener(
+      async (next) => { listener = next; return vi.fn<() => void>(); },
+      () => false,
+      () => vi.fn(async () => true),
+      setDragOver,
+      vi.fn(),
+    );
+    await Promise.resolve();
+
+    listener?.({ payload: { type: "leave" } });
+
+    expect(setDragOver).toHaveBeenCalledWith(false);
+  });
+
+  test("opens only the first dropped path", async () => {
+    let listener: ((event: { payload: { type: "drop"; paths: string[] } }) => void) | undefined;
+    const openPath = vi.fn(async () => true);
+    installNativeDragDropListener(
+      async (next) => { listener = next; return vi.fn<() => void>(); },
+      () => false,
+      () => openPath,
+      vi.fn(),
+      vi.fn(),
+    );
+    await Promise.resolve();
+
+    listener?.({ payload: { type: "drop", paths: ["first.md", "second.md"] } });
+    await Promise.resolve();
+
+    expect(openPath).toHaveBeenCalledTimes(1);
+    expect(openPath).toHaveBeenCalledWith("first.md");
+  });
+
+  test("ignores a drop while document actions are blocked", async () => {
+    let listener: ((event: { payload: { type: "drop"; paths: string[] } }) => void) | undefined;
+    const openPath = vi.fn(async () => true);
+    const setDragOver = vi.fn();
+    installNativeDragDropListener(
+      async (next) => { listener = next; return vi.fn<() => void>(); },
+      () => true,
+      () => openPath,
+      setDragOver,
+      vi.fn(),
+    );
+    await Promise.resolve();
+
+    listener?.({ payload: { type: "drop", paths: ["blocked.md"] } });
+    await Promise.resolve();
+
+    expect(setDragOver).toHaveBeenCalledWith(false);
+    expect(openPath).not.toHaveBeenCalled();
+  });
+
+  test("dispatches drops through the latest open callback", async () => {
+    let listener: ((event: { payload: { type: "drop"; paths: string[] } }) => void) | undefined;
+    let openPath = vi.fn(async () => true);
+    installNativeDragDropListener(
+      async (next) => { listener = next; return vi.fn<() => void>(); },
+      () => false,
+      () => openPath,
+      vi.fn(),
+      vi.fn(),
+    );
+    await Promise.resolve();
+
+    const latestOpenPath = vi.fn(async () => true);
+    openPath = latestOpenPath;
+    listener?.({ payload: { type: "drop", paths: ["latest.md"] } });
+    await Promise.resolve();
+
+    expect(latestOpenPath).toHaveBeenCalledWith("latest.md");
+  });
+
+  test("cleans up a listener whose registration finishes after disposal", async () => {
+    let finishRegistration!: (unlisten: () => void) => void;
+    const unlisten = vi.fn<() => void>();
+    const cleanup = installNativeDragDropListener(
+      async () => new Promise<() => void>((resolve) => { finishRegistration = resolve; }),
+      () => false,
+      () => vi.fn(async () => true),
+      vi.fn(),
+      vi.fn(),
+    );
+
+    cleanup();
+    finishRegistration(unlisten);
+    await vi.waitFor(() => expect(unlisten).toHaveBeenCalledTimes(1));
+  });
+
+  test("reports registration and dropped-file callback failures", async () => {
+    const registrationError = vi.fn();
+    installNativeDragDropListener(
+      () => { throw new Error("listener unavailable"); },
+      () => false,
+      () => vi.fn(async () => true),
+      vi.fn(),
+      registrationError,
+    );
+    await Promise.resolve();
+
+    expect(registrationError).toHaveBeenCalledWith(
+      expect.objectContaining({ message: "listener unavailable" }),
+    );
+
+    let listener: ((event: { payload: { type: "drop"; paths: string[] } }) => void) | undefined;
+    const eventError = vi.fn();
+    installNativeDragDropListener(
+      async (next) => { listener = next; return vi.fn<() => void>(); },
+      () => false,
+      () => async () => { throw new Error("open failed"); },
+      vi.fn(),
+      eventError,
+    );
+    await Promise.resolve();
+
+    listener?.({ payload: { type: "drop", paths: ["broken.md"] } });
+    await vi.waitFor(() => {
+      expect(eventError).toHaveBeenCalledWith(
+        expect.objectContaining({ message: "open failed" }),
+      );
+    });
   });
 });
