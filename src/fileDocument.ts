@@ -4,7 +4,7 @@ export type FileDocument = {
   modified: boolean;
 };
 
-export const APP_DISPLAY_NAME = "Koharu markdown editor";
+export const APP_DISPLAY_NAME = "Koharu";
 
 export function createUntitledDocument(): FileDocument {
   return {

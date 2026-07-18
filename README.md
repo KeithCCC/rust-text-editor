@@ -2,6 +2,8 @@
 
 Koharu is the recommended app for regular users. It is a focused, single-file Markdown editor built as a Tauri desktop application with a React and TypeScript frontend.
 
+Koharu is the application being prepared for Microsoft Store publication under the Daily AI Lab brand.
+
 Hotaru is the more experimental line of this project. It explores vault-style note management, backlinks, tags, wiki links, and other knowledge-base workflows. Some Hotaru-era backend code and naming still exists in the repository, but the current packaged app is Koharu.
 
 ## Which One Should I Use?
