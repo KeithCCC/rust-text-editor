@@ -37,6 +37,7 @@ import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocu
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
 import { RecoveryDraftQueue, type RecoveryDraft } from "./recoveryDraftQueue";
 import { isTauriRuntime } from "./tauriRuntime";
+import { synchronizeDocumentTitle } from "./documentTitleSync";
 import {
   deleteRecoveryDraft,
   exitApp,
@@ -839,7 +840,11 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    document.title = formatDocumentTitle(currentFile, modified);
+    const title = formatDocumentTitle(currentFile, modified);
+    void synchronizeDocumentTitle(
+      title,
+      isTauriRuntime() ? (nativeTitle) => getCurrentWindow().setTitle(nativeTitle) : undefined,
+    );
   }, [currentFile, modified]);
 
   useEffect(() => {
