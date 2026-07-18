@@ -1090,6 +1090,14 @@ textarea {
   background: rgb(14 24 36 / 58%);
 }
 
+.excalidraw-backdrop {
+  z-index: 10;
+}
+
+.decision-dialog-backdrop {
+  z-index: 20;
+}
+
 .decision-dialog {
   width: min(520px, 100%);
   padding: 20px;

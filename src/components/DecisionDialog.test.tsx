@@ -20,6 +20,8 @@ describe("DecisionDialog", () => {
 
     expect(html).toContain('role="dialog"');
     expect(html).toContain('aria-modal="true"');
+    expect(html).toContain('class="modal-backdrop decision-dialog-backdrop"');
+    expect(html).toContain('style="z-index:20"');
     expect(html).toContain("Save changes?");
     expect(html).toContain("Don&#x27;t Save");
   });

@@ -10,6 +10,8 @@ import {
 import { Excalidraw } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawScene } from "../types";
+import { ExcalidrawContentBaseline } from "../excalidrawDirty";
+import { MODAL_LAYERS } from "../modalLayers";
 import { writeExcalidrawFile } from "../tauri";
 
 type ExcalidrawEditorProps = {
@@ -48,11 +50,13 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
   const [dirty, setDirty] = useState(false);
 
   const scene = useMemo(() => initialScene ?? EMPTY_SCENE, [initialScene]);
+  const contentBaselineRef = useRef(new ExcalidrawContentBaseline(scene.elements, scene.files));
 
   useEffect(() => {
+    contentBaselineRef.current.reset(scene.elements, scene.files);
     setDirty(false);
     onDirtyChange(false);
-  }, [onDirtyChange, path]);
+  }, [onDirtyChange, path, scene.elements, scene.files]);
 
   const handleSave = useCallback(async () => {
     const api = apiRef.current;
@@ -76,6 +80,7 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
 
     try {
       await writeExcalidrawFile(path, JSON.stringify(data, null, 2));
+      contentBaselineRef.current.reset(data.elements, data.files);
       setDirty(false);
       onDirtyChange(false);
       onSaved();
@@ -88,13 +93,19 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
 
   useImperativeHandle(ref, () => ({ save: handleSave }), [handleSave]);
 
-  const markDirty = useCallback(() => {
-    setDirty(true);
-    onDirtyChange(true);
+  const updateDirtyState = useCallback((elements: unknown, files: unknown) => {
+    const nextDirty = contentBaselineRef.current.isDirty(elements, files);
+    setDirty(nextDirty);
+    onDirtyChange(nextDirty);
   }, [onDirtyChange]);
 
   return (
-    <div className="modal-backdrop" role="dialog" aria-modal="true">
+    <div
+      className="modal-backdrop excalidraw-backdrop"
+      style={{ zIndex: MODAL_LAYERS.excalidraw }}
+      role="dialog"
+      aria-modal="true"
+    >
       <section className="excalidraw-modal">
         <header className="modal-toolbar">
           <div>
@@ -116,7 +127,7 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
               appState: scene.appState as never,
               files: scene.files as never,
             }}
-            onChange={markDirty}
+            onChange={(elements, _appState, files) => updateDirtyState(elements, files)}
           />
         </div>
       </section>

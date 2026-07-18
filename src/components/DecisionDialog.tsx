@@ -1,4 +1,5 @@
 import { useEffect, useId, useRef } from "react";
+import { MODAL_LAYERS } from "../modalLayers";
 
 type DecisionAction = {
   id: string;
@@ -38,7 +39,10 @@ export function DecisionDialog({
   }, [cancelId, onDecision]);
 
   return (
-    <div className="modal-backdrop">
+    <div
+      className="modal-backdrop decision-dialog-backdrop"
+      style={{ zIndex: MODAL_LAYERS.decision }}
+    >
       <section
         className="decision-dialog"
         role="dialog"
