@@ -1,4 +1,5 @@
 mod atomic_write;
+mod recovery;
 
 use std::fs::{self, OpenOptions};
 use std::io::Write;
@@ -221,7 +222,10 @@ pub fn run() {
             append_debug_log,
             get_debug_log_path,
             resolve_relative_path,
-            exit_app
+            exit_app,
+            recovery::read_recovery_draft,
+            recovery::write_recovery_draft,
+            recovery::delete_recovery_draft
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
