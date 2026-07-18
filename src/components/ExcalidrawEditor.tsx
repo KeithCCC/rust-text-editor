@@ -10,7 +10,10 @@ import {
 import { Excalidraw } from "@excalidraw/excalidraw";
 import type { ExcalidrawImperativeAPI } from "@excalidraw/excalidraw/types";
 import type { ExcalidrawScene } from "../types";
-import { ExcalidrawContentBaseline } from "../excalidrawDirty";
+import {
+  ExcalidrawContentBaseline,
+  persistExcalidrawSnapshot,
+} from "../excalidrawDirty";
 import { MODAL_LAYERS } from "../modalLayers";
 import { writeExcalidrawFile } from "../tauri";
 
@@ -79,12 +82,21 @@ export const ExcalidrawEditor = forwardRef<ExcalidrawEditorHandle, ExcalidrawEdi
     };
 
     try {
-      await writeExcalidrawFile(path, JSON.stringify(data, null, 2));
-      contentBaselineRef.current.reset(data.elements, data.files);
-      setDirty(false);
-      onDirtyChange(false);
+      const clean = await persistExcalidrawSnapshot({
+        baseline: contentBaselineRef.current,
+        snapshot: { elements: data.elements, files: data.files },
+        write: () => writeExcalidrawFile(path, JSON.stringify(data, null, 2)),
+        getCurrent: () => ({
+          elements: api.getSceneElementsIncludingDeleted(),
+          files: api.getFiles(),
+        }),
+        onDirtyChange: (nextDirty) => {
+          setDirty(nextDirty);
+          onDirtyChange(nextDirty);
+        },
+      });
       onSaved();
-      return true;
+      return clean;
     } catch (error) {
       onError(error instanceof Error ? error.message : String(error));
       return false;

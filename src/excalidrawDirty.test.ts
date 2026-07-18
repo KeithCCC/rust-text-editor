@@ -1,5 +1,8 @@
-import { describe, expect, test } from "vitest";
-import { ExcalidrawContentBaseline } from "./excalidrawDirty";
+import { describe, expect, test, vi } from "vitest";
+import {
+  ExcalidrawContentBaseline,
+  persistExcalidrawSnapshot,
+} from "./excalidrawDirty";
 
 const originalElements = [{ id: "box", type: "rectangle", x: 10, y: 20 }];
 const originalFiles = {
@@ -50,5 +53,83 @@ describe("ExcalidrawContentBaseline", () => {
     expect(baseline.isDirty(savedElements, originalFiles)).toBe(true);
     baseline.reset(savedElements, originalFiles);
     expect(baseline.isDirty(savedElements, originalFiles)).toBe(false);
+  });
+});
+
+describe("persistExcalidrawSnapshot", () => {
+  const savedElements = [{ ...originalElements[0], x: 42 }];
+
+  test("returns clean after persisting the current content", async () => {
+    const baseline = new ExcalidrawContentBaseline(originalElements, originalFiles);
+    const onDirtyChange = vi.fn();
+
+    await expect(persistExcalidrawSnapshot({
+      baseline,
+      snapshot: { elements: savedElements, files: originalFiles },
+      write: async () => undefined,
+      getCurrent: () => ({ elements: savedElements, files: originalFiles }),
+      onDirtyChange,
+    })).resolves.toBe(true);
+
+    expect(onDirtyChange).toHaveBeenCalledWith(false);
+    expect(baseline.isDirty(savedElements, originalFiles)).toBe(false);
+  });
+
+  test("returns dirty when content changes while the snapshot is being written", async () => {
+    const baseline = new ExcalidrawContentBaseline(originalElements, originalFiles);
+    const newerElements = [{ ...originalElements[0], x: 84 }];
+    let currentElements = savedElements;
+    let finishWrite!: () => void;
+    const onDirtyChange = vi.fn();
+    const saving = persistExcalidrawSnapshot({
+      baseline,
+      snapshot: { elements: savedElements, files: originalFiles },
+      write: () => new Promise<void>((resolve) => { finishWrite = resolve; }),
+      getCurrent: () => ({ elements: currentElements, files: originalFiles }),
+      onDirtyChange,
+    });
+
+    currentElements = newerElements;
+    finishWrite();
+
+    await expect(saving).resolves.toBe(false);
+    expect(onDirtyChange).toHaveBeenCalledWith(true);
+    expect(baseline.isDirty(newerElements, originalFiles)).toBe(true);
+  });
+
+  test("preserves the written snapshot when a live collection mutates during writing", async () => {
+    const baseline = new ExcalidrawContentBaseline(originalElements, originalFiles);
+    const liveElements = [{ ...originalElements[0], x: 42 }];
+    let finishWrite!: () => void;
+    const onDirtyChange = vi.fn();
+    const saving = persistExcalidrawSnapshot({
+      baseline,
+      snapshot: { elements: liveElements, files: originalFiles },
+      write: () => new Promise<void>((resolve) => { finishWrite = resolve; }),
+      getCurrent: () => ({ elements: liveElements, files: originalFiles }),
+      onDirtyChange,
+    });
+
+    liveElements[0].x = 84;
+    finishWrite();
+
+    await expect(saving).resolves.toBe(false);
+    expect(onDirtyChange).toHaveBeenCalledWith(true);
+  });
+
+  test("keeps the previous baseline and dirty state when writing fails", async () => {
+    const baseline = new ExcalidrawContentBaseline(originalElements, originalFiles);
+    const onDirtyChange = vi.fn();
+
+    await expect(persistExcalidrawSnapshot({
+      baseline,
+      snapshot: { elements: savedElements, files: originalFiles },
+      write: async () => { throw new Error("disk full"); },
+      getCurrent: () => ({ elements: savedElements, files: originalFiles }),
+      onDirtyChange,
+    })).rejects.toThrow("disk full");
+
+    expect(onDirtyChange).not.toHaveBeenCalled();
+    expect(baseline.isDirty(savedElements, originalFiles)).toBe(true);
   });
 });

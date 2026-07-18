@@ -33,3 +33,34 @@ export class ExcalidrawContentBaseline {
     this.fingerprint = contentFingerprint(elements, files);
   }
 }
+
+type ExcalidrawContentSnapshot = {
+  elements: unknown;
+  files: unknown;
+};
+
+type PersistExcalidrawSnapshotOptions = {
+  baseline: ExcalidrawContentBaseline;
+  snapshot: ExcalidrawContentSnapshot;
+  write: () => Promise<void>;
+  getCurrent: () => ExcalidrawContentSnapshot;
+  onDirtyChange: (dirty: boolean) => void;
+};
+
+export async function persistExcalidrawSnapshot({
+  baseline,
+  snapshot,
+  write,
+  getCurrent,
+  onDirtyChange,
+}: PersistExcalidrawSnapshotOptions) {
+  const persistedElements = normalizeContent(snapshot.elements ?? []);
+  const persistedFiles = normalizeContent(snapshot.files ?? {});
+  await write();
+  baseline.reset(persistedElements, persistedFiles);
+
+  const current = getCurrent();
+  const dirty = baseline.isDirty(current.elements, current.files);
+  onDirtyChange(dirty);
+  return !dirty;
+}
