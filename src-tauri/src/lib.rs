@@ -1,3 +1,5 @@
+mod atomic_write;
+
 use std::fs::{self, OpenOptions};
 use std::io::Write;
 use std::panic;
@@ -32,12 +34,7 @@ fn read_text_file(path: String) -> Result<TextFile, String> {
 
 #[tauri::command]
 fn write_text_file(path: String, content: String) -> Result<(), String> {
-    if let Some(parent) = Path::new(&path).parent() {
-        fs::create_dir_all(parent)
-            .map_err(|error| format!("Failed to prepare directory for '{}': {}", path, error))?;
-    }
-
-    fs::write(&path, content).map_err(|error| format!("Failed to write '{}': {}", path, error))
+    atomic_write::write_atomic(Path::new(&path), content.as_bytes())
 }
 
 #[tauri::command]
@@ -114,8 +111,7 @@ fn read_excalidraw_file(path: String) -> Result<String, String> {
 
 #[tauri::command]
 fn write_excalidraw_file(path: String, content: String) -> Result<(), String> {
-    fs::write(&path, content)
-        .map_err(|error| format!("Failed to write Excalidraw file '{}': {}", path, error))
+    atomic_write::write_atomic(Path::new(&path), content.as_bytes())
 }
 
 #[tauri::command]
