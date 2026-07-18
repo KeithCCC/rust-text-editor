@@ -14,26 +14,32 @@ import { BUILD_INFO } from "./buildInfo";
 import { formatBuildLabel } from "./buildLabel";
 import { isPrimaryShortcut } from "./keyboardShortcuts";
 import { HelpDialog } from "./components/HelpDialog";
+import { DecisionDialog } from "./components/DecisionDialog";
 import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
 import { logDebug } from "./debugLog";
+import { runDocumentTransition, type UnsavedDecision } from "./documentLifecycle";
+import { getDocumentSafetyText } from "./documentSafetyText";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
+import { RecoveryDraftQueue, type RecoveryDraft } from "./recoveryDraftQueue";
 import { isTauriRuntime } from "./tauriRuntime";
 import {
+  deleteRecoveryDraft,
   exitApp,
   getFileProperties,
   getStartupFilePath,
   readExcalidrawFile,
+  readRecoveryDraft,
   readTextFile,
   resolveRelativePath,
+  writeRecoveryDraft,
   writeTextFile,
 } from "./tauri";
 import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
-import { canCloseWindow, handleCloseRequested } from "./windowCloseBehavior";
 import { saveCurrentWindowState } from "./windowState";
 
 const ExcalidrawEditor = lazy(() =>
@@ -320,6 +326,10 @@ export default function App() {
   const [hasSearchSelection, setHasSearchSelection] = useState(false);
   const [isDraggingSplit, setIsDraggingSplit] = useState(false);
   const [excalidrawSession, setExcalidrawSession] = useState<ExcalidrawSession | null>(null);
+  const [isUnsavedPromptOpen, setIsUnsavedPromptOpen] = useState(false);
+  const [startupRecoveryDraft, setStartupRecoveryDraft] = useState<RecoveryDraft | null>(null);
+  const [pendingStartupPath, setPendingStartupPath] = useState<string | null>(null);
+  const [resumeStartupPathAfterRecovery, setResumeStartupPathAfterRecovery] = useState(false);
   const menubarRef = useRef<HTMLElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<MarkdownEditorHandle | null>(null);
@@ -327,9 +337,20 @@ export default function App() {
   const previewRef = useRef<HTMLDivElement | null>(null);
   const isSyncingScrollRef = useRef(false);
   const syncScrollFrameRef = useRef<number | null>(null);
+  const unsavedPromptRef = useRef<{
+    promise: Promise<UnsavedDecision>;
+    resolve: (decision: UnsavedDecision) => void;
+  } | null>(null);
+  const transitionInProgressRef = useRef(false);
+  const lastRecoveryWriteMsRef = useRef(0);
+  const startupLoadedRef = useRef(false);
+  const recoveryQueueRef = useRef(
+    new RecoveryDraftQueue(writeRecoveryDraft, deleteRecoveryDraft),
+  );
 
   const isSplitMode = editorMode === "split";
   const text = UI_TEXT[appLanguage];
+  const safetyText = getDocumentSafetyText(appLanguage, fileNameFromPath(currentFile));
   const appStyle = useMemo(() => ({
     "--editor-font-size": `${editorFontSize}px`,
     "--editor-line-height": String(editorLineHeight),
@@ -359,6 +380,40 @@ export default function App() {
     void logDebug("error", title, message);
   }, []);
 
+  const requestUnsavedDecision = useCallback(() => {
+    if (unsavedPromptRef.current) {
+      return unsavedPromptRef.current.promise;
+    }
+
+    let resolve!: (decision: UnsavedDecision) => void;
+    const promise = new Promise<UnsavedDecision>((next) => { resolve = next; });
+    unsavedPromptRef.current = { promise, resolve };
+    setIsUnsavedPromptOpen(true);
+    return promise;
+  }, []);
+
+  const resolveUnsavedDecision = useCallback((decision: UnsavedDecision) => {
+    const prompt = unsavedPromptRef.current;
+    if (!prompt) return;
+    unsavedPromptRef.current = null;
+    setIsUnsavedPromptOpen(false);
+    prompt.resolve(decision);
+  }, []);
+
+  const clearRecoverySafely = useCallback(async (abortTransitionOnFailure = false) => {
+    try {
+      await recoveryQueueRef.current.clear();
+    } catch (recoveryError) {
+      showError(
+        safetyText.recoveryFailed,
+        recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+      );
+      if (abortTransitionOnFailure) {
+        throw recoveryError;
+      }
+    }
+  }, [safetyText.recoveryFailed, showError]);
+
   const loadDocument = useCallback((path: string, nextContent: string) => {
     setContent(nextContent);
     setPreviewContent(nextContent);
@@ -379,52 +434,6 @@ export default function App() {
     setFileProperties(null);
   }, []);
 
-  const confirmDiscardChanges = useCallback(() => {
-    return !modified || window.confirm(text.unsavedDiscard);
-  }, [modified, text.unsavedDiscard]);
-
-  const requestAppClose = useCallback(async () => {
-    if (!canCloseWindow(modified, () => window.confirm(text.unsavedExit))) {
-      return;
-    }
-
-    await saveCurrentWindowState();
-    if (isTauriRuntime()) {
-      await exitApp();
-    } else {
-      window.close();
-    }
-  }, [modified, text.unsavedExit]);
-
-  useEffect(() => {
-    if (!isTauriRuntime()) {
-      return undefined;
-    }
-
-    let unlistenClose: (() => void) | undefined;
-    let cancelled = false;
-
-    getCurrentWindow().onCloseRequested(async (event) => {
-      await handleCloseRequested({
-        modified,
-        confirmClose: () => window.confirm(text.unsavedExit),
-        preventDefault: () => event.preventDefault(),
-        saveWindowState: saveCurrentWindowState,
-      });
-    }).then((unlisten) => {
-      if (cancelled) {
-        unlisten();
-        return;
-      }
-      unlistenClose = unlisten;
-    });
-
-    return () => {
-      cancelled = true;
-      unlistenClose?.();
-    };
-  }, [modified, text.unsavedExit]);
-
   const openFilePath = useCallback(async (path: string) => {
     try {
       const file = await readTextFile(path);
@@ -433,31 +442,6 @@ export default function App() {
       showError(text.openFailed, openError instanceof Error ? openError.message : String(openError));
     }
   }, [loadDocument, showError, text.openFailed]);
-
-  const handleNew = useCallback(() => {
-    if (!confirmDiscardChanges()) {
-      return;
-    }
-    resetDocument();
-    requestAnimationFrame(() => editorRef.current?.focus());
-  }, [confirmDiscardChanges, resetDocument]);
-
-  const handleOpen = useCallback(async () => {
-    if (!confirmDiscardChanges()) {
-      return;
-    }
-
-    const selected = normalizeSelectedPath(await open({
-      multiple: false,
-      filters: [
-        { name: "Text files", extensions: ["txt", "md", "markdown", "json", "csv", "log"] },
-        { name: "All files", extensions: ["*"] },
-      ],
-    }));
-    if (selected) {
-      await openFilePath(selected);
-    }
-  }, [confirmDiscardChanges, openFilePath]);
 
   const handleSaveAs = useCallback(async () => {
     const selected = await save({
@@ -475,13 +459,14 @@ export default function App() {
     try {
       await writeTextFile(selected, content);
       setCurrentFile(selected);
+      await clearRecoverySafely();
       setModified(false);
       return true;
     } catch (saveError) {
       showError(text.saveFailed, saveError instanceof Error ? saveError.message : String(saveError));
       return false;
     }
-  }, [content, currentFile, showError, text.saveFailed]);
+  }, [clearRecoverySafely, content, currentFile, showError, text.saveFailed]);
 
   const handleSave = useCallback(async () => {
     if (!currentFile) {
@@ -490,13 +475,56 @@ export default function App() {
 
     try {
       await writeTextFile(currentFile, content);
+      await clearRecoverySafely();
       setModified(false);
       return true;
     } catch (saveError) {
       showError(text.saveFailed, saveError instanceof Error ? saveError.message : String(saveError));
       return false;
     }
-  }, [content, currentFile, handleSaveAs, showError, text.saveFailed]);
+  }, [clearRecoverySafely, content, currentFile, handleSaveAs, showError, text.saveFailed]);
+
+  const requestDocumentTransition = useCallback(async (proceed: () => Promise<void>) => {
+    if (transitionInProgressRef.current) return false;
+    transitionInProgressRef.current = true;
+    try {
+      return await runDocumentTransition({
+        modified,
+        requestDecision: requestUnsavedDecision,
+        save: handleSave,
+        discardRecovery: () => clearRecoverySafely(true),
+        proceed,
+      });
+    } finally {
+      transitionInProgressRef.current = false;
+    }
+  }, [clearRecoverySafely, handleSave, modified, requestUnsavedDecision]);
+
+  const handleNew = useCallback(async () => {
+    await requestDocumentTransition(async () => {
+      resetDocument();
+      requestAnimationFrame(() => editorRef.current?.focus());
+    });
+  }, [requestDocumentTransition, resetDocument]);
+
+  const handleOpen = useCallback(async () => {
+    const selected = normalizeSelectedPath(await open({
+      multiple: false,
+      filters: [
+        { name: "Text files", extensions: ["txt", "md", "markdown", "json", "csv", "log"] },
+        { name: "All files", extensions: ["*"] },
+      ],
+    }));
+    if (selected) {
+      await requestDocumentTransition(() => openFilePath(selected));
+    }
+  }, [openFilePath, requestDocumentTransition]);
+
+  const requestAppClose = useCallback(() => requestDocumentTransition(async () => {
+    await saveCurrentWindowState();
+    if (isTauriRuntime()) await exitApp();
+    else window.close();
+  }), [requestDocumentTransition]);
 
   const handleExit = useCallback(async () => {
     await requestAppClose();
@@ -579,14 +607,11 @@ export default function App() {
       showError(text.linkOpenFailed, text.saveBeforeOpeningLink);
       return;
     }
-    if (!confirmDiscardChanges()) {
-      return;
-    }
 
     void resolveRelativePath(currentFile, relativePath)
-      .then((path) => openFilePath(path))
+      .then((path) => requestDocumentTransition(() => openFilePath(path)))
       .catch((linkError) => showError(text.linkOpenFailed, linkError instanceof Error ? linkError.message : String(linkError)));
-  }, [confirmDiscardChanges, currentFile, openFilePath, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
+  }, [currentFile, openFilePath, requestDocumentTransition, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
 
   const handleExcalidrawSaved = useCallback(async (path: string) => {
     if (path === currentFile) {
@@ -598,6 +623,31 @@ export default function App() {
       }
     }
   }, [currentFile, loadDocument, showError, text.reloadFailed]);
+
+  const finishStartupRecovery = useCallback(async (recover: boolean) => {
+    const draft = startupRecoveryDraft;
+    if (!draft) return;
+    setStartupRecoveryDraft(null);
+
+    if (recover) {
+      setContent(draft.content);
+      setPreviewContent(draft.content);
+      setCurrentFile(draft.documentPath);
+      setModified(true);
+    } else {
+      await clearRecoverySafely();
+    }
+
+    if (pendingStartupPath) {
+      if (recover) {
+        setResumeStartupPathAfterRecovery(true);
+      } else {
+        const path = pendingStartupPath;
+        setPendingStartupPath(null);
+        await openFilePath(path);
+      }
+    }
+  }, [clearRecoverySafely, openFilePath, pendingStartupPath, startupRecoveryDraft]);
 
   const openNoteSearch = useCallback(() => {
     setIsNoteSearchVisible(true);
@@ -694,21 +744,58 @@ export default function App() {
   }, [searchQuery]);
 
   useEffect(() => {
-    if (!isTauriRuntime()) {
-      return;
+    if (!isTauriRuntime() || !modified) return undefined;
+    if (lastRecoveryWriteMsRef.current === 0) {
+      lastRecoveryWriteMsRef.current = Date.now();
     }
+    const elapsed = Date.now() - lastRecoveryWriteMsRef.current;
+    const delay = Math.min(2000, Math.max(0, 30_000 - elapsed));
+    const timer = window.setTimeout(() => {
+      void recoveryQueueRef.current.write({
+        schemaVersion: 1,
+        documentPath: currentFile,
+        content,
+        updatedMs: Date.now(),
+      }).then(() => {
+        lastRecoveryWriteMsRef.current = Date.now();
+      }, (recoveryError) => {
+        showError(
+          safetyText.recoveryFailed,
+          recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+        );
+      });
+    }, delay);
+    return () => window.clearTimeout(timer);
+  }, [content, currentFile, modified, safetyText.recoveryFailed, showError]);
 
-    void getStartupFilePath()
-      .then((startupPath) => {
-        if (startupPath) {
-          return openFilePath(startupPath);
-        }
-        return undefined;
+  useEffect(() => {
+    if (!isTauriRuntime() || startupLoadedRef.current) return;
+    startupLoadedRef.current = true;
+    const recovery = readRecoveryDraft().catch((recoveryError) => {
+      showError(
+        safetyText.recoveryFailed,
+        recoveryError instanceof Error ? recoveryError.message : String(recoveryError),
+      );
+      return null;
+    });
+    void Promise.all([recovery, getStartupFilePath()])
+      .then(([draft, startupPath]) => {
+        setPendingStartupPath(startupPath);
+        if (draft) setStartupRecoveryDraft(draft);
+        else if (startupPath) void openFilePath(startupPath);
       })
       .catch((startupError) => {
         showError(text.startupOpenFailed, startupError instanceof Error ? startupError.message : String(startupError));
       });
-  }, [openFilePath, showError, text.startupOpenFailed]);
+  }, [openFilePath, safetyText.recoveryFailed, showError, text.startupOpenFailed]);
+
+  useEffect(() => {
+    if (!resumeStartupPathAfterRecovery || !pendingStartupPath) return;
+    const path = pendingStartupPath;
+    setResumeStartupPathAfterRecovery(false);
+    setPendingStartupPath(null);
+    void requestDocumentTransition(() => openFilePath(path));
+  }, [openFilePath, pendingStartupPath, requestDocumentTransition, resumeStartupPathAfterRecovery]);
 
   useEffect(() => {
     if (!isTauriRuntime()) {
@@ -716,14 +803,17 @@ export default function App() {
     }
 
     let unlisten: (() => void) | undefined;
-    void getCurrentWindow().onCloseRequested(async (event) => {
+    let cancelled = false;
+    void getCurrentWindow().onCloseRequested((event) => {
       event.preventDefault();
-      await requestAppClose();
+      void requestAppClose();
     }).then((handler) => {
-      unlisten = handler;
+      if (cancelled) handler();
+      else unlisten = handler;
     });
 
     return () => {
+      cancelled = true;
       unlisten?.();
     };
   }, [requestAppClose]);
@@ -857,13 +947,10 @@ export default function App() {
       onDrop={(event) => {
         event.preventDefault();
         setIsFileDragOver(false);
-        if (!confirmDiscardChanges()) {
-          return;
-        }
         const file = event.dataTransfer.files.item(0);
         const path = file ? "path" in file ? String(file.path) : "" : "";
         if (path) {
-          void openFilePath(path);
+          void requestDocumentTransition(() => openFilePath(path));
         }
       }}
     >
@@ -1172,6 +1259,33 @@ export default function App() {
             </div>
           </div>
         </section>
+      )}
+
+      {isUnsavedPromptOpen && (
+        <DecisionDialog
+          title={safetyText.unsavedTitle}
+          message={safetyText.unsavedMessage}
+          actions={[
+            { id: "save", label: safetyText.save, emphasis: "primary" },
+            { id: "discard", label: safetyText.dontSave, emphasis: "danger" },
+            { id: "cancel", label: safetyText.cancel },
+          ]}
+          cancelId="cancel"
+          onDecision={(id) => resolveUnsavedDecision(id as UnsavedDecision)}
+        />
+      )}
+
+      {startupRecoveryDraft && (
+        <DecisionDialog
+          title={safetyText.recoveryTitle}
+          message={safetyText.recoveryMessage}
+          actions={[
+            { id: "recover", label: safetyText.recover, emphasis: "primary" },
+            { id: "discard", label: safetyText.discardRecovery, emphasis: "danger" },
+          ]}
+          cancelId="recover"
+          onDecision={(id) => void finishStartupRecovery(id === "recover")}
+        />
       )}
 
       {excalidrawSession && (

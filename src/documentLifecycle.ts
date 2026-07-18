@@ -24,7 +24,11 @@ export async function runDocumentTransition({
       return false;
     }
     if (decision === "discard") {
-      await discardRecovery();
+      try {
+        await discardRecovery();
+      } catch {
+        return false;
+      }
     }
   }
 

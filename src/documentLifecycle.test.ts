@@ -45,6 +45,15 @@ describe("runDocumentTransition", () => {
     expect(order).toEqual(["discard", "proceed"]);
   });
 
+  test("stops without rejecting when recovery cannot be discarded", async () => {
+    const options = setup(true);
+    options.requestDecision.mockResolvedValue("discard");
+    options.discardRecovery.mockRejectedValue(new Error("draft is locked"));
+
+    await expect(runDocumentTransition(options)).resolves.toBe(false);
+    expect(options.proceed).not.toHaveBeenCalled();
+  });
+
   test("Cancel preserves the document", async () => {
     const options = setup(true);
     expect(await runDocumentTransition(options)).toBe(false);
