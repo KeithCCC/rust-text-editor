@@ -1263,6 +1263,35 @@ textarea {
   padding: 20px;
 }
 
+.help-identity {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  margin: 0 0 20px;
+  text-align: center;
+}
+
+.help-identity-icon {
+  width: 160px;
+  height: 160px;
+  max-width: 100%;
+  height: auto;
+  object-fit: contain;
+}
+
+.help-identity-name {
+  margin-top: 10px;
+  color: var(--preview-heading);
+  font-size: 24px;
+}
+
+.help-identity-introduction {
+  max-width: 520px;
+  margin: 4px 0 0;
+  color: var(--muted);
+  line-height: 1.5;
+}
+
 .help-sections {
   display: grid;
   grid-template-columns: repeat(2, minmax(0, 1fr));
@@ -1385,6 +1414,12 @@ textarea {
 }
 
 @media (max-width: 700px) {
+  .help-identity-icon {
+    width: 120px;
+    height: 120px;
+    height: auto;
+  }
+
   .help-sections {
     grid-template-columns: 1fr;
   }
