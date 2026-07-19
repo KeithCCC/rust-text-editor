@@ -8,6 +8,11 @@ describe("HelpDialog", () => {
       <HelpDialog language="ja" onClose={() => undefined} />,
     );
 
+    expect(html).toContain('class="help-identity"');
+    expect(html).toContain('src="/koharu-release-icon.png"');
+    expect(html).toContain('alt="Koharuの花アイコン"');
+    expect(html).toContain('<strong class="help-identity-name">Koharu</strong>');
+
     expect(html).toContain("Koharuの使い方");
     expect(html).toContain("ファイルを作る・開く・保存する");
     expect(html).toContain("Markdownの書き方");
@@ -23,6 +28,11 @@ describe("HelpDialog", () => {
     const html = renderToStaticMarkup(
       <HelpDialog language="en" onClose={() => undefined} />,
     );
+
+    expect(html).toContain('class="help-identity"');
+    expect(html).toContain('src="/koharu-release-icon.png"');
+    expect(html).toContain('alt="Koharu flower icon"');
+    expect(html).toContain('<strong class="help-identity-name">Koharu</strong>');
 
     expect(html).toContain("How to use Koharu");
     expect(html).toContain("Create, open, and save files");

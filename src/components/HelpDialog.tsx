@@ -16,6 +16,7 @@ type HelpSection = {
 type HelpContent = {
   title: string;
   introduction: string;
+  identityAlt: string;
   close: string;
   closeLabel: string;
   shortcutsTitle: string;
@@ -29,6 +30,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
   en: {
     title: "How to use Koharu",
     introduction: "The essentials for writing and saving a Markdown document.",
+    identityAlt: "Koharu flower icon",
     close: "Close",
     closeLabel: "Close How to use Koharu",
     shortcutsTitle: "Keyboard shortcuts",
@@ -75,6 +77,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
   ja: {
     title: "Koharuの使い方",
     introduction: "Markdown文書を書いて保存するための、基本的な使い方です。",
+    identityAlt: "Koharuの花アイコン",
     close: "閉じる",
     closeLabel: "Koharuの使い方を閉じる",
     shortcutsTitle: "キーボードショートカット",
@@ -149,12 +152,20 @@ export function HelpDialog({ language, onClose }: HelpDialogProps) {
         <header className="modal-toolbar">
           <div>
             <strong id="help-dialog-title">{content.title}</strong>
-            <span>{content.introduction}</span>
           </div>
           <button type="button" aria-label={content.closeLabel} onClick={onClose}>×</button>
         </header>
 
         <div className="help-dialog-body">
+          <div className="help-identity">
+            <img
+              className="help-identity-icon"
+              src="/koharu-release-icon.png"
+              alt={content.identityAlt}
+            />
+            <strong className="help-identity-name">Koharu</strong>
+            <p className="help-identity-introduction">{content.introduction}</p>
+          </div>
           <div className="help-sections">
             {content.sections.map((section) => (
               <section className="help-section" key={section.title}>
