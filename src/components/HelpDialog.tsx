@@ -77,7 +77,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
   ja: {
     title: "Koharuの使い方",
     introduction: "Markdown文書を書いて保存するための、基本的な使い方です。",
-    identityAlt: "Koharuの花アイコン",
+    identityAlt: "Koharuの花のアイコン",
     close: "閉じる",
     closeLabel: "Koharuの使い方を閉じる",
     shortcutsTitle: "キーボードショートカット",

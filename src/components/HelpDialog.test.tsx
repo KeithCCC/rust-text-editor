@@ -10,7 +10,7 @@ describe("HelpDialog", () => {
 
     expect(html).toContain('class="help-identity"');
     expect(html).toContain('src="/koharu-release-icon.png"');
-    expect(html).toContain('alt="Koharuの花アイコン"');
+    expect(html).toContain('alt="Koharuの花のアイコン"');
     expect(html).toContain('<strong class="help-identity-name">Koharu</strong>');
 
     expect(html).toContain("Koharuの使い方");
