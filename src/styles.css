@@ -1274,6 +1274,8 @@ textarea {
 .help-identity-icon {
   width: 160px;
   height: 160px;
+  max-width: 100%;
+  height: auto;
   object-fit: contain;
 }
 
@@ -1415,6 +1417,7 @@ textarea {
   .help-identity-icon {
     width: 120px;
     height: 120px;
+    height: auto;
   }
 
   .help-sections {
