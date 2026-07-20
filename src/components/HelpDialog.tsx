@@ -11,6 +11,7 @@ type HelpSection = {
   title: string;
   paragraphs: string[];
   examples?: Array<{ source: string; meaning: string }>;
+  codeExample?: string;
 };
 
 type HelpContent = {
@@ -62,6 +63,13 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
           { source: "[Link](https://example.com)", meaning: "Link" },
         ],
       },
+      {
+        title: "Mermaid diagrams",
+        paragraphs: [
+          "Write a fenced code block labeled mermaid to render a diagram in Preview.",
+        ],
+        codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
+      },
     ],
     shortcuts: [
       { action: "New document", keys: "Ctrl+N" },
@@ -108,6 +116,13 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
           { source: "- 箇条書き", meaning: "箇条書き" },
           { source: "[リンク](https://example.com)", meaning: "リンク" },
         ],
+      },
+      {
+        title: "Mermaid蝗ｳ",
+        paragraphs: [
+          "mermaid縺ｨ謖・ｮ壹＠縺溘繧ｳ繝ｼ繝峨ヶ繝ｭ繝・け繧呈嶌縺上→縲√・繝ｬ繝薙Η繝ｼ縺ｫ蝗ｳ縺ｨ縺励※陦ｨ遉ｺ縺輔ｌ縺ｾ縺吶・",
+        ],
+        codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
       },
     ],
     shortcuts: [
@@ -168,7 +183,10 @@ export function HelpDialog({ language, onClose }: HelpDialogProps) {
           </div>
           <div className="help-sections">
             {content.sections.map((section) => (
-              <section className="help-section" key={section.title}>
+              <section
+                className={`help-section${section.examples || section.codeExample ? " help-section-wide" : ""}`}
+                key={section.title}
+              >
                 <h2>{section.title}</h2>
                 {section.paragraphs.map((paragraph) => <p key={paragraph}>{paragraph}</p>)}
                 {section.examples && (
@@ -180,6 +198,9 @@ export function HelpDialog({ language, onClose }: HelpDialogProps) {
                       </div>
                     ))}
                   </dl>
+                )}
+                {section.codeExample && (
+                  <pre className="help-code-example"><code>{section.codeExample}</code></pre>
                 )}
               </section>
             ))}
