@@ -118,9 +118,9 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "Mermaid蝗ｳ",
+        title: "Mermaid図",
         paragraphs: [
-          "mermaid縺ｨ謖・ｮ壹＠縺溘繧ｳ繝ｼ繝峨ヶ繝ｭ繝・け繧呈嶌縺上→縲√・繝ｬ繝薙Η繝ｼ縺ｫ蝗ｳ縺ｨ縺励※陦ｨ遉ｺ縺輔ｌ縺ｾ縺吶・",
+          "mermaidと指定したコードブロックを書くと、プレビューに図として表示されます。",
         ],
         codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
       },

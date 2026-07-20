@@ -19,8 +19,8 @@ describe("HelpDialog", () => {
     expect(html).toContain("Koharuの使い方");
     expect(html).toContain("ファイルを作る・開く・保存する");
     expect(html).toContain("Markdownの書き方");
-    expect(html).toContain("Mermaid蝗ｳ");
-    expect(html).toContain("繧ｳ繝ｼ繝峨ヶ繝ｭ繝・け");
+    expect(html).toContain("Mermaid図");
+    expect(html).toContain("コードブロック");
     expect(html).toContain('class="help-code-example"');
     expect(html).toContain("```mermaid\nflowchart LR\n  A[Start] --&gt; B[Finish]\n```");
     expect(html).toContain("Ctrl+S");
