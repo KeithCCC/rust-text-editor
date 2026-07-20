@@ -1305,7 +1305,7 @@ textarea {
   background: var(--surface-bg);
 }
 
-.help-section:last-child {
+.help-section-wide {
   grid-column: 1 / -1;
 }
 
@@ -1324,6 +1324,21 @@ textarea {
 
 .help-section p:last-of-type {
   margin-bottom: 0;
+}
+
+.help-code-example {
+  margin: 14px 0 0;
+  padding: 12px;
+  overflow-x: auto;
+  border: 1px solid var(--preview-code-border);
+  border-radius: 6px;
+  background: var(--preview-code-bg);
+  color: var(--preview-code-text);
+  white-space: pre;
+}
+
+.help-code-example code {
+  font: inherit;
 }
 
 .help-markdown-examples {
@@ -1424,7 +1439,7 @@ textarea {
     grid-template-columns: 1fr;
   }
 
-  .help-section:last-child {
+  .help-section-wide {
     grid-column: auto;
   }
 
