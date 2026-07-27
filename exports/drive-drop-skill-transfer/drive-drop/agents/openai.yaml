@@ -1,0 +1,4 @@
+interface:
+  display_name: "Drive Drop"
+  short_description: "Copy files to Google Drive 0.Drop safely"
+  default_prompt: "Use $drive-drop to copy the specified local files to my Google Drive 0.Drop folder."

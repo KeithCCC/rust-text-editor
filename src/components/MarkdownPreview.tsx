@@ -1,5 +1,6 @@
 import { forwardRef, isValidElement, memo, type ReactNode } from "react";
 import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
 import { MermaidBlock } from "./MermaidBlock";
@@ -35,7 +36,7 @@ const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps
   return (
     <div className="preview-body" ref={ref}>
       <ReactMarkdown
-        remarkPlugins={[remarkGfm]}
+        remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw]}
         components={{
           a({ href, children, ...props }) {

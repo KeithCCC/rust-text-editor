@@ -1,5 +1,32 @@
 # Work Log
 
+## 2026-07-27 09:12:00 +09:00 - master
+
+### Summary
+
+Prepared Koharu 1.0.0 for public release with system-aware startup language selection, visible Markdown soft line breaks, Windows release packaging support, and refreshed distribution assets.
+
+### Notable Changes
+
+- Promoted the npm, Cargo, Tauri, lockfile, and generated build metadata versions to 1.0.0.
+- Added automatic Japanese startup selection for Japanese system locales while preserving saved language preferences, with focused unit tests.
+- Made single newlines render as visible line breaks in Markdown preview and added regression coverage.
+- Added and validated the Koharu MSIX packaging skill, contract tests, release artwork/screenshots, planning documents, and reusable skill-transfer exports.
+- Rebuilt the portable executable, MSI, and NSIS setup package for the 1.0.0 GitHub release.
+- Ignored generated `.superpowers/brainstorm` runtime state so local process and token files are not committed.
+
+### Validation
+
+- `npm test` passed: 38 test files and 168 tests.
+- `.codex/skill-tests/build-koharu-msix.Tests.ps1` passed.
+- `npm run build` passed.
+- `npm run tauri build` passed and produced `koharu.exe`, `Koharu_1.0.0_x64_en-US.msi`, and `Koharu_1.0.0_x64-setup.exe`.
+
+### Risks And Follow-Ups
+
+- Vite still reports large Mermaid/Excalidraw-related chunks; this is an optimization warning rather than a release failure.
+- A production Store MSIX still requires the exact immutable Partner Center package identity and publisher values.
+
 ## 2026-07-08 03:00:00 +09:00 - master
 
 ### Summary

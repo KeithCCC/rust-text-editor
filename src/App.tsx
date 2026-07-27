@@ -12,6 +12,7 @@ import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
 import { BUILD_INFO } from "./buildInfo";
+import { resolveInitialAppLanguage, type AppLanguage } from "./appLanguage";
 import { formatBuildLabel } from "./buildLabel";
 import { isPrimaryShortcut } from "./keyboardShortcuts";
 import {
@@ -71,7 +72,6 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type AppLanguage = "en" | "ja";
 type MenuId = "file" | "view" | "settings" | "search" | "format" | "help";
 
 const THEME_STORAGE_KEY = "koharu-theme";
@@ -325,7 +325,10 @@ export default function App() {
     return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
   });
   const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => {
-    return window.localStorage.getItem(LANGUAGE_STORAGE_KEY) === "ja" ? "ja" : "en";
+    return resolveInitialAppLanguage(
+      window.localStorage.getItem(LANGUAGE_STORAGE_KEY),
+      navigator.languages.length > 0 ? navigator.languages : [navigator.language],
+    );
   });
   const [editorFontSize, setEditorFontSize] = useState(() => readStoredNumber(EDITOR_FONT_SIZE_STORAGE_KEY, 14, 10, 28));
   const [editorLineHeight, setEditorLineHeight] = useState(() => readStoredNumber(EDITOR_LINE_HEIGHT_STORAGE_KEY, 1.55, 1.1, 2.4));

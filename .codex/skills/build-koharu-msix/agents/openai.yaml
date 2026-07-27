@@ -1,0 +1,4 @@
+interface:
+  display_name: "Build Koharu MSIX"
+  short_description: "Package Koharu for Microsoft Store MSIX"
+  default_prompt: "Use $build-koharu-msix to build a Store-ready Koharu MSIX package."

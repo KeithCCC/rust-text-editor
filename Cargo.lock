@@ -1628,7 +1628,7 @@ dependencies = [
 
 [[package]]
 name = "koharu"
-version = "0.1.3"
+version = "1.0.0"
 dependencies = [
  "atomicwrites",
  "serde",
