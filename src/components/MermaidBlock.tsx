@@ -1,6 +1,11 @@
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { save } from "@tauri-apps/plugin-dialog";
-import { buildMermaidExportFileName, prepareSvgExport, renderSvgToPng } from "../mermaidExport";
+import {
+  buildMermaidExportFileName,
+  buildMermaidRenderConfig,
+  prepareSvgExport,
+  renderSvgToPng,
+} from "../mermaidExport";
 import { writeBinaryFile, writeTextFile } from "../tauri";
 
 type MermaidBlockProps = {
@@ -77,12 +82,7 @@ export function MermaidBlock({ source, themeMode }: MermaidBlockProps) {
         setError("");
         setSvg("");
         const mermaid = (await import("mermaid")).default;
-        mermaid.initialize({
-          startOnLoad: false,
-          securityLevel: "strict",
-          theme: "base",
-          themeVariables: mermaidTheme,
-        });
+        mermaid.initialize(buildMermaidRenderConfig(mermaidTheme));
         const result = await mermaid.render(`mermaid-${id}`, source);
         if (!cancelled) {
           setSvg(result.svg);

@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { buildMermaidExportFileName, prepareSvgExport } from "./mermaidExport";
+import { buildMermaidExportFileName, buildMermaidRenderConfig, prepareSvgExport } from "./mermaidExport";
 
 describe("Mermaid export", () => {
   it("builds a timestamped file name", () => {
@@ -10,5 +10,12 @@ describe("Mermaid export", () => {
     expect(prepareSvgExport('<svg viewBox="0 0 10 10"><path d="M0 0"/></svg>')).toBe(
       '<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 10 10"><path d="M0 0"/></svg>',
     );
+  });
+
+  it("uses SVG text labels so native PNG export does not taint the canvas", () => {
+    expect(buildMermaidRenderConfig({ primaryColor: "#123456" })).toMatchObject({
+      htmlLabels: false,
+      themeVariables: { primaryColor: "#123456" },
+    });
   });
 });

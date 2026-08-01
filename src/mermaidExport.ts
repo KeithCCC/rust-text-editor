@@ -6,6 +6,16 @@ export function buildMermaidExportFileName(date: Date, extension: "png" | "svg")
   return `mermaid-diagram-${date.getFullYear()}${pad(date.getMonth() + 1)}${pad(date.getDate())}-${pad(date.getHours())}${pad(date.getMinutes())}.${extension}`;
 }
 
+export function buildMermaidRenderConfig(themeVariables: Record<string, string>) {
+  return {
+    startOnLoad: false,
+    securityLevel: "strict" as const,
+    theme: "base" as const,
+    themeVariables,
+    htmlLabels: false,
+  };
+}
+
 export function prepareSvgExport(svg: string) {
   return /<svg\b[^>]*\bxmlns=/.test(svg)
     ? svg

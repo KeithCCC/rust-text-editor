@@ -604,6 +604,10 @@ kbd {
   overflow: visible;
 }
 
+.editor-pane[aria-hidden="true"] {
+  display: none;
+}
+
 .preview-pane {
   grid-template-rows: auto minmax(0, 1fr);
 }
