@@ -607,7 +607,9 @@ function hasExactEmphasisAround(
   marker: EmphasisMarker,
   strength: EmphasisStrength,
 ): boolean {
-  if (/\r|\n/.test(document.slice(selection.from, selection.to))) return false;
+  if (/(?:\r\n|\n)[\t ]*(?:\r\n|\n)/.test(document.slice(selection.from, selection.to))) {
+    return false;
+  }
   const lineStart = document.lastIndexOf("\n", selection.from - 1) + 1;
   const nextLineBreak = document.indexOf("\n", selection.to);
   const rawLineEnd = nextLineBreak < 0 ? document.length : nextLineBreak;

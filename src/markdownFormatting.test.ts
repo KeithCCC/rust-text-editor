@@ -86,6 +86,107 @@ describe("formatMarkdownSelection", () => {
     });
   });
 
+  const multilineEmphasisCases = [
+    {
+      label: "bold with LF",
+      command: { kind: "bold" } as const,
+      source: " one\ntwo ",
+      sourceTo: 9,
+      formatted: " **one\ntwo** ",
+      selectionStart: 3,
+      selectionEnd: 10,
+      unwrapFrom: 1,
+      unwrapTo: 12,
+      core: "one\ntwo",
+      coreLength: 7,
+    },
+    {
+      label: "italic with LF",
+      command: { kind: "italic" } as const,
+      source: " one\ntwo ",
+      sourceTo: 9,
+      formatted: " *one\ntwo* ",
+      selectionStart: 2,
+      selectionEnd: 9,
+      unwrapFrom: 1,
+      unwrapTo: 10,
+      core: "one\ntwo",
+      coreLength: 7,
+    },
+    {
+      label: "bold with CRLF",
+      command: { kind: "bold" } as const,
+      source: " one\r\ntwo ",
+      sourceTo: 10,
+      formatted: " **one\r\ntwo** ",
+      selectionStart: 3,
+      selectionEnd: 11,
+      unwrapFrom: 1,
+      unwrapTo: 13,
+      core: "one\r\ntwo",
+      coreLength: 8,
+    },
+    {
+      label: "italic with CRLF",
+      command: { kind: "italic" } as const,
+      source: " one\r\ntwo ",
+      sourceTo: 10,
+      formatted: " *one\r\ntwo* ",
+      selectionStart: 2,
+      selectionEnd: 10,
+      unwrapFrom: 1,
+      unwrapTo: 11,
+      core: "one\r\ntwo",
+      coreLength: 8,
+    },
+  ];
+
+  it.each(multilineEmphasisCases)(
+    "formats $label across a soft break with edge whitespace outside",
+    ({ command, source, sourceTo, formatted, selectionStart, selectionEnd }) => {
+      expect(formatMarkdownSelection(source, { from: 0, to: sourceTo }, command)).toMatchObject({
+        from: 0,
+        to: sourceTo,
+        insert: formatted,
+        selectionStart,
+        selectionEnd,
+      });
+    },
+  );
+
+  it.each(multilineEmphasisCases)(
+    "reverses $label across a soft break without losing edge whitespace",
+    ({ command, source, formatted, selectionStart, selectionEnd, unwrapFrom, unwrapTo, core, coreLength }) => {
+      const result = formatMarkdownSelection(
+        formatted,
+        { from: selectionStart, to: selectionEnd },
+        command,
+      );
+
+      expect(result).toMatchObject({
+        from: unwrapFrom,
+        to: unwrapTo,
+        insert: core,
+        selectionStart: 0,
+        selectionEnd: coreLength,
+      });
+      expect(`${formatted.slice(0, result.from)}${result.insert}${formatted.slice(result.to)}`).toBe(source);
+    },
+  );
+
+  it.each([
+    ["bold with LF", { kind: "bold" } as const, "one\n\ntwo", 8],
+    ["italic with CRLF", { kind: "italic" } as const, "one\r\n\r\ntwo", 10],
+  ])("does not treat a %s paragraph break as soft", (_label, command, source, sourceTo) => {
+    expect(formatMarkdownSelection(source, { from: 0, to: sourceTo }, command)).toMatchObject({
+      from: 0,
+      to: sourceTo,
+      insert: source,
+      selectionStart: 0,
+      selectionEnd: sourceTo,
+    });
+  });
+
   it("uses a longer inline-code delimiter when the selection contains a backtick", () => {
     expect(formatMarkdownSelection("a`b", { from: 0, to: 3 }, { kind: "inlineCode" }).insert).toBe("``a`b``");
   });
