@@ -51,6 +51,41 @@ describe("formatMarkdownSelection", () => {
     });
   });
 
+  it("moves selected edge whitespace outside validated emphasis wrappers", () => {
+    expect(formatMarkdownSelection(" foo ", { from: 0, to: 5 }, { kind: "bold" })).toMatchObject({
+      from: 0,
+      to: 5,
+      insert: " **foo** ",
+      selectionStart: 3,
+      selectionEnd: 6,
+    });
+    expect(formatMarkdownSelection(" foo ", { from: 0, to: 5 }, { kind: "italic" })).toMatchObject({
+      from: 0,
+      to: 5,
+      insert: " *foo* ",
+      selectionStart: 2,
+      selectionEnd: 5,
+    });
+  });
+
+  it("keeps leading whitespace outside italic markers at line start", () => {
+    expect(formatMarkdownSelection(" item", { from: 0, to: 5 }, { kind: "italic" })).toMatchObject({
+      insert: " *item*",
+      selectionStart: 2,
+      selectionEnd: 6,
+    });
+  });
+
+  it("leaves an all-whitespace emphasis selection unchanged", () => {
+    expect(formatMarkdownSelection("   ", { from: 0, to: 3 }, { kind: "bold" })).toMatchObject({
+      from: 0,
+      to: 3,
+      insert: "   ",
+      selectionStart: 0,
+      selectionEnd: 3,
+    });
+  });
+
   it("uses a longer inline-code delimiter when the selection contains a backtick", () => {
     expect(formatMarkdownSelection("a`b", { from: 0, to: 3 }, { kind: "inlineCode" }).insert).toBe("``a`b``");
   });
@@ -135,6 +170,20 @@ describe("formatMarkdownSelection", () => {
 
   it("does not carry a bold opener past an unrecognized closer", () => {
     expect(detectFormattingContext("**bold**plain**", { from: 10, to: 10 }).bold).toBe(false);
+  });
+
+  it("rejects crossing delimiter runs without removing surrounding markers", () => {
+    const document = "*a **b* c**";
+    const selection = { from: 5, to: 9 };
+
+    expect(detectFormattingContext(document, selection).bold).toBe(false);
+    expect(formatMarkdownSelection(document, selection, { kind: "bold" })).toMatchObject({
+      from: 5,
+      to: 9,
+      insert: "b* c",
+      selectionStart: 0,
+      selectionEnd: 4,
+    });
   });
 
   it("does not infer inline code between separate code spans", () => {

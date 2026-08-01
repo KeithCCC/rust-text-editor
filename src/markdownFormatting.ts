@@ -200,30 +200,46 @@ function toggleEmphasis(
     };
   }
   const body = selected || placeholder;
+  const leadingWhitespace = /^[^\S\r\n]*/u.exec(body)?.[0] ?? "";
+  const bodyAfterLeadingWhitespace = body.slice(leadingWhitespace.length);
+  const trailingWhitespace = /[^\S\r\n]*$/u.exec(bodyAfterLeadingWhitespace)?.[0] ?? "";
+  const core = bodyAfterLeadingWhitespace.slice(
+    0,
+    bodyAfterLeadingWhitespace.length - trailingWhitespace.length,
+  );
+  if (!core) {
+    return {
+      from: selection.from,
+      to: selection.to,
+      insert: selected,
+      selectionStart: 0,
+      selectionEnd: selected.length,
+    };
+  }
   for (const marker of ["*", "_"] as const) {
     const delimiter = marker.repeat(strength);
-    const insert = `${delimiter}${body}${delimiter}`;
+    const insert = `${leadingWhitespace}${delimiter}${core}${delimiter}${trailingWhitespace}`;
     const candidateDocument = `${document.slice(0, selection.from)}${insert}${document.slice(selection.to)}`;
     const candidateSelection = {
-      from: selection.from + strength,
-      to: selection.from + strength + body.length,
+      from: selection.from + leadingWhitespace.length + strength,
+      to: selection.from + leadingWhitespace.length + strength + core.length,
     };
     if (!hasExactEmphasisAround(candidateDocument, candidateSelection, marker, strength)) continue;
+    const selectionStart = leadingWhitespace.length + strength;
     return {
       from: selection.from,
       to: selection.to,
       insert,
-      selectionStart: strength,
-      selectionEnd: strength + body.length,
+      selectionStart,
+      selectionEnd: selectionStart + core.length,
     };
   }
-  const delimiter = "*".repeat(strength);
   return {
     from: selection.from,
     to: selection.to,
-    insert: `${delimiter}${body}${delimiter}`,
-    selectionStart: delimiter.length,
-    selectionEnd: delimiter.length + body.length,
+    insert: selected,
+    selectionStart: 0,
+    selectionEnd: selected.length,
   };
 }
 
@@ -576,7 +592,13 @@ function findEmphasisSpans(line: string, excludedSpans: InlineSpan[]): EmphasisS
     }
   }
 
-  return spans;
+  const spansCross = (left: EmphasisSpan, right: EmphasisSpan) => (
+    (left.from < right.from && right.from < left.to && left.to < right.to)
+    || (right.from < left.from && left.from < right.to && right.to < left.to)
+  );
+  return spans.filter((span, index) => !spans.some((other, otherIndex) => (
+    index !== otherIndex && spansCross(span, other)
+  )));
 }
 
 function hasExactEmphasisAround(
