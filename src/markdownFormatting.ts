@@ -46,12 +46,19 @@ function inlineDelimiter(content: string) {
 }
 
 function lineBounds(document: string, selection: FormatSelection): FormatSelection {
-  const previousOffset = Math.max(0, selection.from - 1);
-  const startBreak = Math.max(
-    document.lastIndexOf("\n", previousOffset),
-    document.lastIndexOf("\r", previousOffset),
-  );
+  const previousOffset = selection.from - 1;
+  const startBreak = selection.from === 0
+    ? -1
+    : Math.max(
+      document.lastIndexOf("\n", previousOffset),
+      document.lastIndexOf("\r", previousOffset),
+    );
   const from = startBreak === -1 ? 0 : startBreak + 1;
+  const trailingBreak = selection.to > selection.from && /[\r\n]/.test(document[selection.to - 1]);
+  if (trailingBreak) {
+    const endsAfterCrLf = document[selection.to - 1] === "\n" && document[selection.to - 2] === "\r";
+    return { from, to: selection.to - (endsAfterCrLf ? 2 : 1) };
+  }
   const nextLf = document.indexOf("\n", selection.to);
   const nextCr = document.indexOf("\r", selection.to);
   const candidates = [nextLf, nextCr].filter((value) => value >= 0);

@@ -108,6 +108,30 @@ describe("formatMarkdownSelection", () => {
     });
   });
 
+  it("does not include the next LF line when the selection ends after the newline", () => {
+    expect(formatMarkdownSelection("One\nTwo", { from: 0, to: 4 }, { kind: "taskList" })).toMatchObject({
+      from: 0,
+      to: 3,
+      insert: "- [ ] One",
+    });
+  });
+
+  it("does not include the next CRLF line when the selection ends after the newline", () => {
+    expect(formatMarkdownSelection("One\r\nTwo", { from: 0, to: 5 }, { kind: "taskList" })).toMatchObject({
+      from: 0,
+      to: 3,
+      insert: "- [ ] One",
+    });
+  });
+
+  it("keeps a caret on an empty first line at offset zero", () => {
+    expect(formatMarkdownSelection("\nTwo", { from: 0, to: 0 }, { kind: "taskList" })).toMatchObject({
+      from: 0,
+      to: 0,
+      insert: "- [ ] Task",
+    });
+  });
+
   it("replaces an existing heading level instead of stacking markers", () => {
     expect(formatMarkdownSelection("## Heading", { from: 4, to: 8 }, { kind: "heading", level: 3 }).insert).toBe("### Heading");
   });
