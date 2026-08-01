@@ -14,6 +14,8 @@ it("renders indented heading buttons and an empty state", () => {
   );
   expect(populated).toContain("Details");
   expect(populated).toContain("--outline-level:2");
+  expect(populated).toContain('aria-label="Close Outline"');
+  expect(populated).toContain('title="Close Outline"');
 
   const empty = renderToStaticMarkup(
     <OutlinePanel title="Outline" emptyText="No headings found" headings={[]} onSelect={() => undefined} onClose={() => undefined} />,

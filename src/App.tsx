@@ -67,7 +67,14 @@ import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
 import { saveCurrentWindowState } from "./windowState";
 import { cycleViewMode, resolveViewMode, type ViewMode } from "./viewMode";
-import { resolvePaneVisibility, shouldCycleViewMode } from "./responsiveLayout";
+import {
+  resolvePaneVisibility,
+  shouldCycleViewMode,
+  splitOrientationForWidth,
+  splitPercentFromKey,
+  splitPercentFromPointer,
+  type SplitOrientation,
+} from "./responsiveLayout";
 
 const ExcalidrawEditor = lazy(() =>
   import("./components/ExcalidrawEditor").then((module) => ({
@@ -371,6 +378,9 @@ export default function App() {
     const saved = Number(readStoredValue(SPLIT_STORAGE_KEY, LEGACY_SPLIT_STORAGE_KEY));
     return Number.isFinite(saved) && saved >= 25 && saved <= 75 ? saved : 58;
   });
+  const [splitOrientation, setSplitOrientation] = useState<SplitOrientation>(() => (
+    splitOrientationForWidth(window.innerWidth)
+  ));
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isNoteSearchVisible, setIsNoteSearchVisible] = useState(false);
@@ -440,7 +450,8 @@ export default function App() {
     "--preview-font-size": `${previewFontSize}px`,
     "--preview-line-height": String(previewLineHeight),
     "--ui-font-size": `${uiFontSize}px`,
-  }) as CSSProperties, [editorFontSize, editorLineHeight, previewFontSize, previewLineHeight, uiFontSize]);
+    "--split-percent": `${splitPercent}%`,
+  }) as CSSProperties, [editorFontSize, editorLineHeight, previewFontSize, previewLineHeight, splitPercent, uiFontSize]);
   const stats = useMemo(() => getDocumentStats(content), [content]);
   const outlineHeadings = useMemo(() => parseMarkdownOutline(previewContent), [previewContent]);
   const searchMatches = useMemo(() => {
@@ -915,16 +926,23 @@ export default function App() {
     void action();
   }, []);
 
-  const updateSplitFromPointer = useCallback((clientX: number) => {
+  const updateSplitFromPointer = useCallback((clientX: number, clientY: number) => {
     const workspace = workspaceRef.current;
     if (!workspace) {
       return;
     }
 
     const bounds = workspace.getBoundingClientRect();
-    const next = ((clientX - bounds.left) / bounds.width) * 100;
-    setSplitPercent(Math.min(75, Math.max(25, next)));
-  }, []);
+    setSplitPercent(splitPercentFromPointer({
+      orientation: splitOrientation,
+      clientX,
+      clientY,
+      left: bounds.left,
+      top: bounds.top,
+      width: bounds.width,
+      height: bounds.height,
+    }));
+  }, [splitOrientation]);
 
   const handleOutlineSelect = useCallback((heading: OutlineHeading) => {
     if (editorMode === "preview") {
@@ -958,6 +976,16 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(SPLIT_STORAGE_KEY, String(splitPercent));
   }, [splitPercent]);
+
+  useEffect(() => {
+    const media = window.matchMedia("(max-width: 820px)");
+    const updateOrientation = () => {
+      setSplitOrientation(media.matches ? "horizontal" : "vertical");
+    };
+    updateOrientation();
+    media.addEventListener("change", updateOrientation);
+    return () => media.removeEventListener("change", updateOrientation);
+  }, []);
 
   useEffect(() => {
     window.localStorage.setItem(EDITOR_FONT_SIZE_STORAGE_KEY, String(editorFontSize));
@@ -1160,7 +1188,7 @@ export default function App() {
       if (!isDraggingSplit) {
         return;
       }
-      updateSplitFromPointer(event.clientX);
+      updateSplitFromPointer(event.clientX, event.clientY);
     };
     const handlePointerUp = () => setIsDraggingSplit(false);
 
@@ -1370,13 +1398,9 @@ export default function App() {
           />
         )}
         <section
-          className="workspace"
+          className={`workspace${isSplitMode ? " is-split" : ""}${isDraggingSplit ? " resizing-pane" : ""}`}
+          data-split-orientation={splitOrientation}
           ref={workspaceRef}
-          style={{
-            gridTemplateColumns: isSplitMode
-              ? `minmax(360px, calc(${splitPercent}% - 3px)) 6px minmax(280px, calc(${100 - splitPercent}% - 3px))`
-              : "minmax(360px, 1fr)",
-          }}
         >
           <article className="editor-pane" hidden={!isEditorVisible} aria-hidden={!isEditorVisible}>
             <header className="pane-header">
@@ -1450,7 +1474,7 @@ export default function App() {
                 className="splitter"
                 role="separator"
                 aria-label="Resize editor and preview panes"
-                aria-orientation="vertical"
+                aria-orientation={splitOrientation}
                 aria-valuemin={25}
                 aria-valuemax={75}
                 aria-valuenow={Math.round(splitPercent)}
@@ -1458,14 +1482,13 @@ export default function App() {
                 onPointerDown={(event) => {
                   event.currentTarget.setPointerCapture(event.pointerId);
                   setIsDraggingSplit(true);
-                  updateSplitFromPointer(event.clientX);
+                  updateSplitFromPointer(event.clientX, event.clientY);
                 }}
                 onKeyDown={(event) => {
-                  if (event.key === "ArrowLeft") {
-                    setSplitPercent((value) => Math.max(25, value - 2));
-                  } else if (event.key === "ArrowRight") {
-                    setSplitPercent((value) => Math.min(75, value + 2));
-                  }
+                  const next = splitPercentFromKey(splitPercent, splitOrientation, event.key);
+                  if (next === null) return;
+                  event.preventDefault();
+                  setSplitPercent(next);
                 }}
               />}
 

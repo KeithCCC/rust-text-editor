@@ -12,4 +12,5 @@ it("renders three labelled mode buttons and marks the active mode", () => {
   expect(html).toContain('aria-label="Preview"');
   expect(html).toContain('data-mode="preview"');
   expect(html).toContain('aria-pressed="true"');
+  expect(html.match(/aria-pressed="false"/g)).toHaveLength(2);
 });
