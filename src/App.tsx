@@ -448,6 +448,7 @@ export default function App() {
   const isSplitMode = editorMode === "split";
   const { editorVisible: isEditorVisible, previewVisible: isPreviewVisible } = resolvePaneVisibility(editorMode);
   const text = UI_TEXT[appLanguage];
+  const formattingUi = getFormattingUi(appLanguage);
   const unsavedResourceNames = [
     ...(modified ? [fileNameFromPath(currentFile)] : []),
     ...(excalidrawDirty && excalidrawSession ? [fileNameFromPath(excalidrawSession.path)] : []),
@@ -913,15 +914,15 @@ export default function App() {
 
   const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
     if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
-    const result = editorRef.current?.applyFormat(command);
+    const result = editorRef.current?.applyFormat(command, formattingUi.placeholders);
     if (result) {
       setFormattingAnnouncement((current) => nextFormattingAnnouncement(
         current,
         result,
-        getFormattingUi(appLanguage).feedback,
+        formattingUi.feedback,
       ));
     }
-  }, [appLanguage, editorMode]);
+  }, [editorMode, formattingUi]);
 
   const dismissToolbarHint = useCallback(() => {
     window.localStorage.setItem(TOOLBAR_HINT_STORAGE_KEY, "true");
@@ -1525,6 +1526,7 @@ export default function App() {
               value={content}
               mode="source"
               themeMode={themeMode}
+              placeholder={formattingUi.placeholders.editor}
               readOnly={isFormattingDisabled}
               onChange={handleContentChange}
               onFormattingContextChange={setFormattingContext}

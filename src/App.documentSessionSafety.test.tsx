@@ -294,6 +294,32 @@ describe("document session safety", () => {
     expect(editorContent()).toBe(before);
   });
 
+  it("uses the same Japanese placeholders from the toolbar and Format menu", async () => {
+    await click(button("View"));
+    const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    if (!viewMenu) throw new Error("View menu not found");
+    const japaneseUi = viewMenu.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
+    if (!japaneseUi) throw new Error("Japanese UI choice not found");
+    await click(japaneseUi);
+
+    expect(container.querySelector(".cm-placeholder")?.textContent).toBe("ここに Markdown を入力してください。");
+    const toolbar = container.querySelector<HTMLElement>('[role="toolbar"]');
+    if (!toolbar) throw new Error("Markdown toolbar not found");
+    await click(button("太字", toolbar));
+    expect(editorContent()).toBe("**太字**");
+
+    const editor = container.querySelector<HTMLElement>(".cm-content");
+    if (!editor) throw new Error("CodeMirror editor not found");
+    await shortcut(editor, "z");
+    expect(container.querySelector(".cm-placeholder")?.textContent).toBe("ここに Markdown を入力してください。");
+
+    await click(button("書式"));
+    const formatMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    if (!formatMenu) throw new Error("Format menu not found");
+    await click(button("太字", formatMenu));
+    expect(editorContent()).toBe("**太字**");
+  });
+
   it("preserves same-document editor history, selection, caret, and scroll across Preview", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\roundtrip.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({
@@ -322,7 +348,7 @@ describe("document session safety", () => {
     expect(scrollElement.scrollTop).toBe(37);
 
     await shortcut(window, "i");
-    expect(editorContent()).toBe("**_bold text_**alpha");
+    expect(editorContent()).toBe("***bold text***alpha");
     await shortcut(editor, "z");
     expect(editorContent()).toBe(afterBold);
     await shortcut(editor, "z");

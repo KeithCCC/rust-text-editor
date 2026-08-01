@@ -3,6 +3,7 @@
 import { act, createRef } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
+import { getFormattingUi } from "../formattingUi";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./MarkdownEditor";
 
 let container: HTMLDivElement;
@@ -50,6 +51,7 @@ describe("MarkdownEditor transaction safety", () => {
           value={"one\ntwo"}
           mode="source"
           themeMode="light"
+          placeholder={getFormattingUi("en").placeholders.editor}
           onChange={onChange}
           onFormattingContextChange={() => undefined}
         />,
@@ -60,7 +62,7 @@ describe("MarkdownEditor transaction safety", () => {
 
     let result: ReturnType<MarkdownEditorHandle["applyFormat"]> = undefined;
     act(() => {
-      result = editorRef.current?.applyFormat({ kind: "inlineCode" });
+      result = editorRef.current?.applyFormat({ kind: "inlineCode" }, getFormattingUi("en").placeholders);
     });
 
     expect(result).toMatchObject({ warning: "multilineInlineCode" });

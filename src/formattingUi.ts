@@ -1,4 +1,5 @@
 import type { AppLanguage } from "./appLanguage";
+import { DEFAULT_FORMATTING_PLACEHOLDERS, type FormattingPlaceholders } from "./markdownFormatting";
 
 type FormattingActionUi = {
   label: string;
@@ -10,6 +11,7 @@ export type FormattingUi = {
   toolbarLabel: string;
   groups: { text: string; block: string; insert: string };
   actions: Record<string, FormattingActionUi>;
+  placeholders: FormattingPlaceholders;
   feedback: Record<"codeBlockInserted" | "tableInserted" | "mermaidInserted" | "multilineInlineCode", string>;
 };
 
@@ -47,6 +49,7 @@ const ENGLISH_UI: FormattingUi = {
     mermaid: { label: "Mermaid diagram", tooltip: "Insert a Mermaid diagram that is rendered in Preview", short: "Mermaid" },
     more: { label: "More", tooltip: "Show additional formatting actions", short: "More" },
   },
+  placeholders: DEFAULT_FORMATTING_PLACEHOLDERS,
   feedback: {
     codeBlockInserted: "Code block inserted. Select a language, then edit the selected code placeholder.",
     tableInserted: "Table inserted. Edit the first column heading.",
@@ -88,6 +91,21 @@ const JAPANESE_UI: FormattingUi = {
     table: { label: "表", tooltip: "表を挿入します。プレビューでは表の行と列として表示されます", short: "表" },
     mermaid: { label: "図（Mermaid）", tooltip: "Mermaid の図を挿入し、プレビューで描画します", short: "図" },
     more: { label: "その他", tooltip: "その他の書式設定を表示します", short: "その他" },
+  },
+  placeholders: {
+    editor: "ここに Markdown を入力してください。",
+    bold: "太字",
+    italic: "斜体",
+    strikethrough: "取り消し線",
+    link: "リンク",
+    inlineCode: "コード",
+    heading: "見出し",
+    listItem: "リスト項目",
+    task: "タスク",
+    quote: "引用",
+    codeBlock: "コード",
+    table: { column1: "列 1", column2: "列 2", value1: "値 1", value2: "値 2" },
+    mermaid: "flowchart TD\n    A[開始] --> B[終了]",
   },
   feedback: {
     codeBlockInserted: "コードブロックを挿入しました。言語を選び、選択中のコード部分を編集してください。",

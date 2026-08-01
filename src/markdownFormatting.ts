@@ -16,6 +16,38 @@ export type MarkdownCommand =
   | { kind: "bulletList" | "numberedList" | "taskList" | "quote" | "table" | "mermaid" }
   | { kind: "codeBlock"; language: CodeLanguage };
 
+export type FormattingPlaceholders = {
+  editor: string;
+  bold: string;
+  italic: string;
+  strikethrough: string;
+  link: string;
+  inlineCode: string;
+  heading: string;
+  listItem: string;
+  task: string;
+  quote: string;
+  codeBlock: string;
+  table: { column1: string; column2: string; value1: string; value2: string };
+  mermaid: string;
+};
+
+export const DEFAULT_FORMATTING_PLACEHOLDERS: FormattingPlaceholders = {
+  editor: "Write Markdown here.",
+  bold: "bold text",
+  italic: "italic text",
+  strikethrough: "strikethrough text",
+  link: "link text",
+  inlineCode: "code",
+  heading: "Heading",
+  listItem: "List item",
+  task: "Task",
+  quote: "Quote",
+  codeBlock: "code",
+  table: { column1: "Column 1", column2: "Column 2", value1: "Value 1", value2: "Value 2" },
+  mermaid: "flowchart TD\n    A[Start] --> B[End]",
+};
+
 export type FormatSelection = { from: number; to: number };
 
 export type FormatResult = {
@@ -43,6 +75,14 @@ function detectEol(document: string): "\r\n" | "\n" {
 function inlineDelimiter(content: string) {
   const longest = Math.max(0, ...Array.from(content.matchAll(/`+/g), (match) => match[0].length));
   return "`".repeat(longest + 1);
+}
+
+function codeSpanPadding(content: string): "" | " " {
+  const hasEdgeBacktick = content.startsWith("`") || content.endsWith("`");
+  const hasSymmetricSpaces = content.startsWith(" ")
+    && content.endsWith(" ")
+    && !/^ +$/.test(content);
+  return hasEdgeBacktick || hasSymmetricSpaces ? " " : "";
 }
 
 function lineBounds(document: string, selection: FormatSelection): FormatSelection {
@@ -142,10 +182,101 @@ function toggleWrapper(
   };
 }
 
+function toggleEmphasis(
+  document: string,
+  selection: FormatSelection,
+  strength: 1 | 2,
+  placeholder: string,
+): FormatResult {
+  const selected = document.slice(selection.from, selection.to);
+  for (const marker of ["*", "_"] as const) {
+    if (!hasExactEmphasisAround(document, selection, marker, strength)) continue;
+    return {
+      from: selection.from - strength,
+      to: selection.to + strength,
+      insert: selected,
+      selectionStart: 0,
+      selectionEnd: selected.length,
+    };
+  }
+  const body = selected || placeholder;
+  for (const marker of ["*", "_"] as const) {
+    const delimiter = marker.repeat(strength);
+    const insert = `${delimiter}${body}${delimiter}`;
+    const candidateDocument = `${document.slice(0, selection.from)}${insert}${document.slice(selection.to)}`;
+    const candidateSelection = {
+      from: selection.from + strength,
+      to: selection.from + strength + body.length,
+    };
+    if (!hasExactEmphasisAround(candidateDocument, candidateSelection, marker, strength)) continue;
+    return {
+      from: selection.from,
+      to: selection.to,
+      insert,
+      selectionStart: strength,
+      selectionEnd: strength + body.length,
+    };
+  }
+  const delimiter = "*".repeat(strength);
+  return {
+    from: selection.from,
+    to: selection.to,
+    insert: `${delimiter}${body}${delimiter}`,
+    selectionStart: delimiter.length,
+    selectionEnd: delimiter.length + body.length,
+  };
+}
+
+function toggleInlineCode(
+  document: string,
+  selection: FormatSelection,
+  placeholder: string,
+): FormatResult {
+  const selected = document.slice(selection.from, selection.to);
+  const body = selected || placeholder;
+  const delimiter = inlineDelimiter(body);
+  const padding = codeSpanPadding(body);
+  if (selected) {
+    const before = `${delimiter}${padding}`;
+    const after = `${padding}${delimiter}`;
+    const outerFrom = selection.from - before.length;
+    const outerTo = selection.to + after.length;
+    if (
+      outerFrom >= 0
+      && document.slice(outerFrom, selection.from) === before
+      && document.slice(selection.to, outerTo) === after
+      && document[outerFrom - 1] !== "`"
+      && document[outerTo] !== "`"
+    ) {
+      return {
+        from: outerFrom,
+        to: outerTo,
+        insert: selected,
+        selectionStart: 0,
+        selectionEnd: selected.length,
+      };
+    }
+  }
+  const insert = `${delimiter}${padding}${body}${padding}${delimiter}`;
+  const selectionStart = delimiter.length + padding.length;
+  return {
+    from: selection.from,
+    to: selection.to,
+    insert,
+    selectionStart,
+    selectionEnd: selectionStart + body.length,
+  };
+}
+
+function escapeTableCell(cell: string): string {
+  return cell.replace(/\\/g, "\\\\").replace(/\|/g, "\\|");
+}
+
 export function formatMarkdownSelection(
   document: string,
   selection: FormatSelection,
   command: MarkdownCommand,
+  placeholders: FormattingPlaceholders = DEFAULT_FORMATTING_PLACEHOLDERS,
 ): FormatResult {
   const selected = document.slice(selection.from, selection.to);
   const eol = detectEol(document);
@@ -216,13 +347,13 @@ export function formatMarkdownSelection(
 
   switch (command.kind) {
     case "bold":
-      return toggleWrapper(document, selection, "**", "**", "bold text");
+      return toggleEmphasis(document, selection, 2, placeholders.bold);
     case "italic":
-      return toggleWrapper(document, selection, "_", "_", "italic text");
+      return toggleEmphasis(document, selection, 1, placeholders.italic);
     case "strikethrough":
-      return toggleWrapper(document, selection, "~~", "~~", "strikethrough text");
+      return toggleWrapper(document, selection, "~~", "~~", placeholders.strikethrough);
     case "link": {
-      const result = toggleWrapper(document, selection, "[", "](https://example.com)", "link text");
+      const result = toggleWrapper(document, selection, "[", "](https://example.com)", placeholders.link);
       if (result.from !== selection.from || result.to !== selection.to || !selected) {
         return result;
       }
@@ -237,30 +368,36 @@ export function formatMarkdownSelection(
       if (/[\r\n]/.test(selected)) {
         return change(selected, 0, selected.length, { warning: "multilineInlineCode" });
       }
-      const delimiter = inlineDelimiter(selected);
-      return toggleWrapper(document, selection, delimiter, delimiter, "code");
+      return toggleInlineCode(document, selection, placeholders.inlineCode);
     }
     case "heading":
-      return prefixLines("heading", () => `${"#".repeat(command.level)} `, "Heading", command.level);
+      return prefixLines("heading", () => `${"#".repeat(command.level)} `, placeholders.heading, command.level);
     case "bulletList":
-      return prefixLines("bulletList", () => "- ", "List item");
+      return prefixLines("bulletList", () => "- ", placeholders.listItem);
     case "numberedList":
-      return prefixLines("numberedList", (index) => `${index + 1}. `, "List item");
+      return prefixLines("numberedList", (index) => `${index + 1}. `, placeholders.listItem);
     case "taskList":
-      return prefixLines("taskList", () => "- [ ] ", "Task");
+      return prefixLines("taskList", () => "- [ ] ", placeholders.task);
     case "quote":
-      return prefixLines("quote", () => "> ", "Quote");
+      return prefixLines("quote", () => "> ", placeholders.quote);
     case "codeBlock": {
-      const body = selected || "code";
+      const body = selected || placeholders.codeBlock;
       return fencedBlock(body, command.language, "codeBlockInserted");
     }
     case "table": {
-      if (selected.includes("\t")) {
-        const rows = selected.split(/\r\n|\n/).map((row) => row.split("\t"));
+      const hasTrailingEol = /(?:\r\n|\n)$/.test(selected);
+      const selectedRows = selected.split(/\r\n|\n/);
+      const nonEmptyRows = selectedRows.filter((row) => row.length > 0);
+      const isTsvSelection = Boolean(selected)
+        && !hasTrailingEol
+        && nonEmptyRows.length > 0
+        && nonEmptyRows.every((row) => row.split("\t").length >= 2);
+      if (isTsvSelection) {
+        const rows = selectedRows.map((row) => row.split("\t"));
         const columnCount = Math.max(...rows.map((row) => row.length));
         const rowText = (row: string[]) => `| ${Array.from(
           { length: columnCount },
-          (_, index) => row[index] ?? "",
+          (_, index) => escapeTableCell(row[index] ?? ""),
         ).join(" | ")} |`;
         const table = [
           rowText(rows[0]),
@@ -277,22 +414,24 @@ export function formatMarkdownSelection(
         );
       }
 
-      const table = `| Column 1 | Column 2 |${eol}| --- | --- |${eol}| Value 1 | Value 2 |`;
+      const { column1, column2, value1, value2 } = placeholders.table;
+      const table = `| ${column1} | ${column2} |${eol}| --- | --- |${eol}| ${value1} | ${value2} |`;
+      const columnOffset = table.indexOf(column1);
       if (selected) {
         const leading = blockBoundaryBefore(document, selection.to, eol);
         const trailing = blockBoundaryAfter(document, selection.to, eol);
         const insert = `${selected}${leading}${table}${trailing}`;
-        const columnStart = insert.indexOf("Column 1");
-        return change(insert, columnStart, columnStart + "Column 1".length, { feedback: "tableInserted" });
+        const columnStart = selected.length + leading.length + columnOffset;
+        return change(insert, columnStart, columnStart + column1.length, { feedback: "tableInserted" });
       }
       const leading = blockBoundaryBefore(document, selection.from, eol);
       const trailing = blockBoundaryAfter(document, selection.to, eol);
       const insert = `${leading}${table}${trailing}`;
-      const columnStart = insert.indexOf("Column 1");
-      return change(insert, columnStart, columnStart + "Column 1".length, { feedback: "tableInserted" });
+      const columnStart = leading.length + columnOffset;
+      return change(insert, columnStart, columnStart + column1.length, { feedback: "tableInserted" });
     }
     case "mermaid": {
-      const body = selected || `flowchart TD${eol}    A[Start] --> B[End]`;
+      const body = selected || placeholders.mermaid.replace(/\r\n|\n/g, eol);
       return fencedBlock(body, "mermaid", "mermaidInserted");
     }
   }
@@ -340,6 +479,140 @@ function findInlineCodeSpans(line: string): InlineSpan[] {
     index = closeIndex + 1;
   }
   return spans;
+}
+
+type EmphasisMarker = "*" | "_";
+type EmphasisStrength = 1 | 2;
+type EmphasisDelimiterRun = {
+  marker: EmphasisMarker;
+  from: number;
+  to: number;
+  length: number;
+  canOpen: boolean;
+  canClose: boolean;
+};
+type EmphasisSpan = InlineSpan & { marker: EmphasisMarker; strength: EmphasisStrength };
+
+function isWhitespace(character: string | undefined): boolean {
+  return character === undefined || /\s/u.test(character);
+}
+
+function isPunctuation(character: string | undefined): boolean {
+  return character !== undefined && /[\p{P}\p{S}]/u.test(character);
+}
+
+function findEmphasisDelimiterRuns(
+  line: string,
+  excludedSpans: InlineSpan[],
+): EmphasisDelimiterRun[] {
+  return Array.from(line.matchAll(/\*+|_+/g), (match) => {
+    const marker = match[0][0] as EmphasisMarker;
+    const from = match.index;
+    const to = from + match[0].length;
+    const previous = line[from - 1];
+    const next = line[to];
+    const leftFlanking = !isWhitespace(next)
+      && (!isPunctuation(next) || isWhitespace(previous) || isPunctuation(previous));
+    const rightFlanking = !isWhitespace(previous)
+      && (!isPunctuation(previous) || isWhitespace(next) || isPunctuation(next));
+    return {
+      marker,
+      from,
+      to,
+      length: match[0].length,
+      canOpen: marker === "*"
+        ? leftFlanking
+        : leftFlanking && (!rightFlanking || isPunctuation(previous)),
+      canClose: marker === "*"
+        ? rightFlanking
+        : rightFlanking && (!leftFlanking || isPunctuation(next)),
+    };
+  }).filter((run) => (
+    !isEscaped(line, run.from)
+    && !excludedSpans.some((span) => span.from <= run.from && run.to <= span.to)
+  ));
+}
+
+function canPairEmphasisRuns(
+  opening: EmphasisDelimiterRun,
+  closing: EmphasisDelimiterRun,
+): boolean {
+  if (opening.marker !== closing.marker || opening.to >= closing.from) return false;
+  const ruleOfThreeApplies = opening.canClose || closing.canOpen;
+  return !(
+    ruleOfThreeApplies
+    && (opening.length + closing.length) % 3 === 0
+    && (opening.length % 3 !== 0 || closing.length % 3 !== 0)
+  );
+}
+
+function findEmphasisSpans(line: string, excludedSpans: InlineSpan[]): EmphasisSpan[] {
+  const runs = findEmphasisDelimiterRuns(line, excludedSpans);
+  const spans: EmphasisSpan[] = [];
+
+  for (const marker of ["*", "_"] as const) {
+    for (const strength of [1, 2] as const) {
+      const eligibleRuns = runs.filter((run) => (
+        run.marker === marker
+        && run.length >= strength
+        && (strength === 2 || run.length % 2 === 1)
+      ));
+      const openings: EmphasisDelimiterRun[] = [];
+      for (const run of eligibleRuns) {
+        let matched = false;
+        if (run.canClose) {
+          let openingIndex = openings.length - 1;
+          while (openingIndex >= 0 && !canPairEmphasisRuns(openings[openingIndex], run)) {
+            openingIndex -= 1;
+          }
+          if (openingIndex >= 0) {
+            const [opening] = openings.splice(openingIndex, 1);
+            spans.push({ from: opening.to, to: run.from, marker, strength });
+            matched = true;
+          }
+        }
+        if (!matched && run.canOpen) openings.push(run);
+      }
+    }
+  }
+
+  return spans;
+}
+
+function hasExactEmphasisAround(
+  document: string,
+  selection: FormatSelection,
+  marker: EmphasisMarker,
+  strength: EmphasisStrength,
+): boolean {
+  if (/\r|\n/.test(document.slice(selection.from, selection.to))) return false;
+  const lineStart = document.lastIndexOf("\n", selection.from - 1) + 1;
+  const nextLineBreak = document.indexOf("\n", selection.to);
+  const rawLineEnd = nextLineBreak < 0 ? document.length : nextLineBreak;
+  const lineEnd = rawLineEnd > lineStart && document[rawLineEnd - 1] === "\r"
+    ? rawLineEnd - 1
+    : rawLineEnd;
+  if (selection.to > lineEnd) return false;
+
+  const delimiter = marker.repeat(strength);
+  if (
+    selection.from - strength < lineStart
+    || document.slice(selection.from - strength, selection.from) !== delimiter
+    || document.slice(selection.to, selection.to + strength) !== delimiter
+  ) {
+    return false;
+  }
+
+  const line = document.slice(lineStart, lineEnd);
+  const codeSpans = findInlineCodeSpans(line);
+  const relativeFrom = selection.from - lineStart;
+  const relativeTo = selection.to - lineStart;
+  return findEmphasisSpans(line, codeSpans).some((span) => (
+    span.marker === marker
+    && span.strength === strength
+    && span.from === relativeFrom
+    && span.to === relativeTo
+  ));
 }
 
 function isSurrounded(
@@ -411,11 +684,17 @@ export function detectFormattingContext(
   const relativeTo = selection.to - lineStart;
   const heading = /^(#{1,6})\s/.exec(line);
   const inlineCodeSpans = findInlineCodeSpans(line);
+  const emphasisSpans = findEmphasisSpans(line, inlineCodeSpans);
+  const hasEmphasis = (strength: EmphasisStrength) => emphasisSpans.some((span) => (
+    span.strength === strength
+    && span.from <= relativeFrom
+    && span.to >= relativeTo
+  ));
 
   return {
     headingLevel: heading ? heading[1].length as HeadingLevel : null,
-    bold: isSurrounded(line, relativeFrom, relativeTo, "**", inlineCodeSpans),
-    italic: isSurrounded(line, relativeFrom, relativeTo, "_", inlineCodeSpans),
+    bold: hasEmphasis(2),
+    italic: hasEmphasis(1),
     strikethrough: isSurrounded(line, relativeFrom, relativeTo, "~~", inlineCodeSpans),
     inlineCode: hasInlineCodeAround(inlineCodeSpans, relativeFrom, relativeTo),
   };

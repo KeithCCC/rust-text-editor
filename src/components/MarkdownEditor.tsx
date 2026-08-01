@@ -21,6 +21,7 @@ import {
   detectFormattingContext,
   formatMarkdownSelection,
   type FormatResult,
+  type FormattingPlaceholders,
   type FormattingContext,
   type MarkdownCommand,
 } from "../markdownFormatting";
@@ -32,13 +33,14 @@ export type MarkdownEditorHandle = {
   selectRange: (start: number, end: number) => void;
   getScrollElement: () => HTMLElement | null;
   wrapSelection: (before: string, after: string, placeholder: string) => void;
-  applyFormat: (command: MarkdownCommand) => FormatResult | undefined;
+  applyFormat: (command: MarkdownCommand, placeholders: FormattingPlaceholders) => FormatResult | undefined;
 };
 
 type MarkdownEditorProps = {
   value: string;
   mode: EditorMode;
   themeMode: "system" | "light" | "dark";
+  placeholder: string;
   readOnly?: boolean;
   onChange: (value: string) => void;
   onFormattingContextChange: (context: FormattingContext) => void;
@@ -568,7 +570,7 @@ function sourceHeadingExtension() {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor(
-  { value, mode, themeMode, readOnly = false, onChange, onFormattingContextChange },
+  { value, mode, themeMode, placeholder, readOnly = false, onChange, onFormattingContextChange },
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null);
@@ -623,7 +625,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       });
       view.focus();
     },
-    applyFormat(command: MarkdownCommand) {
+    applyFormat(command: MarkdownCommand, placeholders: FormattingPlaceholders) {
       const view = viewRef.current;
       if (!view) return;
       const selection = view.state.selection.main;
@@ -631,6 +633,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         view.state.doc.toString(),
         { from: selection.from, to: selection.to },
         command,
+        placeholders,
       );
       if (change.warning) {
         view.focus();
@@ -672,7 +675,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
             { from: selection.from, to: selection.to },
           ));
         }}
-        placeholder="Write Markdown here."
+        placeholder={placeholder}
       />
     </div>
   );
