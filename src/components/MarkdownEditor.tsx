@@ -17,7 +17,13 @@ import {
   updateTableCell,
   type MarkdownTable,
 } from "../tableMarkdown";
-import { formatMarkdownSelection, type MarkdownFormat } from "../markdownFormatting";
+import {
+  detectFormattingContext,
+  formatMarkdownSelection,
+  type FormatResult,
+  type FormattingContext,
+  type MarkdownCommand,
+} from "../markdownFormatting";
 
 export type EditorMode = "live" | "source" | "split";
 
@@ -26,7 +32,7 @@ export type MarkdownEditorHandle = {
   selectRange: (start: number, end: number) => void;
   getScrollElement: () => HTMLElement | null;
   wrapSelection: (before: string, after: string, placeholder: string) => void;
-  applyFormat: (format: MarkdownFormat) => void;
+  applyFormat: (command: MarkdownCommand) => void;
 };
 
 type MarkdownEditorProps = {
@@ -35,6 +41,7 @@ type MarkdownEditorProps = {
   themeMode: "system" | "light" | "dark";
   readOnly?: boolean;
   onChange: (value: string) => void;
+  onFormattingContextChange: (context: FormattingContext) => void;
 };
 
 export function editorEditableExtension(readOnly: boolean) {
@@ -561,7 +568,7 @@ function sourceHeadingExtension() {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor(
-  { value, mode, themeMode, readOnly = false, onChange },
+  { value, mode, themeMode, readOnly = false, onChange, onFormattingContextChange },
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null);
@@ -615,11 +622,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       });
       view.focus();
     },
-    applyFormat(format: MarkdownFormat) {
+    applyFormat(command: MarkdownCommand) {
       const view = viewRef.current;
       if (!view) return;
       const selection = view.state.selection.main;
-      const change = formatMarkdownSelection(view.state.doc.toString(), selection.from, selection.to, format);
+      const change: FormatResult = formatMarkdownSelection(
+        view.state.doc.toString(),
+        { from: selection.from, to: selection.to },
+        command,
+      );
       view.dispatch({
         changes: { from: change.from, to: change.to, insert: change.insert },
         selection: EditorSelection.single(change.from + change.selectionStart, change.from + change.selectionEnd),
@@ -637,8 +648,22 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         theme={effectiveTheme}
         extensions={extensions}
         onChange={onChange}
+        onUpdate={(update) => {
+          if (update.docChanged || update.selectionSet) {
+            const selection = update.state.selection.main;
+            onFormattingContextChange(detectFormattingContext(
+              update.state.doc.toString(),
+              { from: selection.from, to: selection.to },
+            ));
+          }
+        }}
         onCreateEditor={(view) => {
           viewRef.current = view;
+          const selection = view.state.selection.main;
+          onFormattingContextChange(detectFormattingContext(
+            view.state.doc.toString(),
+            { from: selection.from, to: selection.to },
+          ));
         }}
         placeholder="Write Markdown here."
       />

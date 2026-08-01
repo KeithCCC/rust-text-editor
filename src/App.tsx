@@ -44,7 +44,7 @@ import { getDocumentSafetyText } from "./documentSafetyText";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
-import type { MarkdownFormat } from "./markdownFormatting";
+import type { FormattingContext, MarkdownCommand } from "./markdownFormatting";
 import { parseMarkdownOutline, type OutlineHeading } from "./markdownOutline";
 import { RecoveryDraftQueue, type RecoveryDraft } from "./recoveryDraftQueue";
 import { parseRecentFiles, removeRecentFile, updateRecentFiles } from "./recentFiles";
@@ -66,6 +66,7 @@ import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
 import { saveCurrentWindowState } from "./windowState";
 import { cycleViewMode, resolveViewMode, type ViewMode } from "./viewMode";
+import { resolvePaneVisibility, shouldCycleViewMode } from "./responsiveLayout";
 
 const ExcalidrawEditor = lazy(() =>
   import("./components/ExcalidrawEditor").then((module) => ({
@@ -343,6 +344,13 @@ export default function App() {
   const [editorMode, setEditorMode] = useState<ViewMode>(() => resolveViewMode(
     window.localStorage.getItem(EDITOR_MODE_STORAGE_KEY),
   ));
+  const [, setFormattingContext] = useState<FormattingContext>({
+    headingLevel: null,
+    bold: false,
+    italic: false,
+    strikethrough: false,
+    inlineCode: false,
+  });
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStoredValue(THEME_STORAGE_KEY, LEGACY_THEME_STORAGE_KEY);
     return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
@@ -409,8 +417,7 @@ export default function App() {
 
   const isNativeRuntime = isTauriRuntime();
   const isSplitMode = editorMode === "split";
-  const isEditorVisible = editorMode !== "preview";
-  const isPreviewVisible = editorMode !== "edit";
+  const { editorVisible: isEditorVisible, previewVisible: isPreviewVisible } = resolvePaneVisibility(editorMode);
   const text = UI_TEXT[appLanguage];
   const unsavedResourceNames = [
     ...(modified ? [fileNameFromPath(currentFile)] : []),
@@ -890,17 +897,17 @@ export default function App() {
 
   const handleBold = useCallback(() => {
     if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.wrapSelection("**", "**", "bold text");
+    editorRef.current?.applyFormat({ kind: "bold" });
   }, []);
 
   const handleItalic = useCallback(() => {
     if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.wrapSelection("_", "_", "italic text");
+    editorRef.current?.applyFormat({ kind: "italic" });
   }, []);
 
   const handleInsertLink = useCallback(() => {
     if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.wrapSelection("[", "](url)", "link text");
+    editorRef.current?.applyFormat({ kind: "link" });
   }, []);
 
   const runMenuAction = useCallback((action: () => void | Promise<unknown>) => {
@@ -920,9 +927,9 @@ export default function App() {
     setSplitPercent(Math.min(75, Math.max(25, next)));
   }, []);
 
-  const handleMarkdownFormat = useCallback((format: MarkdownFormat) => {
+  const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
     if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.applyFormat(format);
+    editorRef.current?.applyFormat(command);
   }, []);
 
   const handleOutlineSelect = useCallback((heading: OutlineHeading) => {
@@ -1142,7 +1149,7 @@ export default function App() {
       } else if (isPrimaryShortcut(event, "i")) {
         event.preventDefault();
         handleItalic();
-      } else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "v") {
+      } else if (shouldCycleViewMode(event)) {
         event.preventDefault();
         setEditorMode((mode) => cycleViewMode(mode));
       } else if (event.key === "Escape") {
@@ -1373,7 +1380,7 @@ export default function App() {
               : "minmax(360px, 1fr)",
           }}
         >
-          {isEditorVisible && <article className="editor-pane">
+          <article className="editor-pane" hidden={!isEditorVisible} aria-hidden={!isEditorVisible}>
             <header className="pane-header">
               <div className="pane-title">
                 <span>{text.editor}</span>
@@ -1422,7 +1429,7 @@ export default function App() {
                 </div>
               )}
             </header>
-            <MarkdownToolbar onFormat={handleMarkdownFormat} />
+            <MarkdownToolbar disabled={isDocumentSafetyActive} onFormat={handleMarkdownFormat} />
             <MarkdownEditor
               ref={editorRef}
               value={content}
@@ -1430,8 +1437,9 @@ export default function App() {
               themeMode={themeMode}
               readOnly={isDocumentSafetyActive}
               onChange={handleContentChange}
+              onFormattingContextChange={setFormattingContext}
             />
-          </article>}
+          </article>
 
           {isPreviewVisible && (
             <>

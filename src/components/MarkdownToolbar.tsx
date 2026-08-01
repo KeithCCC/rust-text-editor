@@ -1,30 +1,31 @@
-import type { MarkdownFormat } from "../markdownFormatting";
+import type { MarkdownCommand } from "../markdownFormatting";
 
 type MarkdownToolbarProps = {
-  onFormat: (format: MarkdownFormat) => void;
+  disabled?: boolean;
+  onFormat: (command: MarkdownCommand) => void;
 };
 
-const ACTIONS: { format: MarkdownFormat; label: string; short: string }[] = [
-  { format: "heading", label: "Heading", short: "H" },
-  { format: "bold", label: "Bold", short: "B" },
-  { format: "italic", label: "Italic", short: "I" },
-  { format: "strikethrough", label: "Strikethrough", short: "S" },
-  { format: "link", label: "Link", short: "Link" },
-  { format: "bulletList", label: "Bullet List", short: "• List" },
-  { format: "numberedList", label: "Numbered List", short: "1. List" },
-  { format: "taskList", label: "Task List", short: "☐" },
-  { format: "quote", label: "Quote", short: "❯" },
-  { format: "inlineCode", label: "Inline Code", short: "`code`" },
-  { format: "codeBlock", label: "Code Block", short: "Code" },
-  { format: "table", label: "Table", short: "Table" },
-  { format: "mermaid", label: "Mermaid", short: "Mermaid" },
+const ACTIONS: { command: MarkdownCommand; label: string; short: string }[] = [
+  { command: { kind: "heading", level: 1 }, label: "Heading", short: "H" },
+  { command: { kind: "bold" }, label: "Bold", short: "B" },
+  { command: { kind: "italic" }, label: "Italic", short: "I" },
+  { command: { kind: "strikethrough" }, label: "Strikethrough", short: "S" },
+  { command: { kind: "link" }, label: "Link", short: "Link" },
+  { command: { kind: "bulletList" }, label: "Bullet List", short: "• List" },
+  { command: { kind: "numberedList" }, label: "Numbered List", short: "1. List" },
+  { command: { kind: "taskList" }, label: "Task List", short: "☐" },
+  { command: { kind: "quote" }, label: "Quote", short: "❯" },
+  { command: { kind: "inlineCode" }, label: "Inline Code", short: "`code`" },
+  { command: { kind: "codeBlock", language: "" }, label: "Code Block", short: "Code" },
+  { command: { kind: "table" }, label: "Table", short: "Table" },
+  { command: { kind: "mermaid" }, label: "Mermaid", short: "Mermaid" },
 ];
 
-export function MarkdownToolbar({ onFormat }: MarkdownToolbarProps) {
+export function MarkdownToolbar({ disabled = false, onFormat }: MarkdownToolbarProps) {
   return (
     <div className="markdown-toolbar" role="toolbar" aria-label="Markdown formatting">
       {ACTIONS.map((action) => (
-        <button key={action.format} type="button" title={action.label} aria-label={action.label} onClick={() => onFormat(action.format)}>
+        <button key={action.label} type="button" title={action.label} aria-label={action.label} disabled={disabled} onClick={() => onFormat(action.command)}>
           {action.short}
         </button>
       ))}
