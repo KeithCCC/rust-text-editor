@@ -45,6 +45,62 @@ function inlineDelimiter(content: string) {
   return "`".repeat(longest + 1);
 }
 
+function lineBounds(document: string, selection: FormatSelection): FormatSelection {
+  const previousOffset = Math.max(0, selection.from - 1);
+  const startBreak = Math.max(
+    document.lastIndexOf("\n", previousOffset),
+    document.lastIndexOf("\r", previousOffset),
+  );
+  const from = startBreak === -1 ? 0 : startBreak + 1;
+  const nextLf = document.indexOf("\n", selection.to);
+  const nextCr = document.indexOf("\r", selection.to);
+  const candidates = [nextLf, nextCr].filter((value) => value >= 0);
+  const to = candidates.length === 0 ? document.length : Math.min(...candidates);
+  return { from, to };
+}
+
+function fenceFor(content: string): string {
+  const longest = Math.max(2, ...Array.from(content.matchAll(/`{3,}/g), (match) => match[0].length));
+  return "`".repeat(longest + 1);
+}
+
+function blockBoundaryBefore(document: string, offset: number, eol: string): string {
+  if (offset === 0 || document.slice(0, offset).endsWith(`${eol}${eol}`)) {
+    return "";
+  }
+  return document.slice(0, offset).endsWith(eol) ? eol : `${eol}${eol}`;
+}
+
+function blockBoundaryAfter(document: string, offset: number, eol: string): string {
+  if (offset === document.length || document.slice(offset).startsWith(`${eol}${eol}`)) {
+    return "";
+  }
+  return document.slice(offset).startsWith(eol) ? eol : `${eol}${eol}`;
+}
+
+type LineMarker = "heading" | "bulletList" | "numberedList" | "taskList" | "quote";
+
+function lineMarker(line: string): { kind: LineMarker; length: number; headingLevel?: number } | null {
+  const heading = /^(#{1,6})[ \t]+/.exec(line);
+  if (heading) {
+    return { kind: "heading", length: heading[0].length, headingLevel: heading[1].length };
+  }
+  const task = /^[-+*][ \t]+\[[ xX]\][ \t]+/.exec(line);
+  if (task) {
+    return { kind: "taskList", length: task[0].length };
+  }
+  const bullet = /^[-+*][ \t]+/.exec(line);
+  if (bullet) {
+    return { kind: "bulletList", length: bullet[0].length };
+  }
+  const numbered = /^\d+\.[ \t]+/.exec(line);
+  if (numbered) {
+    return { kind: "numberedList", length: numbered[0].length };
+  }
+  const quote = /^>[ \t]?/.exec(line);
+  return quote ? { kind: "quote", length: quote[0].length } : null;
+}
+
 function toggleWrapper(
   document: string,
   selection: FormatSelection,
@@ -86,26 +142,69 @@ export function formatMarkdownSelection(
 ): FormatResult {
   const selected = document.slice(selection.from, selection.to);
   const eol = detectEol(document);
-  const change = (
+  const replacement = (
+    range: FormatSelection,
     insert: string,
     selectionStart = 0,
     selectionEnd = insert.length,
     metadata: Pick<FormatResult, "feedback" | "warning"> = {},
   ): FormatResult => ({
-    from: selection.from,
-    to: selection.to,
+    from: range.from,
+    to: range.to,
     insert,
     selectionStart,
     selectionEnd,
     ...metadata,
   });
-  const prefixLines = (prefix: (index: number) => string, placeholder: string) => {
-    const body = selected || placeholder;
+  const change = (
+    insert: string,
+    selectionStart = 0,
+    selectionEnd = insert.length,
+    metadata: Pick<FormatResult, "feedback" | "warning"> = {},
+  ) => replacement(selection, insert, selectionStart, selectionEnd, metadata);
+  const prefixLines = (
+    target: LineMarker,
+    prefix: (index: number) => string,
+    placeholder: string,
+    headingLevel?: HeadingLevel,
+  ) => {
+    const bounds = lineBounds(document, selection);
+    const lineSelection = document.slice(bounds.from, bounds.to);
+    const body = lineSelection || placeholder;
+    const lines = body.split(/\r\n|\n/);
+    const isTarget = (line: string) => {
+      const marker = lineMarker(line);
+      return marker?.kind === target
+        && (target !== "heading" || marker.headingLevel === headingLevel);
+    };
+    const toggleOff = Boolean(lineSelection)
+      && lines.some((line) => isTarget(line))
+      && lines.every((line) => line.length === 0 || isTarget(line));
     const insert = body
       .split(/\r\n|\n/)
-      .map((line, index) => `${prefix(index)}${line}`)
+      .map((line, index) => {
+        const marker = lineMarker(line);
+        const content = marker ? line.slice(marker.length) : line;
+        return toggleOff || line.length === 0 ? content : `${prefix(index)}${content}`;
+      })
       .join(eol);
-    return selected ? change(insert) : change(insert, prefix(0).length, insert.length);
+    return lineSelection
+      ? replacement(bounds, insert)
+      : replacement(bounds, insert, prefix(0).length, insert.length);
+  };
+  const fencedBlock = (
+    body: string,
+    language: string,
+    feedback: NonNullable<FormatResult["feedback"]>,
+  ) => {
+    const fence = fenceFor(body);
+    const opening = `${fence}${language}${eol}`;
+    const closingGap = body.endsWith(eol) ? "" : eol;
+    const leading = blockBoundaryBefore(document, selection.from, eol);
+    const trailing = blockBoundaryAfter(document, selection.to, eol);
+    const insert = `${leading}${opening}${body}${closingGap}${fence}${trailing}`;
+    const bodyStart = leading.length + opening.length;
+    return change(insert, bodyStart, bodyStart + body.length, { feedback });
   };
 
   switch (command.kind) {
@@ -135,40 +234,59 @@ export function formatMarkdownSelection(
       return toggleWrapper(document, selection, delimiter, delimiter, "code");
     }
     case "heading":
-      return prefixLines(() => `${"#".repeat(command.level)} `, "Heading");
+      return prefixLines("heading", () => `${"#".repeat(command.level)} `, "Heading", command.level);
     case "bulletList":
-      return prefixLines(() => "- ", "List item");
+      return prefixLines("bulletList", () => "- ", "List item");
     case "numberedList":
-      return prefixLines((index) => `${index + 1}. `, "List item");
+      return prefixLines("numberedList", (index) => `${index + 1}. `, "List item");
     case "taskList":
-      return prefixLines(() => "- [ ] ", "Task");
+      return prefixLines("taskList", () => "- [ ] ", "Task");
     case "quote":
-      return prefixLines(() => "> ", "Quote");
+      return prefixLines("quote", () => "> ", "Quote");
     case "codeBlock": {
-      const before = `\`\`\`${command.language}${eol}`;
       const body = selected || "code";
-      const insert = `${before}${body}${eol}\`\`\``;
-      return change(
-        insert,
-        before.length,
-        before.length + body.length,
-        { feedback: "codeBlockInserted" },
-      );
+      return fencedBlock(body, command.language, "codeBlockInserted");
     }
     case "table": {
-      const insert = `| Column 1 | Column 2 |${eol}| --- | --- |${eol}| Value 1 | Value 2 |`;
-      return change(insert, 2, 10, { feedback: "tableInserted" });
+      if (selected.includes("\t")) {
+        const rows = selected.split(/\r\n|\n/).map((row) => row.split("\t"));
+        const columnCount = Math.max(...rows.map((row) => row.length));
+        const rowText = (row: string[]) => `| ${Array.from(
+          { length: columnCount },
+          (_, index) => row[index] ?? "",
+        ).join(" | ")} |`;
+        const table = [
+          rowText(rows[0]),
+          rowText(Array.from({ length: columnCount }, () => "---")),
+          ...rows.slice(1).map(rowText),
+        ].join(eol);
+        const leading = blockBoundaryBefore(document, selection.from, eol);
+        const trailing = blockBoundaryAfter(document, selection.to, eol);
+        return change(
+          `${leading}${table}${trailing}`,
+          leading.length,
+          leading.length + table.length,
+          { feedback: "tableInserted" },
+        );
+      }
+
+      const table = `| Column 1 | Column 2 |${eol}| --- | --- |${eol}| Value 1 | Value 2 |`;
+      if (selected) {
+        const leading = blockBoundaryBefore(document, selection.to, eol);
+        const trailing = blockBoundaryAfter(document, selection.to, eol);
+        const insert = `${selected}${leading}${table}${trailing}`;
+        const columnStart = insert.indexOf("Column 1");
+        return change(insert, columnStart, columnStart + "Column 1".length, { feedback: "tableInserted" });
+      }
+      const leading = blockBoundaryBefore(document, selection.from, eol);
+      const trailing = blockBoundaryAfter(document, selection.to, eol);
+      const insert = `${leading}${table}${trailing}`;
+      const columnStart = insert.indexOf("Column 1");
+      return change(insert, columnStart, columnStart + "Column 1".length, { feedback: "tableInserted" });
     }
     case "mermaid": {
       const body = selected || `flowchart TD${eol}    A[Start] --> B[End]`;
-      const before = `\`\`\`mermaid${eol}`;
-      const insert = `${before}${body}${eol}\`\`\``;
-      return change(
-        insert,
-        before.length,
-        before.length + body.length,
-        { feedback: "mermaidInserted" },
-      );
+      return fencedBlock(body, "mermaid", "mermaidInserted");
     }
   }
 }

@@ -99,6 +99,67 @@ describe("formatMarkdownSelection", () => {
     expect(formatMarkdownSelection("One\r\nTwo", { from: 0, to: 8 }, { kind: "taskList" }).insert).toBe("- [ ] One\r\n- [ ] Two");
   });
 
+  it("expands a partial selection to complete lines before making a task list", () => {
+    const document = "Alpha\r\nBeta\r\nGamma";
+    expect(formatMarkdownSelection(document, { from: 8, to: 10 }, { kind: "taskList" })).toMatchObject({
+      from: 7,
+      to: 11,
+      insert: "- [ ] Beta",
+    });
+  });
+
+  it("replaces an existing heading level instead of stacking markers", () => {
+    expect(formatMarkdownSelection("## Heading", { from: 4, to: 8 }, { kind: "heading", level: 3 }).insert).toBe("### Heading");
+  });
+
+  it("toggles matching line markers and replaces other line markers", () => {
+    expect(formatMarkdownSelection("- One\n- Two", { from: 0, to: 11 }, { kind: "bulletList" }).insert).toBe("One\nTwo");
+    expect(formatMarkdownSelection("> One\n> Two", { from: 0, to: 11 }, { kind: "numberedList" }).insert).toBe("1. One\n2. Two");
+    expect(formatMarkdownSelection("1. One\n2. Two", { from: 0, to: 13 }, { kind: "taskList" }).insert).toBe("- [ ] One\n- [ ] Two");
+    expect(formatMarkdownSelection("- [x] One", { from: 0, to: 9 }, { kind: "quote" }).insert).toBe("> One");
+  });
+
+  it("adds safe LF block boundaries around a code block inserted mid-line", () => {
+    expect(formatMarkdownSelection("beforeafter", { from: 6, to: 6 }, { kind: "codeBlock", language: "rust" }).insert).toBe(
+      "\n\n```rust\ncode\n```\n\n",
+    );
+  });
+
+  it("preserves CRLF in safe code-block boundaries", () => {
+    expect(formatMarkdownSelection("before\r\nafter", { from: 8, to: 8 }, { kind: "codeBlock", language: "rust" }).insert).toBe(
+      "\r\n```rust\r\ncode\r\n```\r\n\r\n",
+    );
+  });
+
+  it("uses a longer fence when selected code contains triple backticks", () => {
+    expect(formatMarkdownSelection("```\ninner\n```", { from: 0, to: 13 }, { kind: "codeBlock", language: "markdown" }).insert).toContain("````markdown");
+  });
+
+  it("uses adaptive fences and safe boundaries for Mermaid selections", () => {
+    expect(formatMarkdownSelection("beforeafter", { from: 6, to: 6 }, { kind: "mermaid" }).insert).toBe(
+      "\n\n```mermaid\nflowchart TD\n    A[Start] --> B[End]\n```\n\n",
+    );
+    expect(formatMarkdownSelection("```\nA --> B", { from: 0, to: 11 }, { kind: "mermaid" }).insert).toContain("````mermaid");
+  });
+
+  it("converts tab-separated selected rows into a non-destructive table", () => {
+    expect(formatMarkdownSelection("Name\tValue\nA\t1", { from: 0, to: 14 }, { kind: "table" }).insert).toBe(
+      "| Name | Value |\n| --- | --- |\n| A | 1 |",
+    );
+  });
+
+  it("preserves source EOL while converting tab-separated rows", () => {
+    expect(formatMarkdownSelection("Name\tValue\r\nA\t1", { from: 0, to: 15 }, { kind: "table" }).insert).toBe(
+      "| Name | Value |\r\n| --- | --- |\r\n| A | 1 |",
+    );
+  });
+
+  it("preserves a non-tabular selection and inserts the table after it", () => {
+    const result = formatMarkdownSelection("Keep me", { from: 0, to: 7 }, { kind: "table" });
+    expect(result.insert).toContain("Keep me");
+    expect(result.insert).toContain("| Column 1 | Column 2 |");
+  });
+
   it("inserts a complete Mermaid placeholder", () => {
     const result = formatMarkdownSelection("", { from: 0, to: 0 }, { kind: "mermaid" });
     expect(result.insert).toBe("```mermaid\nflowchart TD\n    A[Start] --> B[End]\n```");
