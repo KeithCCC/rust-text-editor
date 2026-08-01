@@ -601,13 +601,45 @@ function findEmphasisSpans(line: string, excludedSpans: InlineSpan[]): EmphasisS
   )));
 }
 
+function isGfmTableDelimiter(line: string): boolean {
+  const trimmed = line.trim().replace(/^\|/, "").replace(/\|$/, "");
+  const cells = trimmed.split("|");
+  return cells.length > 1 && cells.every((cell) => /^:?-{3,}:?$/.test(cell.trim()));
+}
+
+const htmlBlockTags = new Set([
+  "address", "article", "aside", "base", "basefont", "blockquote", "body", "caption", "center",
+  "col", "colgroup", "dd", "details", "dialog", "dir", "div", "dl", "dt", "fieldset",
+  "figcaption", "figure", "footer", "form", "frame", "frameset", "h1", "h2", "h3", "h4",
+  "h5", "h6", "head", "header", "hr", "html", "iframe", "legend", "li", "link", "main",
+  "menu", "menuitem", "nav", "noframes", "ol", "optgroup", "option", "p", "param", "pre",
+  "script", "search", "section", "style", "summary", "table", "tbody", "td", "textarea",
+  "tfoot", "th", "thead", "title", "tr", "track", "ul",
+]);
+
+function interruptsParagraph(line: string): boolean {
+  if (/^[\t ]*$/.test(line)) return true;
+  if (/^ {0,3}(?:#{1,6}(?:[\t ]+|$)|>|(?:`{3,}|~{3,}))/.test(line)) return true;
+  if (/^ {0,3}(?:[-+*]|1[.)])(?:[\t ]+|$)/.test(line)) return true;
+  if (/^ {0,3}(?:(?:\*[\t ]*){3,}|(?:_[\t ]*){3,}|(?:-[\t ]*){3,})$/.test(line)) return true;
+  if (/^ {0,3}(?:=+[\t ]*|-+[\t ]*)$/.test(line)) return true;
+  if (isGfmTableDelimiter(line)) return true;
+  if (/^ {0,3}(?:<!--|<\?|<![A-Z]|<!\[CDATA\[)/i.test(line)) return true;
+  const htmlTag = /^ {0,3}<\/?([A-Za-z][\w-]*)(?:[\t ]|\/?>|$)/.exec(line)?.[1];
+  return htmlTag !== undefined && htmlBlockTags.has(htmlTag.toLowerCase());
+}
+
+function hasParagraphInterruption(content: string): boolean {
+  return content.split(/\r\n|[\r\n]/).slice(1).some(interruptsParagraph);
+}
+
 function hasExactEmphasisAround(
   document: string,
   selection: FormatSelection,
   marker: EmphasisMarker,
   strength: EmphasisStrength,
 ): boolean {
-  if (/(?:\r\n|\n)[\t ]*(?:\r\n|\n)/.test(document.slice(selection.from, selection.to))) {
+  if (hasParagraphInterruption(document.slice(selection.from, selection.to))) {
     return false;
   }
   const lineStart = document.lastIndexOf("\n", selection.from - 1) + 1;

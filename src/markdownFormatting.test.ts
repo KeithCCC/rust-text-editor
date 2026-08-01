@@ -1,6 +1,20 @@
+import { createElement } from "react";
+import { renderToStaticMarkup } from "react-dom/server";
+import ReactMarkdown from "react-markdown";
+import remarkBreaks from "remark-breaks";
+import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import { describe, expect, it } from "vitest";
 import { getFormattingUi } from "./formattingUi";
 import { detectFormattingContext, formatMarkdownSelection } from "./markdownFormatting";
+
+function renderPreviewMarkdown(markdown: string): string {
+  return renderToStaticMarkup(createElement(
+    ReactMarkdown,
+    { remarkPlugins: [remarkGfm, remarkBreaks], rehypePlugins: [rehypeRaw] },
+    markdown,
+  ));
+}
 
 describe("formatMarkdownSelection", () => {
   it("toggles bold delimiters without stacking them", () => {
@@ -186,6 +200,112 @@ describe("formatMarkdownSelection", () => {
       selectionEnd: sourceTo,
     });
   });
+
+  const interruptingBlockCases = [
+    {
+      label: "ATX heading",
+      command: { kind: "bold" } as const,
+      delimiter: "**",
+      renderedTag: "<strong>",
+      lines: ["one", "# two"],
+    },
+    {
+      label: "bullet list",
+      command: { kind: "italic" } as const,
+      delimiter: "*",
+      renderedTag: "<em>",
+      lines: ["one", "- two"],
+    },
+    {
+      label: "numbered list",
+      command: { kind: "bold" } as const,
+      delimiter: "**",
+      renderedTag: "<strong>",
+      lines: ["one", "1. two"],
+    },
+    {
+      label: "task list",
+      command: { kind: "italic" } as const,
+      delimiter: "*",
+      renderedTag: "<em>",
+      lines: ["one", "- [ ] two"],
+    },
+    {
+      label: "block quote",
+      command: { kind: "bold" } as const,
+      delimiter: "**",
+      renderedTag: "<strong>",
+      lines: ["one", "> two"],
+    },
+    {
+      label: "fenced code",
+      command: { kind: "italic" } as const,
+      delimiter: "*",
+      renderedTag: "<em>",
+      lines: ["one", "```txt", "code", "```", "after"],
+    },
+    {
+      label: "thematic break",
+      command: { kind: "bold" } as const,
+      delimiter: "**",
+      renderedTag: "<strong>",
+      lines: ["one", "- - -", "after"],
+    },
+    {
+      label: "setext heading",
+      command: { kind: "italic" } as const,
+      delimiter: "*",
+      renderedTag: "<em>",
+      lines: ["one", "---", "after"],
+    },
+    {
+      label: "HTML block",
+      command: { kind: "bold" } as const,
+      delimiter: "**",
+      renderedTag: "<strong>",
+      lines: ["one", "<div>", "block", "</div>", "after"],
+    },
+    {
+      label: "GFM table",
+      command: { kind: "italic" } as const,
+      delimiter: "*",
+      renderedTag: "<em>",
+      lines: ["one | value", "--- | ---", "two | value"],
+    },
+  ].flatMap((block) => ([
+    { ...block, eolLabel: "LF", source: block.lines.join("\n") },
+    { ...block, eolLabel: "CRLF", source: block.lines.join("\r\n") },
+  ]));
+
+  it.each(interruptingBlockCases)(
+    "does not add $command.kind across a $label after $eolLabel",
+    ({ command, delimiter, renderedTag, source }) => {
+      expect(renderPreviewMarkdown(`${delimiter}${source}${delimiter}`)).not.toContain(renderedTag);
+      expect(formatMarkdownSelection(source, { from: 0, to: source.length }, command)).toEqual({
+        from: 0,
+        to: source.length,
+        insert: source,
+        selectionStart: 0,
+        selectionEnd: source.length,
+      });
+    },
+  );
+
+  it.each(interruptingBlockCases)(
+    "does not remove $command.kind markers crossing a $label after $eolLabel",
+    ({ command, delimiter, renderedTag, source }) => {
+      const document = `${delimiter}${source}${delimiter}`;
+      const selection = { from: delimiter.length, to: delimiter.length + source.length };
+
+      expect(renderPreviewMarkdown(document)).not.toContain(renderedTag);
+      expect(formatMarkdownSelection(document, selection, command)).toEqual({
+        ...selection,
+        insert: source,
+        selectionStart: 0,
+        selectionEnd: source.length,
+      });
+    },
+  );
 
   it("uses a longer inline-code delimiter when the selection contains a backtick", () => {
     expect(formatMarkdownSelection("a`b", { from: 0, to: 3 }, { kind: "inlineCode" }).insert).toBe("``a`b``");
