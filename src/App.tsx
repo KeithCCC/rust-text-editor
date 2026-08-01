@@ -415,6 +415,7 @@ export default function App() {
   const [isDirectSavePending, setIsDirectSavePending] = useState(false);
   const [isRelativeLinkPreflightPending, setIsRelativeLinkPreflightPending] = useState(false);
   const menubarRef = useRef<HTMLElement | null>(null);
+  const helpMenuButtonRef = useRef<HTMLButtonElement | null>(null);
   const workspaceRef = useRef<HTMLElement | null>(null);
   const editorRef = useRef<MarkdownEditorHandle | null>(null);
   const excalidrawEditorRef = useRef<ExcalidrawEditorHandle | null>(null);
@@ -462,6 +463,7 @@ export default function App() {
     || isDirectSavePending
     || isRelativeLinkPreflightPending
     || isUnsavedPromptOpen;
+  const isDecisionModalOpen = isUnsavedPromptOpen || startupRecoveryDraft !== null;
   const isFormattingDisabled = isDocumentSafetyActive || editorMode === "preview";
   latestDocumentRef.current.set({ content, currentFile, modified });
   const appStyle = useMemo(() => ({
@@ -507,6 +509,7 @@ export default function App() {
     let resolve!: (decision: UnsavedDecision) => void;
     const promise = new Promise<UnsavedDecision>((next) => { resolve = next; });
     unsavedPromptRef.current = { promise, resolve };
+    setIsHelpOpen(false);
     setIsUnsavedPromptOpen(true);
     return promise;
   }, []);
@@ -1408,9 +1411,21 @@ export default function App() {
           </div>
 
           <div className="menu-root" data-open={activeMenu === "help"} onMouseEnter={() => activeMenu && setActiveMenu("help")}>
-            <button className="menu-title" aria-expanded={activeMenu === "help"} onClick={() => setActiveMenu((menu) => (menu === "help" ? null : "help"))}>{text.help}</button>
+            <button
+              ref={helpMenuButtonRef}
+              className="menu-title"
+              aria-expanded={activeMenu === "help"}
+              disabled={isDecisionModalOpen}
+              onClick={() => setActiveMenu((menu) => (menu === "help" ? null : "help"))}
+            >{text.help}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => setIsHelpOpen(true))}>{text.howToUseKoharu}</button>
+              <button
+                role="menuitem"
+                disabled={isDecisionModalOpen}
+                onClick={() => runMenuAction(() => {
+                  if (!isDecisionModalOpen) setIsHelpOpen(true);
+                })}
+              >{text.howToUseKoharu}</button>
             </div>
           </div>
 
@@ -1508,7 +1523,7 @@ export default function App() {
               <MarkdownToolbar
                 language={appLanguage}
                 disabled={isFormattingDisabled}
-                disabledReason={isDocumentSafetyActive ? "documentSafety" : editorMode === "preview" ? "preview" : undefined}
+                disabledReason={isDocumentSafetyActive && editorMode !== "preview" ? "documentSafety" : undefined}
                 formattingContext={formattingContext}
                 onFormat={handleMarkdownFormat}
               />
@@ -1561,6 +1576,11 @@ export default function App() {
                 <header className="pane-header">
                   <span>{text.preview}</span>
                   <small>{isPreviewPending ? text.updating : text.markdownPreview}</small>
+                  {editorMode === "preview" && (
+                    <p className="preview-formatting-status" role="status" tabIndex={0}>
+                      {formattingUi.disabledReasons.preview}
+                    </p>
+                  )}
                 </header>
                 <MarkdownPreview
                   key={previewRefreshToken}
@@ -1610,8 +1630,12 @@ export default function App() {
         </section>
       )}
 
-      {isHelpOpen && (
-        <HelpDialog language={appLanguage} onClose={() => setIsHelpOpen(false)} />
+      {isHelpOpen && !isDecisionModalOpen && (
+        <HelpDialog
+          language={appLanguage}
+          returnFocusTo={helpMenuButtonRef.current}
+          onClose={() => setIsHelpOpen(false)}
+        />
       )}
 
       {isAppearanceSettingsOpen && (

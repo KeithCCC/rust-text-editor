@@ -88,17 +88,6 @@ const SHORTCUTS: Partial<Record<MarkdownCommand["kind"], string>> = {
 
 const TOOLBAR_CONTROL_COUNT = 12;
 
-const DISABLED_REASON_TEXT = {
-  en: {
-    documentSafety: "Formatting is unavailable while Koharu is safely processing the document.",
-    preview: "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
-  },
-  ja: {
-    documentSafety: "文書を安全に処理している間は書式設定を使用できません。",
-    preview: "プレビュー表示では書式設定を使用できません。編集または分割表示に切り替えてください。",
-  },
-} as const;
-
 function navigationControls(
   elements: readonly (HTMLButtonElement | null)[],
   count = elements.length,
@@ -431,7 +420,7 @@ export function MarkdownToolbar({
     >
       {disabled && disabledReason && (
         <p id={disabledReasonId} className="toolbar-disabled-status" role="status" tabIndex={0}>
-          {DISABLED_REASON_TEXT[language][disabledReason]}
+          {ui.disabledReasons[disabledReason]}
         </p>
       )}
       <ToolbarGroup label={ui.groups.text}>

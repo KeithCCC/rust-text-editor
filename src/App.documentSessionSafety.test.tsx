@@ -86,6 +86,15 @@ function focus(target: HTMLElement) {
   act(() => target.focus());
 }
 
+async function openHelpFromMenu() {
+  const invoker = button("Help");
+  await click(invoker);
+  const menuItem = button("How to use Koharu");
+  focus(menuItem);
+  await click(menuItem);
+  return { invoker, menuItem };
+}
+
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   window.localStorage.clear();
@@ -294,7 +303,7 @@ describe("document session safety", () => {
     expect(editorContent()).toBe(before);
   });
 
-  it("describes Preview-disabled formatting in English through the real toolbar", async () => {
+  it("exposes one focusable English Preview reason outside the hidden editor pane", async () => {
     const viewModeSwitcher = container.querySelector(".view-mode-switcher");
     if (!viewModeSwitcher) throw new Error("View mode switcher not found");
 
@@ -302,10 +311,39 @@ describe("document session safety", () => {
 
     const toolbar = container.querySelector<HTMLElement>('[role="toolbar"]');
     if (!toolbar) throw new Error("Markdown toolbar not found");
-    const reasonId = toolbar.getAttribute("aria-describedby");
-    expect(reasonId ? document.getElementById(reasonId)?.textContent : null).toBe(
+    const previewPane = container.querySelector<HTMLElement>(".preview-pane");
+    if (!previewPane) throw new Error("Preview pane not found");
+    const status = previewPane.querySelector<HTMLElement>('[role="status"]');
+    expect(status?.textContent).toBe(
       "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
     );
+    expect(status?.tabIndex).toBe(0);
+    expect(status?.closest(".editor-pane")).toBeNull();
+    expect(toolbar.getAttribute("aria-describedby")).toBeNull();
+    expect(toolbar.querySelector('[role="status"]')).toBeNull();
+    expect(Array.from(container.querySelectorAll('[role="status"]')).filter((candidate) => (
+      candidate.textContent?.includes("Formatting is unavailable in Preview")
+    ))).toHaveLength(1);
+  });
+
+  it("exposes one focusable Japanese Preview reason in the visible preview pane", async () => {
+    await click(button("View"));
+    const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    if (!viewMenu) throw new Error("View menu not found");
+    const japaneseUi = viewMenu.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
+    if (!japaneseUi) throw new Error("Japanese UI choice not found");
+    await click(japaneseUi);
+    const viewModeSwitcher = container.querySelector(".view-mode-switcher");
+    if (!viewModeSwitcher) throw new Error("View mode switcher not found");
+
+    await click(button("プレビュー", viewModeSwitcher));
+
+    const status = container.querySelector<HTMLElement>('.preview-pane [role="status"]');
+    expect(status?.textContent).toBe(
+      "プレビュー表示では書式設定を使用できません。編集または分割表示に切り替えてください。",
+    );
+    expect(status?.tabIndex).toBe(0);
+    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
   });
 
   it("describes document-safety-disabled formatting in Japanese through the real toolbar", async () => {
@@ -387,5 +425,56 @@ describe("document session safety", () => {
     expect(editorContent()).toBe(afterBold);
     await shortcut(editor, "z");
     expect(editorContent()).toBe("alpha");
+  });
+
+  it("restores Help focus to the visible top-level Help button instead of its hidden menu item", async () => {
+    const { invoker, menuItem } = await openHelpFromMenu();
+    const close = button("Close How to use Koharu");
+    expect(document.activeElement).toBe(close);
+
+    await shortcut(close, "Escape", { ctrlKey: false });
+
+    expect(container.querySelector('#help-dialog-title')).toBeNull();
+    expect(invoker.closest('.menu-root')?.getAttribute('data-open')).toBe("false");
+    expect(document.activeElement).toBe(invoker);
+    expect(document.activeElement).not.toBe(menuItem);
+  });
+
+  it("does not open Help while an unsaved-decision dialog owns the modal layer", async () => {
+    await shortcut(window, "b");
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\decision-first.md");
+    await shortcut(window, "o");
+    const cancel = button("Cancel");
+    expect(document.activeElement).toBe(cancel);
+
+    const helpInvoker = button("Help");
+    expect(helpInvoker.disabled).toBe(true);
+    await click(helpInvoker);
+    await click(button("How to use Koharu"));
+
+    expect(container.querySelector('#help-dialog-title')).toBeNull();
+    expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.activeElement).toBe(cancel);
+  });
+
+  it("closes Help before a new unsaved-decision dialog takes focus", async () => {
+    await shortcut(window, "b");
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\decision-after-help.md");
+    await openHelpFromMenu();
+    await click(button("File"));
+    const fileMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    if (!fileMenu) throw new Error("File menu not found");
+    const openItem = Array.from(fileMenu.querySelectorAll<HTMLButtonElement>('button[role="menuitem"]'))
+      .find((candidate) => candidate.textContent?.startsWith("Open"));
+    if (!openItem) throw new Error("Open menu item not found");
+
+    await click(openItem);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 0));
+    });
+
+    expect(container.querySelector('#help-dialog-title')).toBeNull();
+    expect(container.querySelectorAll('[role="dialog"]')).toHaveLength(1);
+    expect(document.activeElement).toBe(button("Cancel"));
   });
 });

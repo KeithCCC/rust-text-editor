@@ -1185,6 +1185,19 @@ textarea {
   outline-offset: 2px;
 }
 
+.preview-formatting-status {
+  flex: 1 0 100%;
+  margin: 0;
+  color: var(--muted);
+  font-size: var(--ui-font-size);
+  font-weight: 400;
+}
+
+.preview-formatting-status:focus-visible {
+  outline: 2px solid var(--focus-ring);
+  outline-offset: 2px;
+}
+
 .resizing-pane {
   cursor: col-resize;
   user-select: none;

@@ -27,3 +27,31 @@
 - Existing responsive More and navigation tests remain green.
 - Preview intentionally hides the editor pane and toolbar from accessibility traversal; its reason remains correctly wired for state consistency, while the focusable status is user-reachable during visible document-safety disabled states.
 - Build completed with the pre-existing Vite large-chunk advisory; no runtime dependency or generated build metadata is included.
+
+## Fix round 1
+
+### RED
+
+- Real-App Help close left focus on the now-hidden `How to use Koharu` menu item instead of the visible top-level Help trigger.
+- Opening an unsaved decision while Help was active left both modal dialogs mounted and Help's focus containment won over the decision dialog.
+- The decision-first path initially passed only because the document action gate happened to block the menu action. The test was strengthened to require explicit modal ownership by disabling the top-level Help trigger, and then failed RED.
+- English and Japanese Preview tests found no focusable formatting-disabled status in the visible preview pane; the only status was under the hidden editor pane.
+
+### GREEN
+
+- The real-App document-session suite passes 16/16. It covers visible invoker restoration, both decision/Help orderings, one visible English Preview status, one visible Japanese Preview status, and the retained Japanese Edit/Split document-safety status.
+- Focused real-App/component/SSR suite passes 41/41; standalone Help trap and toolbar submenu behavior remain green.
+- Full suite passes 40 files and 260/260 tests; `npx tsc --noEmit` and `npm run build` pass.
+- `src/buildInfo.ts` was restored after the build.
+
+### Updated focus and ownership model
+
+- App passes Help the stable top-level Help button as its restoration target; the transient menu item is never used for App-level restoration.
+- A decision modal explicitly owns the top modal layer: Help controls are disabled/guarded, Help is not rendered concurrently, and an unsaved-decision request closes Help before DecisionDialog takes focus.
+- Preview owns one visible, focusable localized status in the preview header. The hidden editor toolbar has no Preview status or description. In visible Edit/Split document-safety states, the toolbar retains its single described status target.
+
+### Self-review
+
+- Removing the stable invoker, either decision ownership gate, the Help-before-decision close, the visible status, either locale, or the hidden-toolbar suppression fails a real-App assertion.
+- Existing Help Tab/Shift+Tab/Escape/inert tests and toolbar outside/focus/Tab/disabled dismissal tests remain unchanged and green.
+- The production build retains only the pre-existing large-chunk advisory; no runtime dependency or generated metadata is included.

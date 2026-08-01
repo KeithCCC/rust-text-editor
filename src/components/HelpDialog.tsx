@@ -5,6 +5,7 @@ export type HelpLanguage = "en" | "ja";
 type HelpDialogProps = {
   language: HelpLanguage;
   onClose: () => void;
+  returnFocusTo?: HTMLElement | null;
 };
 
 type HelpSection = {
@@ -209,13 +210,13 @@ export function handleHelpDialogKeyDown(
   }
 }
 
-export function HelpDialog({ language, onClose }: HelpDialogProps) {
+export function HelpDialog({ language, onClose, returnFocusTo }: HelpDialogProps) {
   const content = HELP_CONTENT[language];
   const backdropRef = useRef<HTMLElement | null>(null);
   const initialFocusRef = useRef<HTMLElement | null>(
-    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+    returnFocusTo ?? (typeof document !== "undefined" && document.activeElement instanceof HTMLElement
       ? document.activeElement
-      : null,
+      : null),
   );
   const closeButtonRef = useRef<HTMLButtonElement | null>(null);
   const onCloseRef = useRef(onClose);

@@ -11,6 +11,7 @@ export type FormattingUi = {
   toolbarLabel: string;
   groups: { text: string; block: string; insert: string };
   actions: Record<string, FormattingActionUi>;
+  disabledReasons: Record<"documentSafety" | "preview", string>;
   placeholders: FormattingPlaceholders;
   feedback: Record<"codeBlockInserted" | "tableInserted" | "mermaidInserted" | "multilineInlineCode", string>;
 };
@@ -48,6 +49,10 @@ const ENGLISH_UI: FormattingUi = {
     table: { label: "Table", tooltip: "Insert a table that is rendered as rows and columns in Preview", short: "Table" },
     mermaid: { label: "Mermaid diagram", tooltip: "Insert a Mermaid diagram that is rendered in Preview", short: "Mermaid" },
     more: { label: "More", tooltip: "Show additional formatting actions", short: "More" },
+  },
+  disabledReasons: {
+    documentSafety: "Formatting is unavailable while Koharu is safely processing the document.",
+    preview: "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
   },
   placeholders: DEFAULT_FORMATTING_PLACEHOLDERS,
   feedback: {
@@ -91,6 +96,10 @@ const JAPANESE_UI: FormattingUi = {
     table: { label: "表", tooltip: "表を挿入します。プレビューでは表の行と列として表示されます", short: "表" },
     mermaid: { label: "図（Mermaid）", tooltip: "Mermaid の図を挿入し、プレビューで描画します", short: "図" },
     more: { label: "その他", tooltip: "その他の書式設定を表示します", short: "その他" },
+  },
+  disabledReasons: {
+    documentSafety: "文書を安全に処理している間は書式設定を使用できません。",
+    preview: "プレビュー表示では書式設定を使用できません。編集または分割表示に切り替えてください。",
   },
   placeholders: {
     editor: "ここに Markdown を入力してください。",
