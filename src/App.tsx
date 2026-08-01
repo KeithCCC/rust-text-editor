@@ -28,9 +28,12 @@ import {
 import { HelpDialog } from "./components/HelpDialog";
 import { DecisionDialog } from "./components/DecisionDialog";
 import type { ExcalidrawEditorHandle } from "./components/ExcalidrawEditor";
-import { MarkdownEditor, type EditorMode, type MarkdownEditorHandle } from "./components/MarkdownEditor";
+import { MarkdownEditor, type MarkdownEditorHandle } from "./components/MarkdownEditor";
+import { MarkdownToolbar } from "./components/MarkdownToolbar";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
+import { OutlinePanel } from "./components/OutlinePanel";
+import { ViewModeSwitcher } from "./components/ViewModeSwitcher";
 import { logDebug } from "./debugLog";
 import {
   runApplicationCloseTransition,
@@ -41,7 +44,10 @@ import { getDocumentSafetyText } from "./documentSafetyText";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
+import type { MarkdownFormat } from "./markdownFormatting";
+import { parseMarkdownOutline, type OutlineHeading } from "./markdownOutline";
 import { RecoveryDraftQueue, type RecoveryDraft } from "./recoveryDraftQueue";
+import { parseRecentFiles, updateRecentFiles } from "./recentFiles";
 import { isTauriRuntime } from "./tauriRuntime";
 import { synchronizeDocumentTitle } from "./documentTitleSync";
 import {
@@ -59,6 +65,7 @@ import {
 import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
 import { saveCurrentWindowState } from "./windowState";
+import { cycleViewMode, resolveViewMode, type ViewMode } from "./viewMode";
 
 const ExcalidrawEditor = lazy(() =>
   import("./components/ExcalidrawEditor").then((module) => ({
@@ -85,6 +92,7 @@ const EDITOR_LINE_HEIGHT_STORAGE_KEY = "koharu-editor-line-height";
 const PREVIEW_FONT_SIZE_STORAGE_KEY = "koharu-preview-font-size";
 const PREVIEW_LINE_HEIGHT_STORAGE_KEY = "koharu-preview-line-height";
 const UI_FONT_SIZE_STORAGE_KEY = "koharu-ui-font-size";
+const RECENT_FILES_STORAGE_KEY = "koharu-recent-files";
 const PREVIEW_UPDATE_DELAY_MS = 350;
 const LARGE_DOCUMENT_PREVIEW_UPDATE_DELAY_MS = 700;
 const LARGE_DOCUMENT_CHAR_THRESHOLD = 120_000;
@@ -104,6 +112,9 @@ const UI_TEXT = {
     saveAs: "Save As...",
     exportHtml: "Export as HTML...",
     fileProperties: "File Properties...",
+    recentFiles: "Recent Files",
+    clearRecentFiles: "Clear Recent Files",
+    removeRecentFile: "Remove from recent files",
     exit: "Exit",
     systemTheme: "System Theme",
     lightTheme: "Light Theme",
@@ -120,6 +131,11 @@ const UI_TEXT = {
     formatJson: "Format JSON",
     editor: "Editor",
     preview: "Preview",
+    editMode: "Edit",
+    splitMode: "Split",
+    previewMode: "Preview",
+    outline: "Outline",
+    noHeadings: "No headings found",
     untitled: "Untitled",
     updating: "Updating...",
     markdownPreview: "Markdown preview",
@@ -185,6 +201,9 @@ const UI_TEXT = {
     saveAs: "名前を付けて保存...",
     exportHtml: "HTMLとしてエクスポート...",
     fileProperties: "ファイル情報...",
+    recentFiles: "最近使ったファイル",
+    clearRecentFiles: "履歴をすべて削除",
+    removeRecentFile: "履歴から削除",
     exit: "終了",
     systemTheme: "システムテーマ",
     lightTheme: "ライトテーマ",
@@ -201,6 +220,11 @@ const UI_TEXT = {
     formatJson: "JSON整形",
     editor: "エディタ",
     preview: "プレビュー",
+    editMode: "編集",
+    splitMode: "分割",
+    previewMode: "プレビュー",
+    outline: "アウトライン",
+    noHeadings: "見出しがありません",
     untitled: "無題",
     updating: "更新中...",
     markdownPreview: "Markdownプレビュー",
@@ -299,27 +323,26 @@ function normalizeSelectedPath(selection: string | string[] | null) {
   return selection;
 }
 
-function cycleEditorMode(mode: EditorMode): EditorMode {
-  return mode === "split" ? "source" : "split";
-}
-
 export default function App() {
   const initialDocument = useMemo(() => createUntitledDocument(), []);
   const [content, setContent] = useState(initialDocument.content);
   const [currentFile, setCurrentFile] = useState<string | null>(initialDocument.path);
+  const [recentFiles, setRecentFiles] = useState(() => parseRecentFiles(
+    window.localStorage.getItem(RECENT_FILES_STORAGE_KEY),
+  ));
   const [modified, setModified] = useState(initialDocument.modified);
   const [error, setError] = useState<EditorError | null>(null);
   const [isFileDragOver, setIsFileDragOver] = useState(false);
   const [fileProperties, setFileProperties] = useState<FileProperties | null>(null);
   const [isAppearanceSettingsOpen, setIsAppearanceSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isOutlineVisible, setIsOutlineVisible] = useState(true);
   const [previewContent, setPreviewContent] = useState(initialDocument.content);
   const [isPreviewPending, setIsPreviewPending] = useState(false);
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
-  const [editorMode, setEditorMode] = useState<EditorMode>(() => {
-    const saved = window.localStorage.getItem(EDITOR_MODE_STORAGE_KEY);
-    return saved === "source" || saved === "split" ? saved : "source";
-  });
+  const [editorMode, setEditorMode] = useState<ViewMode>(() => resolveViewMode(
+    window.localStorage.getItem(EDITOR_MODE_STORAGE_KEY),
+  ));
   const [themeMode, setThemeMode] = useState<ThemeMode>(() => {
     const saved = readStoredValue(THEME_STORAGE_KEY, LEGACY_THEME_STORAGE_KEY);
     return saved === "light" || saved === "dark" || saved === "system" ? saved : "system";
@@ -386,6 +409,8 @@ export default function App() {
 
   const isNativeRuntime = isTauriRuntime();
   const isSplitMode = editorMode === "split";
+  const isEditorVisible = editorMode !== "preview";
+  const isPreviewVisible = editorMode !== "edit";
   const text = UI_TEXT[appLanguage];
   const unsavedResourceNames = [
     ...(modified ? [fileNameFromPath(currentFile)] : []),
@@ -409,6 +434,7 @@ export default function App() {
     "--ui-font-size": `${uiFontSize}px`,
   }) as CSSProperties, [editorFontSize, editorLineHeight, previewFontSize, previewLineHeight, uiFontSize]);
   const stats = useMemo(() => getDocumentStats(content), [content]);
+  const outlineHeadings = useMemo(() => parseMarkdownOutline(previewContent), [previewContent]);
   const searchMatches = useMemo(() => {
     if (!searchQuery) {
       return [];
@@ -428,6 +454,10 @@ export default function App() {
   const showError = useCallback((title: string, message: string) => {
     setError({ title, message });
     void logDebug("error", title, message);
+  }, []);
+
+  const recordRecentFile = useCallback((path: string) => {
+    setRecentFiles((history) => updateRecentFiles(history, path));
   }, []);
 
   const requestUnsavedDecision = useCallback(() => {
@@ -474,7 +504,8 @@ export default function App() {
     setModified(false);
     setSearchQuery("");
     setHasSearchSelection(false);
-  }, []);
+    recordRecentFile(path);
+  }, [recordRecentFile]);
 
   const resetDocument = useCallback(() => {
     const next = createUntitledDocument();
@@ -520,10 +551,11 @@ export default function App() {
     await writeTextFile(selected, latestDocument.content);
     latestDocumentRef.current.set({ ...latestDocument, currentFile: selected, modified: false });
     setCurrentFile(selected);
+    recordRecentFile(selected);
     await clearRecoverySafely();
     setModified(false);
     return true;
-  }, reportSaveError), [clearRecoverySafely, reportSaveError]);
+  }, reportSaveError), [clearRecoverySafely, recordRecentFile, reportSaveError]);
 
   const handleSave = useCallback(async () => {
     const latestDocument = latestDocumentRef.current.get();
@@ -534,12 +566,13 @@ export default function App() {
 
     return runSaveOperationSafely(async () => {
       await writeTextFile(path, latestDocument.content);
+      recordRecentFile(path);
       latestDocumentRef.current.set({ ...latestDocument, modified: false });
       await clearRecoverySafely();
       setModified(false);
       return true;
     }, reportSaveError);
-  }, [clearRecoverySafely, handleSaveAs, reportSaveError]);
+  }, [clearRecoverySafely, handleSaveAs, recordRecentFile, reportSaveError]);
 
   const requestDocumentTransition = useCallback(async (proceed: () => Promise<void>) => {
     if (transitionInProgressRef.current) return false;
@@ -883,6 +916,20 @@ export default function App() {
     setSplitPercent(Math.min(75, Math.max(25, next)));
   }, []);
 
+  const handleMarkdownFormat = useCallback((format: MarkdownFormat) => {
+    if (actionGateRef.current.isBlocked()) return;
+    editorRef.current?.applyFormat(format);
+  }, []);
+
+  const handleOutlineSelect = useCallback((heading: OutlineHeading) => {
+    if (editorMode === "preview") {
+      const previewHeading = previewRef.current?.querySelectorAll("h1, h2, h3, h4, h5, h6")[heading.index];
+      previewHeading?.scrollIntoView({ block: "start", behavior: "smooth" });
+      return;
+    }
+    editorRef.current?.selectRange(heading.offset, heading.offset + heading.text.length + heading.level + 1);
+  }, [editorMode]);
+
   useEffect(() => {
     const title = formatDocumentTitle(currentFile, modified);
     void synchronizeDocumentTitle(
@@ -926,6 +973,10 @@ export default function App() {
   useEffect(() => {
     window.localStorage.setItem(UI_FONT_SIZE_STORAGE_KEY, String(uiFontSize));
   }, [uiFontSize]);
+
+  useEffect(() => {
+    window.localStorage.setItem(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
+  }, [recentFiles]);
 
   useEffect(() => {
     setIsPreviewPending(true);
@@ -1089,7 +1140,7 @@ export default function App() {
         handleItalic();
       } else if ((event.ctrlKey || event.metaKey) && event.shiftKey && event.key.toLowerCase() === "v") {
         event.preventDefault();
-        setEditorMode((mode) => cycleEditorMode(mode));
+        setEditorMode((mode) => cycleViewMode(mode));
       } else if (event.key === "Escape") {
         setActiveMenu(null);
       }
@@ -1185,6 +1236,32 @@ export default function App() {
             <div className="menu-popover" role="menu">
               <button role="menuitem" onClick={() => runMenuAction(handleNew)}>{text.new} <kbd>Ctrl+N</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>{text.open} <kbd>Ctrl+O</kbd></button>
+              {recentFiles.length > 0 && (
+                <>
+                  <div className="menu-separator" />
+                  <div className="recent-files-label">{text.recentFiles}</div>
+                  {recentFiles.map((entry) => (
+                    <div className="recent-file-row" key={entry.path.toLocaleLowerCase()}>
+                      <button
+                        role="menuitem"
+                        title={entry.path}
+                        onClick={() => runMenuAction(() => requestDocumentTransition(() => openFilePath(entry.path)))}
+                      >
+                        <span>{fileNameFromPath(entry.path)}</span>
+                        <small>{entry.path}</small>
+                      </button>
+                      <button
+                        type="button"
+                        className="recent-file-remove"
+                        aria-label={`${text.removeRecentFile}: ${fileNameFromPath(entry.path)}`}
+                        title={text.removeRecentFile}
+                        onClick={() => setRecentFiles((history) => history.filter((item) => item.path !== entry.path))}
+                      >×</button>
+                    </div>
+                  ))}
+                  <button role="menuitem" onClick={() => setRecentFiles([])}>{text.clearRecentFiles}</button>
+                </>
+              )}
               <button role="menuitem" onClick={() => runMenuAction(handleSaveAction)}>{text.save} <kbd>Ctrl+S</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleSaveAsAction)}>{text.saveAs}</button>
               <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>{text.exportHtml}</button>
@@ -1205,12 +1282,10 @@ export default function App() {
               <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
               <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
               <div className="menu-separator" />
-              <MenuCheckboxItem
-                checked={isSplitMode}
-                label={text.previewPane}
-                shortcut="Ctrl+Shift+V"
-                onToggle={() => runMenuAction(() => setEditorMode((mode) => cycleEditorMode(mode)))}
-              />
+              <MenuRadioItem name="view-mode" value="edit" checked={editorMode === "edit"} label={text.editMode} onSelect={() => runMenuAction(() => setEditorMode("edit"))} />
+              <MenuRadioItem name="view-mode" value="split" checked={editorMode === "split"} label={text.splitMode} onSelect={() => runMenuAction(() => setEditorMode("split"))} />
+              <MenuRadioItem name="view-mode" value="preview" checked={editorMode === "preview"} label={text.previewMode} onSelect={() => runMenuAction(() => setEditorMode("preview"))} />
+              <MenuCheckboxItem checked={isOutlineVisible} label={text.outline} onToggle={() => runMenuAction(() => setIsOutlineVisible((visible) => !visible))} />
               <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
             </div>
           </div>
@@ -1246,21 +1321,11 @@ export default function App() {
             </div>
           </div>
 
-          <button
-            type="button"
-            className="menubar-icon-button preview-pane-toggle-button"
-            onClick={() => setEditorMode((mode) => cycleEditorMode(mode))}
-            title={`${isSplitMode ? text.hidePreview : text.showPreview} (Ctrl+Shift+V)`}
-            aria-label={isSplitMode ? text.hidePreview : text.showPreview}
-            aria-pressed={isSplitMode}
-          >
-            <svg viewBox="0 0 18 18" aria-hidden="true" focusable="false">
-              <rect x="2.75" y="3.25" width="12.5" height="11.5" rx="1.5" />
-              <line x1="9.5" y1="4.75" x2="9.5" y2="13.25" />
-              {isSplitMode && <path className="preview-toggle-panel" d="M10.85 4.75h2.9c.55 0 1 .45 1 1v6.5c0 .55-.45 1-1 1h-2.9z" />}
-              <circle cx="12.8" cy="9" r="1.45" />
-            </svg>
-          </button>
+          <ViewModeSwitcher
+            mode={editorMode}
+            labels={{ edit: text.editMode, split: text.splitMode, preview: text.previewMode }}
+            onChange={setEditorMode}
+          />
         </nav>
 
       </header>
@@ -1282,7 +1347,16 @@ export default function App() {
         </section>
       )}
 
-      <section className="app-body">
+      <section className={`app-body${isOutlineVisible ? " has-outline" : ""}`}>
+        {isOutlineVisible && (
+          <OutlinePanel
+            title={text.outline}
+            emptyText={text.noHeadings}
+            headings={outlineHeadings}
+            onSelect={handleOutlineSelect}
+            onClose={() => setIsOutlineVisible(false)}
+          />
+        )}
         <section
           className="workspace"
           ref={workspaceRef}
@@ -1292,7 +1366,7 @@ export default function App() {
               : "minmax(360px, 1fr)",
           }}
         >
-          <article className="editor-pane">
+          {isEditorVisible && <article className="editor-pane">
             <header className="pane-header">
               <div className="pane-title">
                 <span>{text.editor}</span>
@@ -1341,6 +1415,7 @@ export default function App() {
                 </div>
               )}
             </header>
+            <MarkdownToolbar onFormat={handleMarkdownFormat} />
             <MarkdownEditor
               ref={editorRef}
               value={content}
@@ -1349,11 +1424,11 @@ export default function App() {
               readOnly={isDocumentSafetyActive}
               onChange={handleContentChange}
             />
-          </article>
+          </article>}
 
-          {isSplitMode && (
+          {isPreviewVisible && (
             <>
-              <div
+              {isSplitMode && <div
                 className="splitter"
                 role="separator"
                 aria-label="Resize editor and preview panes"
@@ -1374,7 +1449,7 @@ export default function App() {
                     setSplitPercent((value) => Math.min(75, value + 2));
                   }
                 }}
-              />
+              />}
 
               <article className="preview-pane">
                 <header className="pane-header">
@@ -1399,7 +1474,7 @@ export default function App() {
       <footer className="statusbar">
         <span>{currentFile ? `${text.fileStatus} ${currentFile}` : `${text.fileStatus} ${text.untitled}`}</span>
         <span>{modified ? text.unsaved : text.saved}</span>
-        <span>{isSplitMode ? text.previewOn : text.previewOff}</span>
+        <span>{editorMode === "edit" ? text.previewOff : text.previewOn}</span>
         <span>{text.lines} {stats.lines}</span>
         <span>{text.chars} {stats.chars}</span>
         <span className="statusbar-build">{formatBuildLabel(BUILD_INFO.buildNumber)}</span>

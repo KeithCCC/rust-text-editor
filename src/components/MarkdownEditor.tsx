@@ -17,6 +17,7 @@ import {
   updateTableCell,
   type MarkdownTable,
 } from "../tableMarkdown";
+import { formatMarkdownSelection, type MarkdownFormat } from "../markdownFormatting";
 
 export type EditorMode = "live" | "source" | "split";
 
@@ -25,6 +26,7 @@ export type MarkdownEditorHandle = {
   selectRange: (start: number, end: number) => void;
   getScrollElement: () => HTMLElement | null;
   wrapSelection: (before: string, after: string, placeholder: string) => void;
+  applyFormat: (format: MarkdownFormat) => void;
 };
 
 type MarkdownEditorProps = {
@@ -610,6 +612,17 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       view.dispatch({
         changes: { from: selection.from, to: selection.to, insert },
         selection: EditorSelection.single(cursorFrom, cursorTo),
+      });
+      view.focus();
+    },
+    applyFormat(format: MarkdownFormat) {
+      const view = viewRef.current;
+      if (!view) return;
+      const selection = view.state.selection.main;
+      const change = formatMarkdownSelection(view.state.doc.toString(), selection.from, selection.to, format);
+      view.dispatch({
+        changes: { from: change.from, to: change.to, insert: change.insert },
+        selection: EditorSelection.single(change.from + change.selectionStart, change.from + change.selectionEnd),
       });
       view.focus();
     },

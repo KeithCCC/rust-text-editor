@@ -1,4 +1,7 @@
-import { useEffect, useId, useMemo, useState } from "react";
+import { useEffect, useId, useMemo, useRef, useState } from "react";
+import { save } from "@tauri-apps/plugin-dialog";
+import { buildMermaidExportFileName, prepareSvgExport, renderSvgToPng } from "../mermaidExport";
+import { writeBinaryFile, writeTextFile } from "../tauri";
 
 type MermaidBlockProps = {
   source: string;
@@ -17,6 +20,8 @@ export function MermaidBlock({ source, themeMode }: MermaidBlockProps) {
   const id = useId().replace(/:/g, "");
   const [svg, setSvg] = useState("");
   const [error, setError] = useState("");
+  const [exportError, setExportError] = useState("");
+  const previewRef = useRef<HTMLDivElement>(null);
   const [effectiveTheme, setEffectiveTheme] = useState(() => getEffectivePreviewTheme(themeMode));
   const mermaidTheme = useMemo(
     () =>
@@ -97,6 +102,45 @@ export function MermaidBlock({ source, themeMode }: MermaidBlockProps) {
     };
   }, [id, mermaidTheme, source]);
 
+  const createPng = async () => {
+    const svgElement = previewRef.current?.querySelector("svg");
+    if (!svg || !svgElement) throw new Error("The Mermaid diagram is not ready.");
+    return renderSvgToPng(svg, svgElement, effectiveTheme === "dark" ? "#18202b" : "#f8fbff");
+  };
+
+  const exportDiagram = async (format: "png" | "svg") => {
+    if (!svg) return;
+    setExportError("");
+    try {
+      const path = await save({
+        defaultPath: buildMermaidExportFileName(new Date(), format),
+        filters: [{ name: format.toUpperCase(), extensions: [format] }],
+      });
+      if (!path) return;
+      if (format === "svg") {
+        await writeTextFile(path, prepareSvgExport(svg));
+      } else {
+        const blob = await createPng();
+        await writeBinaryFile(path, Array.from(new Uint8Array(await blob.arrayBuffer())));
+      }
+    } catch (exportFailure) {
+      setExportError(exportFailure instanceof Error ? exportFailure.message : String(exportFailure));
+    }
+  };
+
+  const copyImage = async () => {
+    setExportError("");
+    try {
+      if (!navigator.clipboard?.write || typeof ClipboardItem === "undefined") {
+        throw new Error("Image clipboard is unavailable. Use PNG or SVG export instead.");
+      }
+      const blob = await createPng();
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": blob })]);
+    } catch (copyFailure) {
+      setExportError(copyFailure instanceof Error ? copyFailure.message : String(copyFailure));
+    }
+  };
+
   if (error) {
     return (
       <div className="diagram-error">
@@ -107,9 +151,18 @@ export function MermaidBlock({ source, themeMode }: MermaidBlockProps) {
   }
 
   return (
-    <div
-      className="mermaid-preview"
-      dangerouslySetInnerHTML={{ __html: svg || "<span>Rendering Mermaid...</span>" }}
-    />
+    <div className="mermaid-card">
+      <div className="mermaid-export-toolbar" role="toolbar" aria-label="Mermaid export">
+        <button type="button" disabled={!svg} onClick={() => void exportDiagram("png")}>PNG</button>
+        <button type="button" disabled={!svg} onClick={() => void exportDiagram("svg")}>SVG</button>
+        <button type="button" disabled={!svg} onClick={() => void copyImage()}>Copy Image</button>
+      </div>
+      <div
+        ref={previewRef}
+        className="mermaid-preview"
+        dangerouslySetInnerHTML={{ __html: svg || "<span>Rendering Mermaid...</span>" }}
+      />
+      {exportError && <p className="mermaid-export-error" role="alert">{exportError}</p>}
+    </div>
   );
 }

@@ -411,15 +411,161 @@ kbd {
   align-items: stretch;
 }
 
+.app-body.has-outline {
+  grid-template-columns: 230px minmax(0, 1fr);
+}
+
+.outline-panel {
+  min-width: 0;
+  overflow: auto;
+  border-right: 1px solid var(--border);
+  background: var(--pane-bg);
+}
+
+.outline-panel header {
+  position: sticky;
+  top: 0;
+  z-index: 1;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 9px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bar-bg);
+}
+
+.outline-panel header button {
+  border: 0;
+  background: transparent;
+  color: var(--muted);
+}
+
+.outline-panel nav {
+  display: grid;
+  padding: 6px;
+}
+
+.outline-panel nav button {
+  overflow: hidden;
+  padding: 6px 8px 6px calc(8px + (var(--outline-level) - 1) * 12px);
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+  text-align: left;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.outline-panel nav button:hover,
+.outline-panel nav button:focus-visible {
+  background: var(--active-bg);
+}
+
+.outline-panel p {
+  padding: 10px;
+  color: var(--muted);
+}
+
+.recent-files-label {
+  padding: 6px 12px 3px;
+  color: var(--muted);
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.recent-file-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  align-items: stretch;
+}
+
+.recent-file-row > button:first-child {
+  display: grid;
+  min-width: 0;
+}
+
+.recent-file-row small {
+  overflow: hidden;
+  color: var(--muted);
+  font-size: 10px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.recent-file-row .recent-file-remove {
+  width: 30px;
+  padding: 0;
+  text-align: center;
+}
+
+.view-mode-switcher {
+  display: inline-flex;
+  align-self: center;
+  margin-left: auto;
+  padding: 2px;
+  border: 1px solid var(--border);
+  border-radius: 6px;
+  background: var(--surface-bg);
+}
+
+.view-mode-switcher button {
+  min-width: 58px;
+  padding: 5px 9px;
+  border: 0;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--muted);
+}
+
+.view-mode-switcher button[aria-pressed="true"] {
+  background: var(--accent-soft);
+  color: var(--text);
+  font-weight: 700;
+}
+
 
 .editor-pane,
 .preview-pane {
   display: grid;
-  grid-template-rows: auto minmax(0, 1fr);
   height: 100%;
   min-width: 0;
   min-height: 0;
   overflow: hidden;
+}
+
+.editor-pane {
+  grid-template-rows: auto auto minmax(0, 1fr);
+}
+
+.preview-pane {
+  grid-template-rows: auto minmax(0, 1fr);
+}
+
+.markdown-toolbar {
+  display: flex;
+  gap: 3px;
+  overflow-x: auto;
+  padding: 5px 8px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bar-bg);
+}
+
+.markdown-toolbar button {
+  flex: 0 0 auto;
+  min-width: 28px;
+  padding: 4px 7px;
+  border: 1px solid transparent;
+  border-radius: 4px;
+  background: transparent;
+  color: var(--text);
+}
+
+.markdown-toolbar button:hover,
+.markdown-toolbar button:focus-visible {
+  border-color: var(--border);
+  background: var(--active-bg);
 }
 
 .pane-header {
@@ -990,7 +1136,7 @@ textarea {
   color: var(--json-punctuation);
 }
 
-.mermaid-preview,
+.mermaid-card,
 .excalidraw-card {
   display: block;
   width: 100%;
@@ -1000,11 +1146,44 @@ textarea {
   background: var(--surface-bg);
 }
 
+.mermaid-card {
+  overflow: hidden;
+}
+
+.mermaid-export-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  gap: 4px;
+  padding: 5px 7px;
+  border-bottom: 1px solid var(--border);
+  background: var(--bar-bg);
+}
+
+.mermaid-export-toolbar button {
+  padding: 3px 7px;
+  border: 1px solid var(--border);
+  border-radius: 4px;
+  background: var(--surface-bg);
+  color: var(--text);
+}
+
+.mermaid-export-toolbar button:disabled {
+  opacity: 0.45;
+}
+
 .mermaid-preview {
   overflow: auto;
   padding: 18px;
   text-align: center;
   background: color-mix(in srgb, var(--preview-bg) 82%, var(--surface-bg));
+}
+
+.mermaid-export-error {
+  margin: 0;
+  padding: 8px 12px;
+  border-top: 1px solid var(--danger-border);
+  background: var(--danger-bg);
+  color: var(--danger-text);
 }
 
 .mermaid-preview svg {
@@ -1469,6 +1648,12 @@ textarea {
   .app-body {
     display: flex;
     flex-direction: column;
+  }
+
+  .outline-panel {
+    max-height: 220px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border);
   }
 
 

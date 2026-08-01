@@ -39,6 +39,11 @@ fn write_text_file(path: String, content: String) -> Result<(), String> {
 }
 
 #[tauri::command]
+fn write_binary_file(path: String, content: Vec<u8>) -> Result<(), String> {
+    atomic_write::write_atomic(Path::new(&path), &content)
+}
+
+#[tauri::command]
 fn get_file_properties(path: String) -> Result<FileProperties, String> {
     let normalized = normalize_path(PathBuf::from(&path))
         .map_err(|error| format!("Failed to resolve file path '{}': {}", path, error))?;
@@ -214,6 +219,7 @@ pub fn run() {
         .invoke_handler(tauri::generate_handler![
             read_text_file,
             write_text_file,
+            write_binary_file,
             get_file_properties,
             open_file_in_new_instance,
             get_startup_file_path,
@@ -229,4 +235,17 @@ pub fn run() {
         ])
         .run(tauri::generate_context!())
         .expect("error while running tauri application");
+}
+
+#[cfg(test)]
+mod binary_file_tests {
+    use super::write_binary_file;
+
+    #[test]
+    fn writes_binary_export_bytes() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let path = directory.path().join("diagram.png");
+        write_binary_file(path.to_string_lossy().to_string(), vec![0, 1, 2, 255]).expect("write");
+        assert_eq!(std::fs::read(path).expect("read"), vec![0, 1, 2, 255]);
+    }
 }

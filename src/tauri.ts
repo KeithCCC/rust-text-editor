@@ -27,6 +27,10 @@ export function writeTextFile(path: string, content: string) {
   return invoke<void>("write_text_file", { path, content });
 }
 
+export function writeBinaryFile(path: string, content: number[]) {
+  return invoke<void>("write_binary_file", { path, content });
+}
+
 export function readRecoveryDraft() {
   return invoke<RecoveryDraft | null>("read_recovery_draft");
 }
