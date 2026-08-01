@@ -26,6 +26,7 @@ import {
   runSaveOperationSafely,
 } from "./appSafety";
 import { HelpDialog } from "./components/HelpDialog";
+import { FormattingFeedback } from "./components/FormattingFeedback";
 import { DecisionDialog } from "./components/DecisionDialog";
 import type { ExcalidrawEditorHandle } from "./components/ExcalidrawEditor";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./components/MarkdownEditor";
@@ -45,7 +46,8 @@ import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
 import { formatJsonContent } from "./jsonFormatting";
 import {
-  formattingResultMessage,
+  EMPTY_FORMATTING_ANNOUNCEMENT,
+  nextFormattingAnnouncement,
   shouldShowToolbarHint,
   TOOLBAR_HINT_STORAGE_KEY,
 } from "./formattingGuidance";
@@ -358,7 +360,7 @@ export default function App() {
   const [isToolbarHintVisible, setIsToolbarHintVisible] = useState(() => shouldShowToolbarHint(
     window.localStorage.getItem(TOOLBAR_HINT_STORAGE_KEY),
   ));
-  const [formattingFeedback, setFormattingFeedback] = useState("");
+  const [formattingAnnouncement, setFormattingAnnouncement] = useState(EMPTY_FORMATTING_ANNOUNCEMENT);
   const [isOutlineVisible, setIsOutlineVisible] = useState(true);
   const [previewContent, setPreviewContent] = useState(initialDocument.content);
   const [isPreviewPending, setIsPreviewPending] = useState(false);
@@ -908,7 +910,11 @@ export default function App() {
     if (actionGateRef.current.isBlocked()) return;
     const result = editorRef.current?.applyFormat(command);
     if (result) {
-      setFormattingFeedback(formattingResultMessage(result, getFormattingUi(appLanguage).feedback));
+      setFormattingAnnouncement((current) => nextFormattingAnnouncement(
+        current,
+        result,
+        getFormattingUi(appLanguage).feedback,
+      ));
     }
   }, [appLanguage]);
 
@@ -1486,7 +1492,7 @@ export default function App() {
                   <button type="button" onClick={dismissToolbarHint}>{text.dismiss}</button>
                 </aside>
               )}
-              <span className="formatting-feedback" aria-live="polite">{formattingFeedback}</span>
+              <FormattingFeedback announcement={formattingAnnouncement} />
             </div>
             <MarkdownEditor
               ref={editorRef}
