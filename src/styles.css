@@ -552,6 +552,40 @@ kbd {
   background: var(--bar-bg);
 }
 
+.markdown-toolbar-group {
+  display: flex;
+  gap: 3px;
+}
+
+.toolbar-menu-root {
+  position: relative;
+  display: flex;
+}
+
+.toolbar-menu-popover {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  z-index: 5;
+  display: none;
+  min-width: 180px;
+  padding: 4px;
+  border: 1px solid var(--strong-border);
+  background: var(--bar-bg);
+  box-shadow: 0 12px 24px var(--shadow);
+}
+
+.toolbar-menu-root[data-open="true"] .toolbar-menu-popover {
+  display: flex;
+  flex-direction: column;
+}
+
+.toolbar-menu-popover button {
+  width: 100%;
+  text-align: left;
+  white-space: nowrap;
+}
+
 .markdown-toolbar button {
   flex: 0 0 auto;
   min-width: 28px;

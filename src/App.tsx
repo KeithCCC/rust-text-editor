@@ -29,7 +29,7 @@ import { HelpDialog } from "./components/HelpDialog";
 import { DecisionDialog } from "./components/DecisionDialog";
 import type { ExcalidrawEditorHandle } from "./components/ExcalidrawEditor";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./components/MarkdownEditor";
-import { MarkdownToolbar } from "./components/MarkdownToolbar";
+import { MarkdownFormatMenu, MarkdownToolbar } from "./components/MarkdownToolbar";
 import { MarkdownPreview } from "./components/MarkdownPreview";
 import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
 import { OutlinePanel } from "./components/OutlinePanel";
@@ -344,7 +344,7 @@ export default function App() {
   const [editorMode, setEditorMode] = useState<ViewMode>(() => resolveViewMode(
     window.localStorage.getItem(EDITOR_MODE_STORAGE_KEY),
   ));
-  const [, setFormattingContext] = useState<FormattingContext>({
+  const [formattingContext, setFormattingContext] = useState<FormattingContext>({
     headingLevel: null,
     bold: false,
     italic: false,
@@ -771,23 +771,6 @@ export default function App() {
     requestAnimationFrame(() => editorRef.current?.focus());
   }, []);
 
-  const handleFormatJson = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return;
-    try {
-      const formatted = JSON.stringify(JSON.parse(content), null, 2);
-      recoveryQueueRef.current.resume();
-      latestDocumentRef.current.set({
-        ...latestDocumentRef.current.get(),
-        content: formatted,
-        modified: true,
-      });
-      setContent(formatted);
-      setModified(true);
-    } catch (formatError) {
-      showError(text.jsonFormatFailed, formatError instanceof Error ? formatError.message : String(formatError));
-    }
-  }, [content, showError, text.jsonFormatFailed]);
-
   const handleExcalidrawDirtyChange = useCallback((dirty: boolean) => {
     latestExcalidrawDirtyRef.current = dirty;
     setExcalidrawDirty(dirty);
@@ -895,20 +878,18 @@ export default function App() {
     });
   }, []);
 
-  const handleBold = useCallback(() => {
+  const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
     if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.applyFormat({ kind: "bold" });
+    editorRef.current?.applyFormat(command);
   }, []);
+
+  const handleBold = useCallback(() => {
+    handleMarkdownFormat({ kind: "bold" });
+  }, [handleMarkdownFormat]);
 
   const handleItalic = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.applyFormat({ kind: "italic" });
-  }, []);
-
-  const handleInsertLink = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.applyFormat({ kind: "link" });
-  }, []);
+    handleMarkdownFormat({ kind: "italic" });
+  }, [handleMarkdownFormat]);
 
   const runMenuAction = useCallback((action: () => void | Promise<unknown>) => {
     setActiveMenu(null);
@@ -925,11 +906,6 @@ export default function App() {
     const bounds = workspace.getBoundingClientRect();
     const next = ((clientX - bounds.left) / bounds.width) * 100;
     setSplitPercent(Math.min(75, Math.max(25, next)));
-  }, []);
-
-  const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
-    if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.applyFormat(command);
   }, []);
 
   const handleOutlineSelect = useCallback((heading: OutlineHeading) => {
@@ -1321,10 +1297,11 @@ export default function App() {
           <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
             <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(handleBold)}>{text.bold} <kbd>Ctrl+B</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleItalic)}>{text.italic} <kbd>Ctrl+I</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleInsertLink)}>{text.insertLink}</button>
-              <button role="menuitem" onClick={() => runMenuAction(handleFormatJson)}>{text.formatJson}</button>
+              <MarkdownFormatMenu
+                language={appLanguage}
+                disabled={isDocumentSafetyActive}
+                onFormat={(command) => runMenuAction(() => handleMarkdownFormat(command))}
+              />
             </div>
           </div>
 
@@ -1429,7 +1406,12 @@ export default function App() {
                 </div>
               )}
             </header>
-            <MarkdownToolbar disabled={isDocumentSafetyActive} onFormat={handleMarkdownFormat} />
+            <MarkdownToolbar
+              language={appLanguage}
+              disabled={isDocumentSafetyActive}
+              formattingContext={formattingContext}
+              onFormat={handleMarkdownFormat}
+            />
             <MarkdownEditor
               ref={editorRef}
               value={content}
