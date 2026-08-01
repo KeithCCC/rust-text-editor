@@ -294,6 +294,40 @@ describe("document session safety", () => {
     expect(editorContent()).toBe(before);
   });
 
+  it("describes Preview-disabled formatting in English through the real toolbar", async () => {
+    const viewModeSwitcher = container.querySelector(".view-mode-switcher");
+    if (!viewModeSwitcher) throw new Error("View mode switcher not found");
+
+    await click(button("Preview", viewModeSwitcher));
+
+    const toolbar = container.querySelector<HTMLElement>('[role="toolbar"]');
+    if (!toolbar) throw new Error("Markdown toolbar not found");
+    const reasonId = toolbar.getAttribute("aria-describedby");
+    expect(reasonId ? document.getElementById(reasonId)?.textContent : null).toBe(
+      "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
+    );
+  });
+
+  it("describes document-safety-disabled formatting in Japanese through the real toolbar", async () => {
+    await click(button("View"));
+    const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    if (!viewMenu) throw new Error("View menu not found");
+    const japaneseUi = viewMenu.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
+    if (!japaneseUi) throw new Error("Japanese UI choice not found");
+    await click(japaneseUi);
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\pending-ja.md");
+    tauriMocks.readTextFile.mockReturnValueOnce(new Promise(() => undefined));
+
+    await shortcut(window, "o");
+
+    const toolbar = container.querySelector<HTMLElement>('[role="toolbar"]');
+    if (!toolbar) throw new Error("Markdown toolbar not found");
+    const reasonId = toolbar.getAttribute("aria-describedby");
+    expect(reasonId ? document.getElementById(reasonId)?.textContent : null).toBe(
+      "文書を安全に処理している間は書式設定を使用できません。",
+    );
+  });
+
   it("uses the same Japanese placeholders from the toolbar and Format menu", async () => {
     await click(button("View"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');

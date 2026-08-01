@@ -622,6 +622,25 @@ kbd {
   background: var(--toolbar-bg);
 }
 
+.toolbar-disabled-status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+}
+
+.toolbar-disabled-status:focus {
+  position: static;
+  width: auto;
+  height: auto;
+  overflow: visible;
+  clip-path: none;
+  white-space: normal;
+}
+
 .formatting-toolbar-region {
   position: relative;
   min-width: 0;

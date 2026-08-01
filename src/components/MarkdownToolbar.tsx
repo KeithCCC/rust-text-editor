@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AppLanguage } from "../appLanguage";
 import { getFormattingUi, type FormattingUi } from "../formattingUi";
 import type {
@@ -22,6 +22,7 @@ type FormattingControlProps = {
 };
 
 type MarkdownToolbarProps = FormattingControlProps & {
+  disabledReason?: "documentSafety" | "preview";
   formattingContext?: FormattingContext;
 };
 
@@ -86,6 +87,17 @@ const SHORTCUTS: Partial<Record<MarkdownCommand["kind"], string>> = {
 };
 
 const TOOLBAR_CONTROL_COUNT = 12;
+
+const DISABLED_REASON_TEXT = {
+  en: {
+    documentSafety: "Formatting is unavailable while Koharu is safely processing the document.",
+    preview: "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
+  },
+  ja: {
+    documentSafety: "文書を安全に処理している間は書式設定を使用できません。",
+    preview: "プレビュー表示では書式設定を使用できません。編集または分割表示に切り替えてください。",
+  },
+} as const;
 
 function navigationControls(
   elements: readonly (HTMLButtonElement | null)[],
@@ -181,10 +193,12 @@ export function MarkdownFormatMenu({
 export function MarkdownToolbar({
   language,
   disabled = false,
+  disabledReason,
   formattingContext,
   onFormat,
 }: MarkdownToolbarProps) {
   const ui = getFormattingUi(language);
+  const disabledReasonId = useId();
   const [activeIndex, setActiveIndex] = useState(0);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const toolbarRef = useRef<HTMLDivElement | null>(null);
@@ -228,6 +242,24 @@ export function MarkdownToolbar({
     };
   }, [activeIndex, openMenu]);
 
+  useEffect(() => {
+    if (disabled) setOpenMenu(null);
+  }, [disabled]);
+
+  useEffect(() => {
+    if (openMenu === null) return;
+    const dismissOutsideToolbar = (event: Event) => {
+      if (!(event.target instanceof Node) || toolbarRef.current?.contains(event.target)) return;
+      setOpenMenu(null);
+    };
+    document.addEventListener("pointerdown", dismissOutsideToolbar, true);
+    document.addEventListener("focusin", dismissOutsideToolbar, true);
+    return () => {
+      document.removeEventListener("pointerdown", dismissOutsideToolbar, true);
+      document.removeEventListener("focusin", dismissOutsideToolbar, true);
+    };
+  }, [openMenu]);
+
   const runCommand = (command: MarkdownCommand) => {
     onFormat(command);
   };
@@ -258,11 +290,15 @@ export function MarkdownToolbar({
     },
     "data-toolbar-control": "true",
     "data-toolbar-index": String(index),
-    tabIndex: index === activeIndex ? 0 : -1,
+    tabIndex: !disabled && index === activeIndex ? 0 : -1,
     onFocus: () => setActiveIndex(index),
   });
 
   const handleToolbarKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+    if (event.key === "Tab" && openMenu !== null) {
+      setOpenMenu(null);
+      return;
+    }
     if (!(event.target instanceof HTMLButtonElement) || event.target.dataset.toolbarControl !== "true") {
       return;
     }
@@ -390,8 +426,14 @@ export function MarkdownToolbar({
       role="toolbar"
       aria-label={ui.toolbarLabel}
       aria-disabled={disabled || undefined}
+      aria-describedby={disabled && disabledReason ? disabledReasonId : undefined}
       onKeyDown={handleToolbarKeyDown}
     >
+      {disabled && disabledReason && (
+        <p id={disabledReasonId} className="toolbar-disabled-status" role="status" tabIndex={0}>
+          {DISABLED_REASON_TEXT[language][disabledReason]}
+        </p>
+      )}
       <ToolbarGroup label={ui.groups.text}>
         {menu(0, "heading", "heading", HEADING_ITEMS, {
           pressed: formattingContext?.headingLevel !== null,

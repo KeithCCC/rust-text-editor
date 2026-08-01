@@ -1,4 +1,4 @@
-import { useEffect } from "react";
+import { useEffect, useRef } from "react";
 
 export type HelpLanguage = "en" | "ja";
 
@@ -211,15 +211,69 @@ export function handleHelpDialogKeyDown(
 
 export function HelpDialog({ language, onClose }: HelpDialogProps) {
   const content = HELP_CONTENT[language];
+  const backdropRef = useRef<HTMLElement | null>(null);
+  const initialFocusRef = useRef<HTMLElement | null>(
+    typeof document !== "undefined" && document.activeElement instanceof HTMLElement
+      ? document.activeElement
+      : null,
+  );
+  const closeButtonRef = useRef<HTMLButtonElement | null>(null);
+  const onCloseRef = useRef(onClose);
+  onCloseRef.current = onClose;
 
   useEffect(() => {
-    const listener = (event: KeyboardEvent) => handleHelpDialogKeyDown(event, onClose);
-    window.addEventListener("keydown", listener);
-    return () => window.removeEventListener("keydown", listener);
-  }, [onClose]);
+    const backdrop = backdropRef.current;
+    const dialog = backdrop?.querySelector<HTMLElement>('[role="dialog"]');
+    if (!backdrop || !dialog) return;
+    const backgroundElements = Array.from(backdrop.parentElement?.children ?? [])
+      .filter((element): element is HTMLElement => element instanceof HTMLElement && element !== backdrop);
+    const previousInert = backgroundElements.map((element) => element.hasAttribute("inert"));
+    for (const element of backgroundElements) element.setAttribute("inert", "");
+
+    const focusableElements = () => Array.from(dialog.querySelectorAll<HTMLElement>(
+      'button:not(:disabled), [href], input:not(:disabled), select:not(:disabled), textarea:not(:disabled), [tabindex]:not([tabindex="-1"])',
+    )).filter((element) => !element.hidden && element.getAttribute("aria-hidden") !== "true");
+    const focusFirst = () => (closeButtonRef.current ?? focusableElements()[0])?.focus();
+    const handleKeyDown = (event: globalThis.KeyboardEvent) => {
+      if (event.key === "Escape") {
+        event.preventDefault();
+        event.stopPropagation();
+        onCloseRef.current();
+        return;
+      }
+      if (event.key !== "Tab") return;
+      const focusable = focusableElements();
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (!first || !last) return;
+      if (event.shiftKey && document.activeElement === first) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && document.activeElement === last) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+    const containFocus = (event: FocusEvent) => {
+      if (!(event.target instanceof Node) || dialog.contains(event.target)) return;
+      focusFirst();
+    };
+
+    document.addEventListener("keydown", handleKeyDown, true);
+    document.addEventListener("focusin", containFocus, true);
+    focusFirst();
+    return () => {
+      document.removeEventListener("keydown", handleKeyDown, true);
+      document.removeEventListener("focusin", containFocus, true);
+      backgroundElements.forEach((element, index) => {
+        if (!previousInert[index]) element.removeAttribute("inert");
+      });
+      initialFocusRef.current?.focus();
+    };
+  }, []);
 
   return (
-    <section className="modal-backdrop help-dialog-backdrop">
+    <section ref={backdropRef} className="modal-backdrop help-dialog-backdrop">
       <div
         className="help-dialog"
         role="dialog"
@@ -230,7 +284,7 @@ export function HelpDialog({ language, onClose }: HelpDialogProps) {
           <div>
             <strong id="help-dialog-title">{content.title}</strong>
           </div>
-          <button type="button" aria-label={content.closeLabel} onClick={onClose}>×</button>
+          <button ref={closeButtonRef} type="button" aria-label={content.closeLabel} onClick={onClose}>×</button>
         </header>
 
         <div className="help-dialog-body">

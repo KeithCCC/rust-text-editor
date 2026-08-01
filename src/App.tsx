@@ -1508,6 +1508,7 @@ export default function App() {
               <MarkdownToolbar
                 language={appLanguage}
                 disabled={isFormattingDisabled}
+                disabledReason={isDocumentSafetyActive ? "documentSafety" : editorMode === "preview" ? "preview" : undefined}
                 formattingContext={formattingContext}
                 onFormat={handleMarkdownFormat}
               />

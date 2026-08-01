@@ -40,6 +40,12 @@ function click(target: HTMLElement) {
   });
 }
 
+function pointerDown(target: HTMLElement) {
+  act(() => {
+    target.dispatchEvent(new Event("pointerdown", { bubbles: true, cancelable: true }));
+  });
+}
+
 function focus(target: HTMLElement) {
   act(() => {
     target.focus();
@@ -82,6 +88,45 @@ afterEach(() => {
 });
 
 describe("MarkdownToolbar rendered interaction", () => {
+  it("provides one focusable localized reason when every formatting command is disabled", () => {
+    act(() => {
+      root.render(
+        <MarkdownToolbar
+          language="en"
+          disabled
+          disabledReason="preview"
+          onFormat={() => undefined}
+        />,
+      );
+    });
+
+    const toolbar = container.querySelector<HTMLElement>('[role="toolbar"]');
+    if (!toolbar) throw new Error("Toolbar not found");
+    const reasonId = toolbar.getAttribute("aria-describedby");
+    const reason = reasonId ? document.getElementById(reasonId) : null;
+    expect(reason?.getAttribute("role")).toBe("status");
+    expect(reason?.tabIndex).toBe(0);
+    expect(reason?.textContent).toBe(
+      "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
+    );
+    expect(Array.from(toolbar.querySelectorAll("button")).every((control) => control.disabled)).toBe(true);
+    expect(Array.from(toolbar.querySelectorAll("button")).every((control) => control.tabIndex === -1)).toBe(true);
+
+    act(() => {
+      root.render(
+        <MarkdownToolbar
+          language="ja"
+          disabled
+          disabledReason="documentSafety"
+          onFormat={() => undefined}
+        />,
+      );
+    });
+    expect(container.querySelector('[role="status"]')?.textContent).toBe(
+      "文書を安全に処理している間は書式設定を使用できません。",
+    );
+  });
+
   it("dispatches Left, Right, Home, and End through the toolbar handler", () => {
     act(() => {
       root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
@@ -190,5 +235,79 @@ describe("MarkdownToolbar rendered interaction", () => {
     expect(onFormat).toHaveBeenLastCalledWith({ kind: "heading", level: 2 });
     expect(heading.getAttribute("aria-expanded")).toBe("false");
     expect(document.activeElement).toBe(heading);
+  });
+
+  it("closes an open submenu on an outside pointer without restoring trigger focus", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
+    });
+    patchLayout();
+    const heading = button("Heading");
+    click(heading);
+    flushAnimationFrame();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+
+    pointerDown(outside);
+
+    expect(heading.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).not.toBe(heading);
+    outside.remove();
+  });
+
+  it("closes an open submenu when focus moves outside without stealing that focus", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
+    });
+    patchLayout();
+    const heading = button("Heading");
+    click(heading);
+    flushAnimationFrame();
+    const outside = document.createElement("button");
+    document.body.append(outside);
+
+    focus(outside);
+
+    expect(heading.getAttribute("aria-expanded")).toBe("false");
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
+  });
+
+  it("lets Tab leave a submenu while dismissing it", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
+    });
+    patchLayout();
+    const heading = button("Heading");
+    click(heading);
+    flushAnimationFrame();
+
+    const event = keyDown(button("Heading 1"), "Tab");
+
+    expect(event.defaultPrevented).toBe(false);
+    expect(heading.getAttribute("aria-expanded")).toBe("false");
+  });
+
+  it("dismisses an open submenu when formatting becomes disabled", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
+    });
+    patchLayout();
+    const heading = button("Heading");
+    click(heading);
+    expect(heading.getAttribute("aria-expanded")).toBe("true");
+
+    act(() => {
+      root.render(
+        <MarkdownToolbar
+          language="en"
+          disabled
+          disabledReason="preview"
+          onFormat={() => undefined}
+        />,
+      );
+    });
+
+    expect(button("Heading").getAttribute("aria-expanded")).toBe("false");
   });
 });
