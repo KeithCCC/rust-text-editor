@@ -238,11 +238,15 @@ function isSurrounded(
     if (!insideExcludedSpan && !isEscaped(line, offset)) {
       if (opening === null && canOpen) {
         opening = offset;
-      } else if (opening !== null && canClose) {
-        if (opening + delimiter.length <= from && offset >= to) {
-          return true;
+      } else if (opening !== null) {
+        if (canClose) {
+          if (opening + delimiter.length <= from && offset >= to) {
+            return true;
+          }
+          opening = null;
+        } else {
+          opening = canOpen ? offset : null;
         }
-        opening = null;
       }
     }
     offset = line.indexOf(delimiter, offset + delimiter.length);

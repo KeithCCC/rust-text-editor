@@ -65,6 +65,10 @@ describe("formatMarkdownSelection", () => {
     });
   });
 
+  it("does not carry a bold opener past an unrecognized closer", () => {
+    expect(detectFormattingContext("**bold**plain**", { from: 10, to: 10 }).bold).toBe(false);
+  });
+
   it("does not infer inline code between separate code spans", () => {
     expect(detectFormattingContext("`three` gap `four`", { from: 9, to: 9 }).inlineCode).toBe(false);
   });
