@@ -16,4 +16,36 @@ describe("MarkdownPreview", () => {
 
     expect(html).toContain("First line<br/>\nSecond line");
   });
+
+  it("gives duplicate ATX headings source-offset IDs without changing Setext or raw headings", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownPreview
+        markdown={"Setext\n=======\n\n<h2 id=\"raw-heading\">Raw</h2>\n\n# Same\n\n# Same"}
+        currentFile={null}
+        themeMode="light"
+        onOpenExcalidraw={() => undefined}
+        onOpenRelativeMarkdownLink={() => undefined}
+      />,
+    );
+
+    expect(html).toContain("<h1>Setext</h1>");
+    expect(html).toContain('<h2 id="raw-heading">Raw</h2>');
+    expect(html).toContain('<h1 id="markdown-heading-47">Same</h1>');
+    expect(html).toContain('<h1 id="markdown-heading-55">Same</h1>');
+  });
+
+  it("keeps ReactMarkdown source offsets aligned for CRLF headings", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownPreview
+        markdown={"# First\r\n\r\n# Second"}
+        currentFile={null}
+        themeMode="light"
+        onOpenExcalidraw={() => undefined}
+        onOpenRelativeMarkdownLink={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('<h1 id="markdown-heading-0">First</h1>');
+    expect(html).toContain('<h1 id="markdown-heading-11">Second</h1>');
+  });
 });

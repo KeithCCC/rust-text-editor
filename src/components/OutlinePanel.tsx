@@ -22,7 +22,7 @@ export function OutlinePanel({ title, emptyText, headings, onSelect, onClose }: 
         <nav aria-label={title}>
           {headings.map((heading) => (
             <button
-              key={`${heading.offset}-${heading.text}`}
+              key={heading.id}
               type="button"
               style={{ "--outline-level": heading.level } as CSSProperties}
               onClick={() => onSelect(heading)}

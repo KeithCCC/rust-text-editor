@@ -7,7 +7,7 @@ it("renders indented heading buttons and an empty state", () => {
     <OutlinePanel
       title="Outline"
       emptyText="No headings found"
-      headings={[{ level: 2, text: "Details", offset: 10, index: 0 }]}
+      headings={[{ id: "markdown-heading-10", level: 2, text: "Details", offset: 10 }]}
       onSelect={() => undefined}
       onClose={() => undefined}
     />,

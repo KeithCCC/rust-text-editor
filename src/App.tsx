@@ -980,7 +980,7 @@ export default function App() {
 
   const handleOutlineSelect = useCallback((heading: OutlineHeading) => {
     if (editorMode === "preview") {
-      const previewHeading = previewRef.current?.querySelectorAll("h1, h2, h3, h4, h5, h6")[heading.index];
+      const previewHeading = previewRef.current?.querySelector<HTMLElement>(`#${heading.id}`);
       previewHeading?.scrollIntoView({ block: "start", behavior: "smooth" });
       return;
     }

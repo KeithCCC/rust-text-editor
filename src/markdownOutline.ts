@@ -1,9 +1,13 @@
 export type OutlineHeading = {
+  id: string;
   level: number;
   text: string;
   offset: number;
-  index: number;
 };
+
+export function markdownOutlineHeadingId(offset: number) {
+  return `markdown-heading-${offset}`;
+}
 
 export function parseMarkdownOutline(markdown: string): OutlineHeading[] {
   const headings: OutlineHeading[] = [];
@@ -20,13 +24,15 @@ export function parseMarkdownOutline(markdown: string): OutlineHeading[] {
     }
     if (fence) continue;
 
-    const heading = /^ {0,3}(#{1,6})\s+(.+?)\s*#*\s*$/.exec(line);
+    const heading = /^ {0,3}(#{1,6})([ \t]+)(.+)$/.exec(line);
     if (!heading) continue;
+    const text = `${heading[2]}${heading[3]}`.replace(/[ \t]+#+[ \t]*$/, "").trim();
+    if (!text) continue;
     headings.push({
+      id: markdownOutlineHeadingId(match.index),
       level: heading[1].length,
-      text: heading[2],
+      text,
       offset: match.index,
-      index: headings.length,
     });
   }
 

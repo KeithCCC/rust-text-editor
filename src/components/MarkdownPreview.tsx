@@ -1,5 +1,5 @@
-import { forwardRef, isValidElement, memo, type ReactNode } from "react";
-import ReactMarkdown from "react-markdown";
+import { createElement, forwardRef, isValidElement, memo, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import ReactMarkdown, { type ExtraProps } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
 import rehypeRaw from "rehype-raw";
@@ -7,6 +7,7 @@ import { MermaidBlock } from "./MermaidBlock";
 import { ExcalidrawEmbed } from "./ExcalidrawEmbed";
 import { JsonCodeBlock } from "./JsonCodeBlock";
 import { getRelativeMarkdownPath } from "../markdownLinks";
+import { parseMarkdownOutline } from "../markdownOutline";
 import type { ExcalidrawScene } from "../types";
 
 type MarkdownPreviewProps = {
@@ -29,16 +30,39 @@ function getPreCodeLanguage(children: ReactNode) {
   return getCodeLanguage(children.props.className);
 }
 
+type PreviewHeadingProps = ComponentPropsWithoutRef<"h1"> & ExtraProps;
+
+function createPreviewHeading(
+  tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
+  outlineIdsByOffset: ReadonlyMap<number, string>,
+) {
+  return function PreviewHeading({ node, children, ...props }: PreviewHeadingProps) {
+    const offset = node?.position?.start.offset;
+    const outlineId = typeof offset === "number" ? outlineIdsByOffset.get(offset) : undefined;
+    return createElement(tag, { ...props, id: outlineId ?? props.id }, children);
+  };
+}
+
 const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps>(function MarkdownPreview(
   { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenRelativeMarkdownLink },
   ref,
 ) {
+  const outlineIdsByOffset = new Map(
+    parseMarkdownOutline(markdown).map((heading) => [heading.offset, heading.id]),
+  );
+
   return (
     <div className="preview-body" ref={ref}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw]}
         components={{
+          h1: createPreviewHeading("h1", outlineIdsByOffset),
+          h2: createPreviewHeading("h2", outlineIdsByOffset),
+          h3: createPreviewHeading("h3", outlineIdsByOffset),
+          h4: createPreviewHeading("h4", outlineIdsByOffset),
+          h5: createPreviewHeading("h5", outlineIdsByOffset),
+          h6: createPreviewHeading("h6", outlineIdsByOffset),
           a({ href, children, ...props }) {
             const relativeMarkdownPath = href ? getRelativeMarkdownPath(href) : null;
             if (relativeMarkdownPath) {
