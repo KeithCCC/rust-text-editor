@@ -82,6 +82,10 @@ async function click(target: HTMLElement) {
   });
 }
 
+function focus(target: HTMLElement) {
+  act(() => target.focus());
+}
+
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   window.localStorage.clear();
@@ -114,6 +118,103 @@ afterEach(() => {
 });
 
 describe("document session safety", () => {
+  it("focuses the replacement editor after a successful Open from the focused editor", async () => {
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\focused-open.md");
+    tauriMocks.readTextFile.mockResolvedValueOnce({
+      path: "C:\\notes\\focused-open.md",
+      content: "replacement",
+    });
+    const previousEditor = container.querySelector<HTMLElement>(".cm-content");
+    if (!previousEditor) throw new Error("CodeMirror content element not found");
+    focus(previousEditor);
+    expect(document.activeElement).toBe(previousEditor);
+
+    await shortcut(previousEditor, "o");
+
+    const replacementEditor = container.querySelector<HTMLElement>(".cm-content");
+    if (!replacementEditor) throw new Error("Replacement CodeMirror editor not found");
+    expect(replacementEditor).not.toBe(previousEditor);
+    expect(editorContent()).toBe("replacement");
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    });
+    expect(document.activeElement).toBe(replacementEditor);
+  });
+
+  it("keeps the existing editor focused when Open is canceled", async () => {
+    dialogMocks.open.mockResolvedValueOnce(null);
+    const editor = container.querySelector<HTMLElement>(".cm-content");
+    if (!editor) throw new Error("CodeMirror content element not found");
+    focus(editor);
+
+    await shortcut(editor, "o");
+
+    expect(container.querySelector(".cm-content")).toBe(editor);
+    expect(document.activeElement).toBe(editor);
+  });
+
+  it("keeps the existing editor focused when Open fails", async () => {
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\missing.md");
+    tauriMocks.readTextFile.mockRejectedValueOnce(new Error("File not found"));
+    const editor = container.querySelector<HTMLElement>(".cm-content");
+    if (!editor) throw new Error("CodeMirror content element not found");
+    focus(editor);
+
+    await shortcut(editor, "o");
+
+    expect(container.querySelector(".cm-content")).toBe(editor);
+    expect(document.activeElement).toBe(editor);
+    expect(container.querySelector('[role="alert"]')?.textContent).toContain("File not found");
+  });
+
+  it("waits for an unsaved-decision dialog before focusing the successfully opened editor", async () => {
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\after-dialog.md");
+    tauriMocks.readTextFile.mockResolvedValueOnce({
+      path: "C:\\notes\\after-dialog.md",
+      content: "after dialog",
+    });
+    const previousEditor = container.querySelector<HTMLElement>(".cm-content");
+    if (!previousEditor) throw new Error("CodeMirror content element not found");
+    focus(previousEditor);
+    await shortcut(previousEditor, "b");
+
+    await shortcut(previousEditor, "o");
+
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
+    if (!dialog) throw new Error("Unsaved-decision dialog not found");
+    expect(document.activeElement).toBe(button("Cancel", dialog));
+
+    await click(button("Don't Save", dialog));
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    });
+
+    const replacementEditor = container.querySelector<HTMLElement>(".cm-content");
+    if (!replacementEditor) throw new Error("Replacement CodeMirror editor not found");
+    expect(replacementEditor).not.toBe(previousEditor);
+    expect(editorContent()).toBe("after dialog");
+    expect(document.activeElement).toBe(replacementEditor);
+  });
+
+  it("does not focus the hidden replacement editor when Open succeeds in Preview", async () => {
+    const viewModeSwitcher = container.querySelector(".view-mode-switcher");
+    if (!viewModeSwitcher) throw new Error("View mode switcher not found");
+    const previewButton = button("Preview", viewModeSwitcher);
+    focus(previewButton);
+    await click(previewButton);
+    dialogMocks.open.mockResolvedValueOnce("C:\\notes\\preview-open.md");
+    tauriMocks.readTextFile.mockResolvedValueOnce({
+      path: "C:\\notes\\preview-open.md",
+      content: "preview replacement",
+    });
+
+    await shortcut(window, "o");
+
+    expect(editorContent()).toBe("preview replacement");
+    expect(document.activeElement).toBe(previewButton);
+    expect(document.activeElement).not.toBe(container.querySelector(".cm-content"));
+  });
+
   it("saves newly opened B after Undo instead of restoring and saving document A", async () => {
     dialogMocks.open
       .mockResolvedValueOnce("C:\\notes\\A.md")

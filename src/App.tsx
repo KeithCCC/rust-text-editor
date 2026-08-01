@@ -429,6 +429,7 @@ export default function App() {
   const transitionInProgressRef = useRef(false);
   const lastRecoveryWriteMsRef = useRef(0);
   const startupLoadedRef = useRef(false);
+  const lastHandledEditorFocusSessionRef = useRef(documentSessionId);
   const recoveryQueueRef = useRef(
     new RecoveryDraftQueue(writeRecoveryDraft, deleteRecoveryDraft),
   );
@@ -653,7 +654,6 @@ export default function App() {
     if (actionGateRef.current.isBlocked()) return;
     await requestDocumentTransition(async () => {
       resetDocument();
-      requestAnimationFrame(() => editorRef.current?.focus());
       return true;
     });
   }, [requestDocumentTransition, resetDocument]);
@@ -985,6 +985,26 @@ export default function App() {
     }
     editorRef.current?.selectRange(heading.offset, heading.offset + heading.text.length + heading.level + 1);
   }, [editorMode]);
+
+  useEffect(() => {
+    if (lastHandledEditorFocusSessionRef.current === documentSessionId) {
+      return undefined;
+    }
+    if (editorMode === "preview") {
+      lastHandledEditorFocusSessionRef.current = documentSessionId;
+      return undefined;
+    }
+    if (isDocumentSafetyActive) {
+      return undefined;
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      if (actionGateRef.current.isBlocked()) return;
+      lastHandledEditorFocusSessionRef.current = documentSessionId;
+      editorRef.current?.focus();
+    });
+    return () => window.cancelAnimationFrame(frame);
+  }, [documentSessionId, editorMode, isDocumentSafetyActive]);
 
   useEffect(() => {
     const title = formatDocumentTitle(currentFile, modified);
