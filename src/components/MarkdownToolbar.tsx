@@ -7,7 +7,13 @@ import type {
   HeadingLevel,
   MarkdownCommand,
 } from "../markdownFormatting";
-import { nextToolbarIndex, type ToolbarNavigationKey } from "../toolbarNavigation";
+import {
+  dispatchMenuNavigation,
+  dispatchToolbarNavigation,
+  focusMenuBoundary,
+  restoreMenuTriggerFocus,
+  type NavigationControl,
+} from "../toolbarNavigation";
 
 type FormattingControlProps = {
   language: AppLanguage;
@@ -17,6 +23,12 @@ type FormattingControlProps = {
 
 type MarkdownToolbarProps = FormattingControlProps & {
   formattingContext?: FormattingContext;
+};
+
+type MarkdownFormatMenuProps = FormattingControlProps & {
+  formatJsonLabel: string;
+  formattingContext?: FormattingContext;
+  onFormatJson: () => void;
 };
 
 type MenuId = "heading" | "list" | "code" | "more";
@@ -73,35 +85,58 @@ const SHORTCUTS: Partial<Record<MarkdownCommand["kind"], string>> = {
   italic: "Control+I Meta+I",
 };
 
+const TOOLBAR_CONTROL_COUNT = 12;
+
+function navigationControls(
+  elements: readonly (HTMLButtonElement | null)[],
+  count = elements.length,
+): NavigationControl[] {
+  return Array.from({ length: count }, (_, index) => {
+    const element = elements[index];
+    return {
+      disabled: !element || element.disabled,
+      hidden: !element || element.offsetParent === null,
+      focus: () => element?.focus(),
+    };
+  });
+}
+
 function MenuItems({
   items,
   ui,
   disabled,
   formattingContext,
+  managed = false,
+  registerItem,
   onSelect,
 }: {
   items: CommandItem[];
   ui: FormattingUi;
   disabled: boolean;
   formattingContext?: FormattingContext;
+  managed?: boolean;
+  registerItem?: (index: number, element: HTMLButtonElement | null) => void;
   onSelect: (command: MarkdownCommand) => void;
 }) {
-  return items.map(({ key, command }) => {
+  return items.map(({ key, command }, index) => {
     const action = ui.actions[key];
-    const isCurrentHeading = command.kind === "heading" && formattingContext
-      ? formattingContext.headingLevel === command.level
+    const isHeading = command.kind === "heading";
+    const isCurrentHeading = isHeading
+      ? formattingContext?.headingLevel === command.level
       : undefined;
     return (
       <button
+        ref={managed ? (element) => registerItem?.(index, element) : undefined}
         key={`${key}-${command.kind === "codeBlock" ? command.language : ""}`}
         type="button"
-        role="menuitem"
+        role={isHeading ? "menuitemradio" : "menuitem"}
         aria-label={action.label}
+        aria-checked={isHeading ? isCurrentHeading : undefined}
         title={action.tooltip}
         disabled={disabled}
         aria-disabled={disabled || undefined}
-        aria-pressed={isCurrentHeading}
         aria-keyshortcuts={SHORTCUTS[command.kind]}
+        tabIndex={managed ? -1 : undefined}
         onClick={() => onSelect(command)}
       >
         {action.label}
@@ -113,8 +148,11 @@ function MenuItems({
 export function MarkdownFormatMenu({
   language,
   disabled = false,
+  formatJsonLabel,
+  formattingContext,
   onFormat,
-}: FormattingControlProps) {
+  onFormatJson,
+}: MarkdownFormatMenuProps) {
   const ui = getFormattingUi(language);
   return (
     <>
@@ -122,8 +160,20 @@ export function MarkdownFormatMenu({
         items={FORMAT_MENU_ITEMS}
         ui={ui}
         disabled={disabled}
+        formattingContext={formattingContext}
         onSelect={onFormat}
       />
+      <div className="menu-separator" role="separator" />
+      <button
+        type="button"
+        role="menuitem"
+        aria-label={formatJsonLabel}
+        disabled={disabled}
+        aria-disabled={disabled || undefined}
+        onClick={onFormatJson}
+      >
+        {formatJsonLabel}
+      </button>
     </>
   );
 }
@@ -138,10 +188,35 @@ export function MarkdownToolbar({
   const [activeIndex, setActiveIndex] = useState(0);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
   const controlRefs = useRef<Array<HTMLButtonElement | null>>([]);
+  const menuItemRefs = useRef<Record<MenuId, Array<HTMLButtonElement | null>>>({
+    heading: [],
+    list: [],
+    code: [],
+    more: [],
+  });
 
   const runCommand = (command: MarkdownCommand) => {
-    setOpenMenu(null);
     onFormat(command);
+  };
+
+  const closeMenu = (triggerIndex: number) => {
+    restoreMenuTriggerFocus(controlRefs.current[triggerIndex], () => setOpenMenu(null));
+  };
+
+  const focusMenu = (id: MenuId, boundary: "first" | "last") => {
+    window.requestAnimationFrame(() => {
+      focusMenuBoundary(navigationControls(menuItemRefs.current[id]), boundary);
+    });
+  };
+
+  const openAndFocusMenu = (id: MenuId, boundary: "first" | "last" = "first") => {
+    setOpenMenu(id);
+    focusMenu(id, boundary);
+  };
+
+  const runMenuCommand = (triggerIndex: number, command: MarkdownCommand) => {
+    onFormat(command);
+    restoreMenuTriggerFocus(controlRefs.current[triggerIndex], () => setOpenMenu(null));
   };
 
   const controlProps = (index: number) => ({
@@ -158,23 +233,12 @@ export function MarkdownToolbar({
     if (!(event.target instanceof HTMLButtonElement) || event.target.dataset.toolbarControl !== "true") {
       return;
     }
-    if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(event.key)) {
-      return;
-    }
-    event.preventDefault();
-    const visibleControls = controlRefs.current.filter((control): control is HTMLButtonElement => (
-      Boolean(control && control.offsetParent !== null && !control.disabled)
-    ));
-    const visibleIndex = Math.max(0, visibleControls.indexOf(event.target));
-    const nextVisibleIndex = nextToolbarIndex(
-      visibleIndex,
-      visibleControls.length,
-      event.key as ToolbarNavigationKey,
+    const nextIndex = dispatchToolbarNavigation(
+      event,
+      Number(event.target.dataset.toolbarIndex),
+      navigationControls(controlRefs.current, TOOLBAR_CONTROL_COUNT),
     );
-    const nextControl = visibleControls[nextVisibleIndex];
-    if (!nextControl) return;
-    setActiveIndex(Number(nextControl.dataset.toolbarIndex));
-    nextControl.focus();
+    if (nextIndex !== null) setActiveIndex(nextIndex);
   };
 
   const actionButton = (
@@ -212,6 +276,37 @@ export function MarkdownToolbar({
   ) => {
     const action = ui.actions[key];
     const isOpen = openMenu === id;
+    const toggleMenu = () => {
+      if (isOpen) {
+        closeMenu(index);
+      } else {
+        openAndFocusMenu(id);
+      }
+    };
+    const handleMenuTriggerKeyDown = (event: KeyboardEvent<HTMLButtonElement>) => {
+      if (event.key === "ArrowDown" || event.key === "ArrowUp") {
+        event.preventDefault();
+        event.stopPropagation();
+        openAndFocusMenu(id, event.key === "ArrowUp" ? "last" : "first");
+      } else if (event.key === "Escape" && isOpen) {
+        event.preventDefault();
+        event.stopPropagation();
+        closeMenu(index);
+      }
+    };
+    const handleMenuItemsKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
+      if (!(event.target instanceof HTMLButtonElement)) return;
+      if (!["ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "Home", "End", "Escape"].includes(event.key)) {
+        return;
+      }
+      event.stopPropagation();
+      dispatchMenuNavigation(
+        event,
+        menuItemRefs.current[id].indexOf(event.target),
+        navigationControls(menuItemRefs.current[id]),
+        () => closeMenu(index),
+      );
+    };
     return (
       <div className={`toolbar-menu-root${options.className ? ` ${options.className}` : ""}`} data-open={isOpen}>
         <button
@@ -224,17 +319,27 @@ export function MarkdownToolbar({
           disabled={disabled}
           aria-disabled={disabled || undefined}
           aria-pressed={formattingContext ? options.pressed : undefined}
-          onClick={() => setOpenMenu((current) => current === id ? null : id)}
+          onClick={toggleMenu}
+          onKeyDown={handleMenuTriggerKeyDown}
         >
           {action.short}<span aria-hidden="true"> ▾</span>
         </button>
-        <div className="toolbar-menu-popover" role="menu" aria-label={action.label}>
+        <div
+          className="toolbar-menu-popover"
+          role="menu"
+          aria-label={action.label}
+          onKeyDown={handleMenuItemsKeyDown}
+        >
           <MenuItems
             items={items}
             ui={ui}
             disabled={disabled}
             formattingContext={formattingContext}
-            onSelect={runCommand}
+            managed
+            registerItem={(itemIndex, element) => {
+              menuItemRefs.current[id][itemIndex] = element;
+            }}
+            onSelect={(command) => runMenuCommand(index, command)}
           />
         </div>
       </div>

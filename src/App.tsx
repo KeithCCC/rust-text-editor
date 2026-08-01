@@ -43,6 +43,7 @@ import {
 import { getDocumentSafetyText } from "./documentSafetyText";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
+import { formatJsonContent } from "./jsonFormatting";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
 import type { FormattingContext, MarkdownCommand } from "./markdownFormatting";
 import { parseMarkdownOutline, type OutlineHeading } from "./markdownOutline";
@@ -883,6 +884,23 @@ export default function App() {
     editorRef.current?.applyFormat(command);
   }, []);
 
+  const handleFormatJson = useCallback(() => {
+    if (actionGateRef.current.isBlocked()) return;
+    const result = formatJsonContent(content);
+    if (!result.ok) {
+      showError(text.jsonFormatFailed, result.message);
+      return;
+    }
+    recoveryQueueRef.current.resume();
+    latestDocumentRef.current.set({
+      ...latestDocumentRef.current.get(),
+      content: result.content,
+      modified: true,
+    });
+    setContent(result.content);
+    setModified(true);
+  }, [content, showError, text.jsonFormatFailed]);
+
   const handleBold = useCallback(() => {
     handleMarkdownFormat({ kind: "bold" });
   }, [handleMarkdownFormat]);
@@ -1300,7 +1318,10 @@ export default function App() {
               <MarkdownFormatMenu
                 language={appLanguage}
                 disabled={isDocumentSafetyActive}
+                formatJsonLabel={text.formatJson}
+                formattingContext={formattingContext}
                 onFormat={(command) => runMenuAction(() => handleMarkdownFormat(command))}
+                onFormatJson={() => runMenuAction(handleFormatJson)}
               />
             </div>
           </div>
