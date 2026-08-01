@@ -53,6 +53,13 @@ function flushAnimationFrame() {
   });
 }
 
+function resizeViewport() {
+  act(() => {
+    window.dispatchEvent(new Event("resize"));
+  });
+  flushAnimationFrame();
+}
+
 beforeEach(() => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   animationFrames = [];
@@ -110,6 +117,44 @@ describe("MarkdownToolbar rendered interaction", () => {
 
     expect(event.defaultPrevented).toBe(true);
     expect(document.activeElement).toBe(button("Link"));
+  });
+
+  it("moves the roving tab stop and focus to More when the active direct action becomes hidden", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
+    });
+    patchLayout();
+    const strikethrough = button("Strikethrough");
+    const more = button("More");
+    focus(strikethrough);
+    expect(strikethrough.tabIndex).toBe(0);
+
+    strikethrough.hidden = true;
+    resizeViewport();
+
+    expect(strikethrough.tabIndex).toBe(-1);
+    expect(more.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(more);
+  });
+
+  it("updates a hidden roving tab stop without stealing focus from outside the toolbar", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />);
+    });
+    patchLayout();
+    const strikethrough = button("Strikethrough");
+    const more = button("More");
+    const outside = document.createElement("button");
+    document.body.append(outside);
+    focus(strikethrough);
+    focus(outside);
+
+    strikethrough.hidden = true;
+    resizeViewport();
+
+    expect(more.tabIndex).toBe(0);
+    expect(document.activeElement).toBe(outside);
+    outside.remove();
   });
 
   it("opens a real menu, manages item keys, and restores trigger focus", () => {

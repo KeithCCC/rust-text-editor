@@ -609,6 +609,7 @@ kbd {
 }
 
 .markdown-toolbar {
+  position: relative;
   display: flex;
   gap: 3px;
   overflow: visible;
@@ -1773,12 +1774,35 @@ textarea {
 }
 
 @media (max-width: 960px) {
+  .markdown-toolbar {
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .markdown-toolbar-group {
+    flex-wrap: wrap;
+    max-width: 100%;
+  }
+
   .toolbar-wide-action {
     display: none;
   }
 
   .toolbar-more-menu {
     display: flex;
+    position: static;
+  }
+
+  .toolbar-menu-root[data-menu-placement="end"] .toolbar-menu-popover {
+    right: 8px;
+    left: auto;
+    width: min(180px, calc(100% - 16px));
+    min-width: 0;
+  }
+
+  .toolbar-menu-root[data-menu-placement="end"] .toolbar-menu-popover button {
+    overflow-wrap: anywhere;
+    white-space: normal;
   }
 }
 

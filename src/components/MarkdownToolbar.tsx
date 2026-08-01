@@ -1,4 +1,4 @@
-import { useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { useEffect, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AppLanguage } from "../appLanguage";
 import { getFormattingUi, type FormattingUi } from "../formattingUi";
 import type {
@@ -187,6 +187,7 @@ export function MarkdownToolbar({
   const ui = getFormattingUi(language);
   const [activeIndex, setActiveIndex] = useState(0);
   const [openMenu, setOpenMenu] = useState<MenuId | null>(null);
+  const toolbarRef = useRef<HTMLDivElement | null>(null);
   const controlRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const menuItemRefs = useRef<Record<MenuId, Array<HTMLButtonElement | null>>>({
     heading: [],
@@ -194,6 +195,38 @@ export function MarkdownToolbar({
     code: [],
     more: [],
   });
+
+  useEffect(() => {
+    let frame: number | null = null;
+    const synchronizeVisibleTabStop = () => {
+      if (frame !== null) window.cancelAnimationFrame(frame);
+      frame = window.requestAnimationFrame(() => {
+        frame = null;
+        const controls = controlRefs.current;
+        const isAvailable = (index: number) => {
+          const control = controls[index];
+          return Boolean(control && !control.disabled && control.offsetParent !== null);
+        };
+        if (isAvailable(activeIndex)) return;
+
+        const nextIndex = isAvailable(11)
+          ? 11
+          : controls.findIndex((_control, index) => isAvailable(index));
+        if (nextIndex < 0) return;
+
+        const toolbarHasFocus = toolbarRef.current?.contains(document.activeElement) ?? false;
+        setActiveIndex(nextIndex);
+        if (openMenu !== null && !isAvailable(activeIndex)) setOpenMenu(null);
+        if (toolbarHasFocus) controls[nextIndex]?.focus();
+      });
+    };
+
+    window.addEventListener("resize", synchronizeVisibleTabStop);
+    return () => {
+      window.removeEventListener("resize", synchronizeVisibleTabStop);
+      if (frame !== null) window.cancelAnimationFrame(frame);
+    };
+  }, [activeIndex, openMenu]);
 
   const runCommand = (command: MarkdownCommand) => {
     onFormat(command);
@@ -308,7 +341,11 @@ export function MarkdownToolbar({
       );
     };
     return (
-      <div className={`toolbar-menu-root${options.className ? ` ${options.className}` : ""}`} data-open={isOpen}>
+      <div
+        className={`toolbar-menu-root${options.className ? ` ${options.className}` : ""}`}
+        data-open={isOpen}
+        data-menu-placement={id === "more" ? "end" : undefined}
+      >
         <button
           {...controlProps(index)}
           type="button"
@@ -348,6 +385,7 @@ export function MarkdownToolbar({
 
   return (
     <div
+      ref={toolbarRef}
       className="markdown-toolbar"
       role="toolbar"
       aria-label={ui.toolbarLabel}

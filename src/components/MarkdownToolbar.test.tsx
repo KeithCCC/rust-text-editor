@@ -36,6 +36,7 @@ describe("MarkdownToolbar", () => {
     for (const menu of ["Heading", "List", "Code Block", "More"]) {
       expect(html).toContain(`aria-label="${menu}" aria-haspopup="menu"`);
     }
+    expect(html).toContain('data-menu-placement="end"');
     for (const item of [
       "Heading 1", "Heading 6", "Bullet list", "Numbered list", "Task list",
       "Plain text", "Markdown", "JavaScript", "TypeScript", "JSON", "Rust", "Bash", "PowerShell",
