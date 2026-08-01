@@ -1,4 +1,14 @@
-import { createElement, forwardRef, isValidElement, memo, type ComponentPropsWithoutRef, type ReactNode } from "react";
+import {
+  createElement,
+  forwardRef,
+  isValidElement,
+  memo,
+  useImperativeHandle,
+  useMemo,
+  useRef,
+  type ComponentPropsWithoutRef,
+  type ReactNode,
+} from "react";
 import ReactMarkdown, { type ExtraProps } from "react-markdown";
 import remarkBreaks from "remark-breaks";
 import remarkGfm from "remark-gfm";
@@ -18,6 +28,11 @@ type MarkdownPreviewProps = {
   onOpenRelativeMarkdownLink: (path: string) => void;
 };
 
+export type MarkdownPreviewHandle = {
+  getScrollElement: () => HTMLDivElement | null;
+  scrollToSourceOffset: (offset: number) => void;
+};
+
 function getCodeLanguage(className: string | undefined) {
   return /language-([\w-]+)/.exec(className ?? "")?.[1]?.toLowerCase() ?? null;
 }
@@ -35,34 +50,55 @@ type PreviewHeadingProps = ComponentPropsWithoutRef<"h1"> & ExtraProps;
 function createPreviewHeading(
   tag: "h1" | "h2" | "h3" | "h4" | "h5" | "h6",
   outlineIdsByOffset: ReadonlyMap<number, string>,
+  headingElementsByOffset: Map<number, HTMLHeadingElement>,
 ) {
   return function PreviewHeading({ node, children, ...props }: PreviewHeadingProps) {
     const offset = node?.position?.start.offset;
     const outlineId = typeof offset === "number" ? outlineIdsByOffset.get(offset) : undefined;
-    return createElement(tag, { ...props, id: outlineId ?? props.id }, children);
+    const ref = outlineId === undefined || typeof offset !== "number"
+      ? undefined
+      : (element: HTMLHeadingElement | null) => {
+        if (element) headingElementsByOffset.set(offset, element);
+        else headingElementsByOffset.delete(offset);
+      };
+    return createElement(tag, { ...props, id: outlineId ?? props.id, ref }, children);
   };
 }
 
-const MarkdownPreviewComponent = forwardRef<HTMLDivElement, MarkdownPreviewProps>(function MarkdownPreview(
+const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(function MarkdownPreview(
   { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenRelativeMarkdownLink },
   ref,
 ) {
-  const outlineIdsByOffset = new Map(
+  const rootRef = useRef<HTMLDivElement>(null);
+  const headingElementsByOffset = useRef(new Map<number, HTMLHeadingElement>());
+  const outlineIdsByOffset = useMemo(() => new Map(
     parseMarkdownOutline(markdown).map((heading) => [heading.offset, heading.id]),
-  );
+  ), [markdown]);
+  const headingComponents = useMemo(() => ({
+    h1: createPreviewHeading("h1", outlineIdsByOffset, headingElementsByOffset.current),
+    h2: createPreviewHeading("h2", outlineIdsByOffset, headingElementsByOffset.current),
+    h3: createPreviewHeading("h3", outlineIdsByOffset, headingElementsByOffset.current),
+    h4: createPreviewHeading("h4", outlineIdsByOffset, headingElementsByOffset.current),
+    h5: createPreviewHeading("h5", outlineIdsByOffset, headingElementsByOffset.current),
+    h6: createPreviewHeading("h6", outlineIdsByOffset, headingElementsByOffset.current),
+  }), [outlineIdsByOffset]);
+
+  useImperativeHandle(ref, () => ({
+    getScrollElement: () => rootRef.current,
+    scrollToSourceOffset(offset) {
+      const heading = headingElementsByOffset.current.get(offset);
+      if (!heading || !rootRef.current?.contains(heading)) return;
+      heading.scrollIntoView({ block: "start", behavior: "smooth" });
+    },
+  }), []);
 
   return (
-    <div className="preview-body" ref={ref}>
+    <div className="preview-body" ref={rootRef}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
         rehypePlugins={[rehypeRaw]}
         components={{
-          h1: createPreviewHeading("h1", outlineIdsByOffset),
-          h2: createPreviewHeading("h2", outlineIdsByOffset),
-          h3: createPreviewHeading("h3", outlineIdsByOffset),
-          h4: createPreviewHeading("h4", outlineIdsByOffset),
-          h5: createPreviewHeading("h5", outlineIdsByOffset),
-          h6: createPreviewHeading("h6", outlineIdsByOffset),
+          ...headingComponents,
           a({ href, children, ...props }) {
             const relativeMarkdownPath = href ? getRelativeMarkdownPath(href) : null;
             if (relativeMarkdownPath) {

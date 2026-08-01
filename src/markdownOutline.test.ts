@@ -35,4 +35,20 @@ describe("parseMarkdownOutline", () => {
       "markdown-heading-8",
     ]);
   });
+
+  it("bases LF source offsets on opening hashes after one to three spaces", () => {
+    expect(parseMarkdownOutline(" # One\n  ## Two\n   ### Three")).toEqual([
+      { id: "markdown-heading-1", level: 1, text: "One", offset: 1 },
+      { id: "markdown-heading-9", level: 2, text: "Two", offset: 9 },
+      { id: "markdown-heading-19", level: 3, text: "Three", offset: 19 },
+    ]);
+  });
+
+  it("bases CRLF source offsets on opening hashes after one to three spaces", () => {
+    expect(parseMarkdownOutline(" # One\r\n  ## Two\r\n   ### Three")).toEqual([
+      { id: "markdown-heading-1", level: 1, text: "One", offset: 1 },
+      { id: "markdown-heading-10", level: 2, text: "Two", offset: 10 },
+      { id: "markdown-heading-21", level: 3, text: "Three", offset: 21 },
+    ]);
+  });
 });

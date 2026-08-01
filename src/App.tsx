@@ -31,7 +31,7 @@ import { DecisionDialog } from "./components/DecisionDialog";
 import type { ExcalidrawEditorHandle } from "./components/ExcalidrawEditor";
 import { MarkdownEditor, type MarkdownEditorHandle } from "./components/MarkdownEditor";
 import { MarkdownFormatMenu, MarkdownToolbar } from "./components/MarkdownToolbar";
-import { MarkdownPreview } from "./components/MarkdownPreview";
+import { MarkdownPreview, type MarkdownPreviewHandle } from "./components/MarkdownPreview";
 import { MenuCheckboxItem, MenuRadioItem } from "./components/MenuRadioItem";
 import { OutlinePanel } from "./components/OutlinePanel";
 import { ViewModeSwitcher } from "./components/ViewModeSwitcher";
@@ -419,7 +419,7 @@ export default function App() {
   const editorRef = useRef<MarkdownEditorHandle | null>(null);
   const excalidrawEditorRef = useRef<ExcalidrawEditorHandle | null>(null);
   const searchInputRef = useRef<HTMLInputElement>(null);
-  const previewRef = useRef<HTMLDivElement | null>(null);
+  const previewRef = useRef<MarkdownPreviewHandle | null>(null);
   const isSyncingScrollRef = useRef(false);
   const syncScrollFrameRef = useRef<number | null>(null);
   const unsavedPromptRef = useRef<{
@@ -980,8 +980,7 @@ export default function App() {
 
   const handleOutlineSelect = useCallback((heading: OutlineHeading) => {
     if (editorMode === "preview") {
-      const previewHeading = previewRef.current?.querySelector<HTMLElement>(`#${heading.id}`);
-      previewHeading?.scrollIntoView({ block: "start", behavior: "smooth" });
+      previewRef.current?.scrollToSourceOffset(heading.offset);
       return;
     }
     editorRef.current?.selectRange(heading.offset, heading.offset + heading.text.length + heading.level + 1);
@@ -1260,7 +1259,7 @@ export default function App() {
     }
 
     const editor = editorRef.current?.getScrollElement();
-    const preview = previewRef.current;
+    const preview = previewRef.current?.getScrollElement();
     if (!editor || !preview) {
       return undefined;
     }

@@ -24,15 +24,16 @@ export function parseMarkdownOutline(markdown: string): OutlineHeading[] {
     }
     if (fence) continue;
 
-    const heading = /^ {0,3}(#{1,6})([ \t]+)(.+)$/.exec(line);
+    const heading = /^( {0,3})(#{1,6})([ \t]+)(.+)$/.exec(line);
     if (!heading) continue;
-    const text = `${heading[2]}${heading[3]}`.replace(/[ \t]+#+[ \t]*$/, "").trim();
+    const text = `${heading[3]}${heading[4]}`.replace(/[ \t]+#+[ \t]*$/, "").trim();
     if (!text) continue;
+    const offset = match.index + heading[1].length;
     headings.push({
-      id: markdownOutlineHeadingId(match.index),
-      level: heading[1].length,
+      id: markdownOutlineHeadingId(offset),
+      level: heading[2].length,
       text,
-      offset: match.index,
+      offset,
     });
   }
 

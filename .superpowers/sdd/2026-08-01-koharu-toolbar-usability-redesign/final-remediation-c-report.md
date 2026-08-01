@@ -30,3 +30,30 @@ Implemented outline/Preview heading correspondence by source-derived ID and corr
 - Tests cover preceding Setext and raw HTML headings, duplicate ATX text, missing target safety, valid closing hashes, `C#`, LF offsets, CRLF offsets, and direct CRLF Preview position correspondence.
 - No dependencies were added. No toolbar, Help, accessibility, nesting, or keyboard behavior was changed.
 - Vite retains its existing large-chunk warnings for Mermaid/Excalidraw bundles; the build exits successfully.
+
+## Fix round 1
+
+### Findings addressed
+
+- One-to-three-space-indented ATX headings previously used the line start for outline IDs while `react-markdown` reports the opening hash offset, so those Preview headings were never registered under the outline ID.
+- A raw HTML heading could author the same predictable DOM ID as a later ATX heading and intercept App's unrestricted `querySelector` lookup.
+
+### RED evidence
+
+- `npm test -- src/markdownOutline.test.ts src/components/MarkdownPreview.test.tsx src/App.outlineNavigation.test.tsx`
+  - Failed 4 expected tests: LF and CRLF indentation offsets remained at line starts, indented Preview headings had no matching IDs, and a spoofed raw ID scrolled `Raw` instead of the ATX `Same` target.
+
+### GREEN evidence
+
+- Focused: `npm test -- src/markdownOutline.test.ts src/components/MarkdownPreview.test.tsx src/App.outlineNavigation.test.tsx src/components/OutlinePanel.test.tsx` — 4 files, 12 tests passed.
+- Full: `npm test` — 39 files, 246 tests passed.
+- TypeScript: `npx tsc --noEmit` — passed.
+- Production frontend: `npm run build` — passed; 2,714 modules transformed. Generated `src/buildInfo.ts` was restored afterward.
+
+### Design and self-review
+
+- Outline offsets and IDs now start at the actual opening hash, matching mdast/rehype positions for zero-to-three-space-indented ATX headings under LF and CRLF. Source-mode selection continues to use the same offset and now excludes indentation.
+- `MarkdownPreview` exposes an imperative `scrollToSourceOffset` method backed by a private map populated only by renderer-verified ATX heading refs. Raw HTML IDs stay intact but cannot enter or shadow this registry.
+- The handle also exposes the Preview root scroll element so existing split-pane scroll synchronization remains unchanged.
+- Missing or detached targets remain safe no-ops via a Preview-root containment check. Duplicate text, heading levels, Outline buttons, keyboard reachability, and smooth scrolling are preserved.
+- No dependencies or unrelated UI behavior changed. Existing Vite large-chunk warnings remain non-blocking.

@@ -105,11 +105,11 @@ afterEach(() => {
 });
 
 describe("Preview outline navigation", () => {
-  it("scrolls duplicate ATX headings by source ID past Setext and raw headings and tolerates a missing target", async () => {
+  it("scrolls duplicate ATX headings past Setext and spoofed raw IDs and tolerates a missing target", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\outline.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({
       path: "C:\\notes\\outline.md",
-      content: "Setext\n=======\n\n<h2>Raw</h2>\n\n# Same\n\n# Same",
+      content: "Setext\n=======\n\n<h2 id=\"markdown-heading-55\">Raw</h2>\n\n# Same\n\n# Same",
     });
     await shortcut(window, "o");
 
@@ -121,13 +121,19 @@ describe("Preview outline navigation", () => {
     await click(outlineButtons[0]);
     await click(outlineButtons[1]);
     expect(scrollIntoView.mock.contexts.map((target) => (target as HTMLElement).id)).toEqual([
-      "markdown-heading-30",
-      "markdown-heading-38",
+      "markdown-heading-55",
+      "markdown-heading-63",
+    ]);
+    expect(scrollIntoView.mock.contexts.map((target) => (target as HTMLElement).textContent)).toEqual([
+      "Same",
+      "Same",
     ]);
     expect(scrollIntoView).toHaveBeenNthCalledWith(1, { block: "start", behavior: "smooth" });
     expect(scrollIntoView).toHaveBeenNthCalledWith(2, { block: "start", behavior: "smooth" });
 
-    container.querySelector("#markdown-heading-38")?.remove();
+    Array.from(container.querySelectorAll("#markdown-heading-63"))
+      .find((heading) => heading.textContent === "Same")
+      ?.remove();
     await click(outlineButtons[1]);
     expect(scrollIntoView).toHaveBeenCalledTimes(2);
   });

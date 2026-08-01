@@ -48,4 +48,19 @@ describe("MarkdownPreview", () => {
     expect(html).toContain('<h1 id="markdown-heading-0">First</h1>');
     expect(html).toContain('<h1 id="markdown-heading-11">Second</h1>');
   });
+
+  it("aligns indented ATX IDs with opening-hash offsets", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownPreview
+        markdown={"  # Indented\r\n\r\n   ## Deeper"}
+        currentFile={null}
+        themeMode="light"
+        onOpenExcalidraw={() => undefined}
+        onOpenRelativeMarkdownLink={() => undefined}
+      />,
+    );
+
+    expect(html).toContain('<h1 id="markdown-heading-2">Indented</h1>');
+    expect(html).toContain('<h2 id="markdown-heading-19">Deeper</h2>');
+  });
 });
