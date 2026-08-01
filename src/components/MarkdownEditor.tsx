@@ -32,7 +32,7 @@ export type MarkdownEditorHandle = {
   selectRange: (start: number, end: number) => void;
   getScrollElement: () => HTMLElement | null;
   wrapSelection: (before: string, after: string, placeholder: string) => void;
-  applyFormat: (command: MarkdownCommand) => void;
+  applyFormat: (command: MarkdownCommand) => FormatResult | undefined;
 };
 
 type MarkdownEditorProps = {
@@ -636,6 +636,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         selection: EditorSelection.single(change.from + change.selectionStart, change.from + change.selectionEnd),
       });
       view.focus();
+      return change;
     },
   }), []);
 

@@ -618,6 +618,38 @@ kbd {
   background: var(--toolbar-bg);
 }
 
+.formatting-toolbar-region {
+  position: relative;
+  min-width: 0;
+  background: var(--toolbar-bg);
+}
+
+.toolbar-hint,
+.formatting-feedback:not(:empty) {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 7px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--accent-soft);
+  color: var(--selected-fg);
+  font-size: var(--ui-font-size);
+  line-height: 1.4;
+}
+
+.toolbar-hint button {
+  flex: 0 0 auto;
+}
+
+.formatting-feedback:empty {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 .markdown-toolbar-group {
   display: flex;
   gap: 3px;
@@ -1678,6 +1710,7 @@ textarea {
   border-radius: 5px;
   background: var(--preview-code-bg);
   color: var(--preview-code-text);
+  white-space: pre-wrap;
 }
 
 .help-markdown-examples dd {

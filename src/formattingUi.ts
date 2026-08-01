@@ -48,9 +48,9 @@ const ENGLISH_UI: FormattingUi = {
     more: { label: "More", tooltip: "Show additional formatting actions", short: "More" },
   },
   feedback: {
-    codeBlockInserted: "Code block inserted. Replace the selected placeholder with your code.",
-    tableInserted: "Table inserted. Edit the selected header cell.",
-    mermaidInserted: "Mermaid diagram inserted. Edit the diagram definition.",
+    codeBlockInserted: "Code block inserted. Select a language, then edit the selected code placeholder.",
+    tableInserted: "Table inserted. Edit the first column heading.",
+    mermaidInserted: "Mermaid diagram inserted. Edit the flowchart source, then use Split to check the result.",
     multilineInlineCode: "Inline code cannot span multiple lines. Use Code Block instead.",
   },
 };
@@ -90,9 +90,9 @@ const JAPANESE_UI: FormattingUi = {
     more: { label: "その他", tooltip: "その他の書式設定を表示します", short: "その他" },
   },
   feedback: {
-    codeBlockInserted: "コードブロックを挿入しました。選択中の部分をコードに置き換えてください。",
-    tableInserted: "表を挿入しました。選択中の見出しセルを編集してください。",
-    mermaidInserted: "Mermaid の図を挿入しました。図の定義を編集してください。",
+    codeBlockInserted: "コードブロックを挿入しました。言語を選び、選択中のコード部分を編集してください。",
+    tableInserted: "表を挿入しました。最初の列見出しを編集してください。",
+    mermaidInserted: "Mermaid の図を挿入しました。フローチャートの定義を編集し、分割表示で結果を確認してください。",
     multilineInlineCode: "文中コードは複数行にできません。コードブロックを使用してください。",
   },
 };

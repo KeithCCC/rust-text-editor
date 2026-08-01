@@ -54,7 +54,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       },
       {
         title: "Markdown basics",
-        paragraphs: ["Type these simple marks to format your document."],
+        paragraphs: ["The toolbar inserts literal Markdown marks. You can select and copy every source example below."],
         examples: [
           { source: "# Heading", meaning: "Heading" },
           { source: "**Bold**", meaning: "Bold" },
@@ -64,9 +64,40 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "Mermaid diagrams",
+        title: "Text",
         paragraphs: [
-          "Write a fenced code block labeled mermaid to render a diagram in Preview.",
+          "Use Heading for document structure; Bold, Italic, and Strikethrough for emphasis; Link for a destination; and Inline code for a short fragment within a sentence.",
+        ],
+        examples: [
+          { source: "# Heading", meaning: "Heading — a section title" },
+          { source: "**Bold**", meaning: "Bold — strong emphasis" },
+          { source: "_Italic_", meaning: "Italic — light emphasis" },
+          { source: "~~Removed~~", meaning: "Strikethrough — text that no longer applies" },
+          { source: "[Koharu](https://example.com)", meaning: "Link — clickable linked text" },
+          { source: "`code`", meaning: "Inline code — a short code fragment inside a sentence" },
+        ],
+      },
+      {
+        title: "Block",
+        paragraphs: [
+          "Block actions format complete lines. Use Code block for multi-line code; unlike Inline code, it stands on its own and can specify a language.",
+          "A Task list adds checkboxes, while Bullet and Numbered lists organize ordinary list items.",
+        ],
+        examples: [
+          { source: "> Quoted text", meaning: "Quote — a quotation on its own line" },
+          { source: "- List item", meaning: "Bullet list — unordered items" },
+          { source: "1. First item", meaning: "Numbered list — ordered steps" },
+          { source: "- [ ] Task", meaning: "Task list — an unchecked task" },
+          { source: "```javascript\nconsole.log(\"Hello\");\n```", meaning: "Code block — multi-line JavaScript code" },
+        ],
+      },
+      {
+        title: "Insert",
+        paragraphs: [
+          "Table inserts rows and columns. Mermaid diagram inserts a flowchart definition that becomes a diagram in Split or Preview.",
+        ],
+        examples: [
+          { source: "| Heading 1 | Heading 2 |\n| --- | --- |\n| Value 1 | Value 2 |", meaning: "Table — rendered rows and columns" },
         ],
         codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
       },
@@ -79,7 +110,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       { action: "Find", keys: "Ctrl+F" },
       { action: "Bold", keys: "Ctrl+B" },
       { action: "Italic", keys: "Ctrl+I" },
-      { action: "Toggle preview", keys: "Ctrl+Shift+V" },
+      { action: "Cycle Edit, Split, and Preview", keys: "Ctrl/Cmd+Alt+M" },
     ],
   },
   ja: {
@@ -108,7 +139,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       },
       {
         title: "Markdownの書き方",
-        paragraphs: ["次のような簡単な記号を入力すると、文章に書式を付けられます。"],
+        paragraphs: ["ツールバーはMarkdownの記号をそのまま挿入します。以下のソース例は選択してコピーできます。"],
         examples: [
           { source: "# 見出し", meaning: "見出し" },
           { source: "**太字**", meaning: "太字" },
@@ -118,9 +149,40 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "Mermaid図",
+        title: "文字",
         paragraphs: [
-          "mermaidと指定したコードブロックを書くと、プレビューに図として表示されます。",
+          "見出しは文書の構成に、太字・斜体・取り消し線は強調に、リンクは移動先の設定に使います。文中コードは文章内の短いコードに使います。",
+        ],
+        examples: [
+          { source: "# 見出し", meaning: "見出し — 節のタイトル" },
+          { source: "**太字**", meaning: "太字 — 強い強調" },
+          { source: "_斜体_", meaning: "斜体 — 軽い強調" },
+          { source: "~~削除済み~~", meaning: "取り消し線 — 現在は無効な内容" },
+          { source: "[Koharu](https://example.com)", meaning: "リンク — クリックできる文字" },
+          { source: "`コード`", meaning: "文中コード — 文章内の短いコード" },
+        ],
+      },
+      {
+        title: "ブロック",
+        paragraphs: [
+          "ブロックの操作は行全体を書式設定します。複数行のコードには、文章内で使う文中コードではなくコードブロックを使い、必要に応じて言語を選びます。",
+          "チェックリストにはチェック欄が付き、箇条書きと番号付きリストは通常の項目整理に使います。",
+        ],
+        examples: [
+          { source: "> 引用文", meaning: "引用 — 独立した行の引用" },
+          { source: "- 項目", meaning: "箇条書き — 順序のない項目" },
+          { source: "1. 最初の項目", meaning: "番号付きリスト — 順序のある手順" },
+          { source: "- [ ] タスク", meaning: "チェックリスト — 未完了のタスク" },
+          { source: "```javascript\nconsole.log(\"こんにちは\");\n```", meaning: "コードブロック — 複数行のJavaScriptコード" },
+        ],
+      },
+      {
+        title: "挿入",
+        paragraphs: [
+          "表は行と列を挿入します。図（Mermaid）はフローチャートの定義を挿入し、分割表示またはプレビューで図として表示します。",
+        ],
+        examples: [
+          { source: "| 見出し 1 | 見出し 2 |\n| --- | --- |\n| 値 1 | 値 2 |", meaning: "表 — 行と列として表示" },
         ],
         codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
       },
@@ -133,7 +195,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       { action: "検索", keys: "Ctrl+F" },
       { action: "太字", keys: "Ctrl+B" },
       { action: "斜体", keys: "Ctrl+I" },
-      { action: "プレビューを切り替える", keys: "Ctrl+Shift+V" },
+      { action: "編集・分割・プレビューを切り替える", keys: "Ctrl/Cmd+Alt+M" },
     ],
   },
 };

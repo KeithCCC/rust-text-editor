@@ -44,6 +44,12 @@ import { getDocumentSafetyText } from "./documentSafetyText";
 import { buildStandaloneHtml, markdownToHtml } from "./exportHtml";
 import { createUntitledDocument, defaultSaveAsPath, fileNameFromPath, formatDocumentTitle } from "./fileDocument";
 import { formatJsonContent } from "./jsonFormatting";
+import {
+  formattingResultMessage,
+  shouldShowToolbarHint,
+  TOOLBAR_HINT_STORAGE_KEY,
+} from "./formattingGuidance";
+import { getFormattingUi } from "./formattingUi";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
 import type { FormattingContext, MarkdownCommand } from "./markdownFormatting";
 import { parseMarkdownOutline, type OutlineHeading } from "./markdownOutline";
@@ -166,6 +172,8 @@ const UI_TEXT = {
     clear: "Clear",
     close: "Close",
     dismiss: "Dismiss",
+    toolbarHintTitle: "Formatting tip",
+    toolbarHintBody: "Select text and choose a formatting button. Use Split to check the finished result.",
     unsavedDiscard: "The current file has unsaved changes. Discard them?",
     unsavedExit: "The current file has unsaved changes. Exit anyway?",
     openFailed: "Open failed",
@@ -255,6 +263,8 @@ const UI_TEXT = {
     clear: "クリア",
     close: "閉じる",
     dismiss: "閉じる",
+    toolbarHintTitle: "書式設定のヒント",
+    toolbarHintBody: "文字を選択して書式ボタンを選びます。分割表示で仕上がりを確認できます。",
     unsavedDiscard: "現在のファイルには未保存の変更があります。破棄しますか?",
     unsavedExit: "現在のファイルには未保存の変更があります。終了しますか?",
     openFailed: "開くことに失敗しました",
@@ -345,6 +355,10 @@ export default function App() {
   const [fileProperties, setFileProperties] = useState<FileProperties | null>(null);
   const [isAppearanceSettingsOpen, setIsAppearanceSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
+  const [isToolbarHintVisible, setIsToolbarHintVisible] = useState(() => shouldShowToolbarHint(
+    window.localStorage.getItem(TOOLBAR_HINT_STORAGE_KEY),
+  ));
+  const [formattingFeedback, setFormattingFeedback] = useState("");
   const [isOutlineVisible, setIsOutlineVisible] = useState(true);
   const [previewContent, setPreviewContent] = useState(initialDocument.content);
   const [isPreviewPending, setIsPreviewPending] = useState(false);
@@ -892,7 +906,15 @@ export default function App() {
 
   const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
     if (actionGateRef.current.isBlocked()) return;
-    editorRef.current?.applyFormat(command);
+    const result = editorRef.current?.applyFormat(command);
+    if (result) {
+      setFormattingFeedback(formattingResultMessage(result, getFormattingUi(appLanguage).feedback));
+    }
+  }, [appLanguage]);
+
+  const dismissToolbarHint = useCallback(() => {
+    window.localStorage.setItem(TOOLBAR_HINT_STORAGE_KEY, "true");
+    setIsToolbarHintVisible(false);
   }, []);
 
   const handleFormatJson = useCallback(() => {
@@ -1451,12 +1473,21 @@ export default function App() {
                 </div>
               )}
             </header>
-            <MarkdownToolbar
-              language={appLanguage}
-              disabled={isDocumentSafetyActive}
-              formattingContext={formattingContext}
-              onFormat={handleMarkdownFormat}
-            />
+            <div className="formatting-toolbar-region">
+              <MarkdownToolbar
+                language={appLanguage}
+                disabled={isDocumentSafetyActive}
+                formattingContext={formattingContext}
+                onFormat={handleMarkdownFormat}
+              />
+              {isToolbarHintVisible && (
+                <aside className="toolbar-hint" aria-label={text.toolbarHintTitle}>
+                  <span>{text.toolbarHintBody}</span>
+                  <button type="button" onClick={dismissToolbarHint}>{text.dismiss}</button>
+                </aside>
+              )}
+              <span className="formatting-feedback" aria-live="polite">{formattingFeedback}</span>
+            </div>
             <MarkdownEditor
               ref={editorRef}
               value={content}
