@@ -347,6 +347,7 @@ function normalizeSelectedPath(selection: string | string[] | null) {
 export default function App() {
   const initialDocument = useMemo(() => createUntitledDocument(), []);
   const [content, setContent] = useState(initialDocument.content);
+  const [documentSessionId, setDocumentSessionId] = useState(0);
   const [currentFile, setCurrentFile] = useState<string | null>(initialDocument.path);
   const [recentFiles, setRecentFiles] = useState(() => parseRecentFiles(
     window.localStorage.getItem(RECENT_FILES_STORAGE_KEY),
@@ -459,6 +460,7 @@ export default function App() {
     || isDirectSavePending
     || isRelativeLinkPreflightPending
     || isUnsavedPromptOpen;
+  const isFormattingDisabled = isDocumentSafetyActive || editorMode === "preview";
   latestDocumentRef.current.set({ content, currentFile, modified });
   const appStyle = useMemo(() => ({
     "--editor-font-size": `${editorFontSize}px`,
@@ -533,6 +535,7 @@ export default function App() {
 
   const loadDocument = useCallback((path: string, nextContent: string) => {
     latestDocumentRef.current.set({ content: nextContent, currentFile: path, modified: false });
+    setDocumentSessionId((sessionId) => sessionId + 1);
     setContent(nextContent);
     setPreviewContent(nextContent);
     setCurrentFile(path);
@@ -545,6 +548,7 @@ export default function App() {
   const resetDocument = useCallback(() => {
     const next = createUntitledDocument();
     latestDocumentRef.current.set({ content: next.content, currentFile: next.path, modified: next.modified });
+    setDocumentSessionId((sessionId) => sessionId + 1);
     setContent(next.content);
     setPreviewContent(next.content);
     setCurrentFile(next.path);
@@ -865,6 +869,7 @@ export default function App() {
             currentFile: draft.documentPath,
             modified: true,
           });
+          setDocumentSessionId((sessionId) => sessionId + 1);
           setContent(draft.content);
           setPreviewContent(draft.content);
           setCurrentFile(draft.documentPath);
@@ -907,7 +912,7 @@ export default function App() {
   }, []);
 
   const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
-    if (actionGateRef.current.isBlocked()) return;
+    if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
     const result = editorRef.current?.applyFormat(command);
     if (result) {
       setFormattingAnnouncement((current) => nextFormattingAnnouncement(
@@ -916,7 +921,7 @@ export default function App() {
         getFormattingUi(appLanguage).feedback,
       ));
     }
-  }, [appLanguage]);
+  }, [appLanguage, editorMode]);
 
   const dismissToolbarHint = useCallback(() => {
     window.localStorage.setItem(TOOLBAR_HINT_STORAGE_KEY, "true");
@@ -924,7 +929,7 @@ export default function App() {
   }, []);
 
   const handleFormatJson = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return;
+    if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
     const result = formatJsonContent(content);
     if (!result.ok) {
       showError(text.jsonFormatFailed, result.message);
@@ -938,7 +943,7 @@ export default function App() {
     });
     setContent(result.content);
     setModified(true);
-  }, [content, showError, text.jsonFormatFailed]);
+  }, [content, editorMode, showError, text.jsonFormatFailed]);
 
   const handleBold = useCallback(() => {
     handleMarkdownFormat({ kind: "bold" });
@@ -1373,7 +1378,7 @@ export default function App() {
             <div className="menu-popover" role="menu">
               <MarkdownFormatMenu
                 language={appLanguage}
-                disabled={isDocumentSafetyActive}
+                disabled={isFormattingDisabled}
                 formatJsonLabel={text.formatJson}
                 formattingContext={formattingContext}
                 onFormat={(command) => runMenuAction(() => handleMarkdownFormat(command))}
@@ -1482,7 +1487,7 @@ export default function App() {
             <div className="formatting-toolbar-region">
               <MarkdownToolbar
                 language={appLanguage}
-                disabled={isDocumentSafetyActive}
+                disabled={isFormattingDisabled}
                 formattingContext={formattingContext}
                 onFormat={handleMarkdownFormat}
               />
@@ -1495,11 +1500,12 @@ export default function App() {
               <FormattingFeedback announcement={formattingAnnouncement} />
             </div>
             <MarkdownEditor
+              key={documentSessionId}
               ref={editorRef}
               value={content}
               mode="source"
               themeMode={themeMode}
-              readOnly={isDocumentSafetyActive}
+              readOnly={isFormattingDisabled}
               onChange={handleContentChange}
               onFormattingContextChange={setFormattingContext}
             />

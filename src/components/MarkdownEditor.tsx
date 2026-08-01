@@ -2,9 +2,9 @@ import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown } from "@codemirror/lang-markdown";
 import { json } from "@codemirror/lang-json";
-import { EditorSelection, StateField, type EditorState, type Extension, type Range } from "@codemirror/state";
+import { EditorSelection, EditorState, StateField, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, keymap, WidgetType } from "@codemirror/view";
-import { defaultKeymap, history, historyKeymap } from "@codemirror/commands";
+import { defaultKeymap, history, historyKeymap, isolateHistory } from "@codemirror/commands";
 import {
   deleteTableColumn,
   deleteTableRow,
@@ -581,6 +581,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       keymap.of([...defaultKeymap, ...historyKeymap]),
       EditorView.lineWrapping,
       editorEditableExtension(readOnly),
+      EditorState.readOnly.of(readOnly),
       mode === "live" ? livePreviewExtension() : sourceHeadingExtension(),
     ],
     [mode, readOnly],
@@ -631,9 +632,14 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         { from: selection.from, to: selection.to },
         command,
       );
+      if (change.warning) {
+        view.focus();
+        return change;
+      }
       view.dispatch({
         changes: { from: change.from, to: change.to, insert: change.insert },
         selection: EditorSelection.single(change.from + change.selectionStart, change.from + change.selectionEnd),
+        annotations: isolateHistory.of("full"),
       });
       view.focus();
       return change;
