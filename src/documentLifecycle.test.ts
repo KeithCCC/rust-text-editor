@@ -58,12 +58,12 @@ describe("runDocumentTransition", () => {
     expect(options.discardRecovery).not.toHaveBeenCalled();
   });
 
-  test("reports failure without rejecting when recovery cannot be discarded after opening", async () => {
+  test("keeps the completed document switch successful when recovery cleanup fails", async () => {
     const options = setup(true);
     options.requestDecision.mockResolvedValue("discard");
     options.discardRecovery.mockRejectedValue(new Error("draft is locked"));
 
-    await expect(runDocumentTransition(options)).resolves.toBe(false);
+    await expect(runDocumentTransition(options)).resolves.toBe(true);
     expect(options.proceed).toHaveBeenCalledTimes(1);
   });
 

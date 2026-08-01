@@ -30,7 +30,7 @@ export async function runDocumentTransition({
       try {
         await discardRecovery();
       } catch {
-        return false;
+        return true;
       }
     }
 
