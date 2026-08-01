@@ -181,51 +181,77 @@ const emptyFormattingContext = (): FormattingContext => ({
   inlineCode: false,
 });
 
-function isSurrounded(
-  line: string,
-  from: number,
-  to: number,
-  delimiter: string,
-): boolean {
-  const delimiters: number[] = [];
-  let offset = line.indexOf(delimiter);
-  while (offset >= 0) {
-    delimiters.push(offset);
-    offset = line.indexOf(delimiter, offset + delimiter.length);
-  }
+type InlineSpan = { from: number; to: number };
 
-  if (delimiters.length % 2 !== 0) {
-    return false;
+function isEscaped(line: string, offset: number): boolean {
+  let backslashes = 0;
+  for (let index = offset - 1; index >= 0 && line[index] === "\\"; index -= 1) {
+    backslashes += 1;
   }
-  for (let index = 0; index < delimiters.length; index += 2) {
-    if (delimiters[index] + delimiter.length <= from && delimiters[index + 1] >= to) {
-      return true;
-    }
-  }
-  return false;
+  return backslashes % 2 === 1;
 }
 
-function hasInlineCodeAround(line: string, from: number, to: number): boolean {
+function isBoundary(character: string | undefined): boolean {
+  return character === undefined || /[\s\p{P}\p{S}]/u.test(character);
+}
+
+function findInlineCodeSpans(line: string): InlineSpan[] {
   const runs = Array.from(line.matchAll(/`+/g), (match) => ({
     from: match.index,
     to: match.index + match[0].length,
     length: match[0].length,
-  }));
+  })).filter((run) => !isEscaped(line, run.from));
+  const spans: InlineSpan[] = [];
 
   for (let index = 0; index < runs.length;) {
     const left = runs[index];
     const relativeClose = runs.slice(index + 1).findIndex((right) => right.length === left.length);
     if (relativeClose < 0) {
-      return false;
+      index += 1;
+      continue;
     }
     const closeIndex = index + relativeClose + 1;
-    const right = runs[closeIndex];
-    if (left.to <= from && right.from >= to) {
-      return true;
-    }
+    spans.push({ from: left.to, to: runs[closeIndex].from });
     index = closeIndex + 1;
   }
+  return spans;
+}
+
+function isSurrounded(
+  line: string,
+  from: number,
+  to: number,
+  delimiter: string,
+  excludedSpans: InlineSpan[],
+): boolean {
+  let opening: number | null = null;
+  let offset = line.indexOf(delimiter);
+  while (offset >= 0) {
+    const insideExcludedSpan = excludedSpans.some((span) => (
+      span.from <= offset && offset + delimiter.length <= span.to
+    ));
+    const previous = line[offset - 1];
+    const next = line[offset + delimiter.length];
+    const canOpen = isBoundary(previous) && next !== undefined && !/\s/.test(next);
+    const canClose = previous !== undefined && !/\s/.test(previous) && isBoundary(next);
+
+    if (!insideExcludedSpan && !isEscaped(line, offset)) {
+      if (opening === null && canOpen) {
+        opening = offset;
+      } else if (opening !== null && canClose) {
+        if (opening + delimiter.length <= from && offset >= to) {
+          return true;
+        }
+        opening = null;
+      }
+    }
+    offset = line.indexOf(delimiter, offset + delimiter.length);
+  }
   return false;
+}
+
+function hasInlineCodeAround(spans: InlineSpan[], from: number, to: number): boolean {
+  return spans.some((span) => span.from <= from && span.to >= to);
 }
 
 export function detectFormattingContext(
@@ -255,12 +281,13 @@ export function detectFormattingContext(
   const relativeFrom = selection.from - lineStart;
   const relativeTo = selection.to - lineStart;
   const heading = /^(#{1,6})\s/.exec(line);
+  const inlineCodeSpans = findInlineCodeSpans(line);
 
   return {
     headingLevel: heading ? heading[1].length as HeadingLevel : null,
-    bold: isSurrounded(line, relativeFrom, relativeTo, "**"),
-    italic: isSurrounded(line, relativeFrom, relativeTo, "_"),
-    strikethrough: isSurrounded(line, relativeFrom, relativeTo, "~~"),
-    inlineCode: hasInlineCodeAround(line, relativeFrom, relativeTo),
+    bold: isSurrounded(line, relativeFrom, relativeTo, "**", inlineCodeSpans),
+    italic: isSurrounded(line, relativeFrom, relativeTo, "_", inlineCodeSpans),
+    strikethrough: isSurrounded(line, relativeFrom, relativeTo, "~~", inlineCodeSpans),
+    inlineCode: hasInlineCodeAround(inlineCodeSpans, relativeFrom, relativeTo),
   };
 }

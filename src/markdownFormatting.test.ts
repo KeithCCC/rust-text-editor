@@ -15,6 +15,14 @@ describe("formatMarkdownSelection", () => {
     expect(formatMarkdownSelection("a`b", { from: 0, to: 3 }, { kind: "inlineCode" }).insert).toBe("``a`b``");
   });
 
+  it("removes an adaptive inline-code delimiter without losing inner backticks", () => {
+    expect(formatMarkdownSelection("``a`b``", { from: 2, to: 5 }, { kind: "inlineCode" })).toMatchObject({
+      from: 0,
+      to: 7,
+      insert: "a`b",
+    });
+  });
+
   it("rejects multiline inline code without replacing the selection", () => {
     expect(formatMarkdownSelection("one\r\ntwo", { from: 0, to: 8 }, { kind: "inlineCode" })).toMatchObject({
       from: 0,
@@ -29,6 +37,11 @@ describe("formatMarkdownSelection", () => {
       insert: "[Koharu](https://example.com)",
       selectionStart: 9,
       selectionEnd: 28,
+    });
+    expect(formatMarkdownSelection("", { from: 0, to: 0 }, { kind: "link" })).toMatchObject({
+      insert: "[link text](https://example.com)",
+      selectionStart: 1,
+      selectionEnd: 10,
     });
   });
 
@@ -54,6 +67,24 @@ describe("formatMarkdownSelection", () => {
 
   it("does not infer inline code between separate code spans", () => {
     expect(detectFormattingContext("`three` gap `four`", { from: 9, to: 9 }).inlineCode).toBe(false);
+  });
+
+  it("does not infer inline wrappers from literal delimiters inside code", () => {
+    expect(detectFormattingContext("`**literal**`", { from: 6, to: 6 })).toEqual({
+      headingLevel: null,
+      bold: false,
+      italic: false,
+      strikethrough: false,
+      inlineCode: true,
+    });
+  });
+
+  it("does not infer italic formatting from intraword underscores", () => {
+    expect(detectFormattingContext("foo_bar_baz", { from: 7, to: 7 }).italic).toBe(false);
+  });
+
+  it("finds valid inline code after an unmatched delimiter run", () => {
+    expect(detectFormattingContext("``oops `valid`", { from: 10, to: 10 }).inlineCode).toBe(true);
   });
 
   it("prefixes each selected line as a task list", () => {
