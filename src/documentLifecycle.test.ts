@@ -11,7 +11,7 @@ function setup(modified: boolean) {
     requestDecision: vi.fn<() => Promise<UnsavedDecision>>(async () => "cancel"),
     save: vi.fn(async () => true),
     discardRecovery: vi.fn(async () => undefined),
-    proceed: vi.fn(async () => undefined),
+    proceed: vi.fn<() => Promise<boolean>>(async () => true),
   };
 }
 
@@ -39,23 +39,32 @@ describe("runDocumentTransition", () => {
     expect(options.proceed).not.toHaveBeenCalled();
   });
 
-  test("clears recovery before discarding and proceeding", async () => {
+  test("clears recovery only after a discarded document opens", async () => {
     const order: string[] = [];
     const options = setup(true);
     options.requestDecision.mockResolvedValue("discard");
     options.discardRecovery.mockImplementation(async () => { order.push("discard"); });
-    options.proceed.mockImplementation(async () => { order.push("proceed"); });
+    options.proceed.mockImplementation(async () => { order.push("proceed"); return true; });
     expect(await runDocumentTransition(options)).toBe(true);
-    expect(order).toEqual(["discard", "proceed"]);
+    expect(order).toEqual(["proceed", "discard"]);
   });
 
-  test("stops without rejecting when recovery cannot be discarded", async () => {
+  test("preserves recovery when a discarded document cannot be opened", async () => {
+    const options = setup(true);
+    options.requestDecision.mockResolvedValue("discard");
+    options.proceed.mockResolvedValue(false);
+
+    expect(await runDocumentTransition(options)).toBe(false);
+    expect(options.discardRecovery).not.toHaveBeenCalled();
+  });
+
+  test("reports failure without rejecting when recovery cannot be discarded after opening", async () => {
     const options = setup(true);
     options.requestDecision.mockResolvedValue("discard");
     options.discardRecovery.mockRejectedValue(new Error("draft is locked"));
 
     await expect(runDocumentTransition(options)).resolves.toBe(false);
-    expect(options.proceed).not.toHaveBeenCalled();
+    expect(options.proceed).toHaveBeenCalledTimes(1);
   });
 
   test("Cancel preserves the document", async () => {

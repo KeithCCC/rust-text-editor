@@ -47,7 +47,7 @@ import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
 import type { MarkdownFormat } from "./markdownFormatting";
 import { parseMarkdownOutline, type OutlineHeading } from "./markdownOutline";
 import { RecoveryDraftQueue, type RecoveryDraft } from "./recoveryDraftQueue";
-import { parseRecentFiles, updateRecentFiles } from "./recentFiles";
+import { parseRecentFiles, removeRecentFile, updateRecentFiles } from "./recentFiles";
 import { isTauriRuntime } from "./tauriRuntime";
 import { synchronizeDocumentTitle } from "./documentTitleSync";
 import {
@@ -519,12 +519,15 @@ export default function App() {
     setFileProperties(null);
   }, []);
 
-  const openFilePath = useCallback(async (path: string) => {
+  const openFilePath = useCallback(async (path: string, failure?: { title: string; onFailure?: () => void }) => {
     try {
       const file = await readTextFile(path);
       loadDocument(file.path, file.content);
+      return true;
     } catch (openError) {
-      showError(text.openFailed, openError instanceof Error ? openError.message : String(openError));
+      failure?.onFailure?.();
+      showError(failure?.title ?? text.openFailed, openError instanceof Error ? openError.message : String(openError));
+      return false;
     }
   }, [loadDocument, showError, text.openFailed]);
 
@@ -574,7 +577,7 @@ export default function App() {
     }, reportSaveError);
   }, [clearRecoverySafely, handleSaveAs, recordRecentFile, reportSaveError]);
 
-  const requestDocumentTransition = useCallback(async (proceed: () => Promise<void>) => {
+  const requestDocumentTransition = useCallback(async (proceed: () => Promise<boolean>) => {
     if (transitionInProgressRef.current) return false;
     transitionInProgressRef.current = true;
     actionGateRef.current.block("transition");
@@ -612,6 +615,7 @@ export default function App() {
     await requestDocumentTransition(async () => {
       resetDocument();
       requestAnimationFrame(() => editorRef.current?.focus());
+      return true;
     });
   }, [requestDocumentTransition, resetDocument]);
 
@@ -1245,7 +1249,10 @@ export default function App() {
                       <button
                         role="menuitem"
                         title={entry.path}
-                        onClick={() => runMenuAction(() => requestDocumentTransition(() => openFilePath(entry.path)))}
+                        onClick={() => runMenuAction(() => requestDocumentTransition(() => openFilePath(entry.path, {
+                          title: "File not found",
+                          onFailure: () => setRecentFiles((history) => removeRecentFile(history, entry.path)),
+                        })))}
                       >
                         <span>{fileNameFromPath(entry.path)}</span>
                         <small>{entry.path}</small>
@@ -1255,7 +1262,7 @@ export default function App() {
                         className="recent-file-remove"
                         aria-label={`${text.removeRecentFile}: ${fileNameFromPath(entry.path)}`}
                         title={text.removeRecentFile}
-                        onClick={() => setRecentFiles((history) => history.filter((item) => item.path !== entry.path))}
+                        onClick={() => setRecentFiles((history) => removeRecentFile(history, entry.path))}
                       >×</button>
                     </div>
                   ))}

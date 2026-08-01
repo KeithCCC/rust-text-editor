@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseRecentFiles, updateRecentFiles } from "./recentFiles";
+import { parseRecentFiles, removeRecentFile, updateRecentFiles } from "./recentFiles";
 
 describe("recent files", () => {
   it("moves a reopened Windows path to the front without duplicating it", () => {
@@ -26,5 +26,14 @@ describe("recent files", () => {
   it("treats malformed persisted data as an empty history", () => {
     expect(parseRecentFiles("not json")).toEqual([]);
     expect(parseRecentFiles('[{"path":42}]')).toEqual([]);
+  });
+
+  it("removes an inaccessible recent path without removing the remaining history", () => {
+    expect(removeRecentFile([
+      { path: "C:\\notes\\missing.md", lastAccessedAt: 2 },
+      { path: "C:\\notes\\keep.md", lastAccessedAt: 1 },
+    ], "c:/NOTES/missing.md")).toEqual([
+      { path: "C:\\notes\\keep.md", lastAccessedAt: 1 },
+    ]);
   });
 });

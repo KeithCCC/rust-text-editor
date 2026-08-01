@@ -5,7 +5,7 @@ export type DocumentTransitionOptions = {
   requestDecision: () => Promise<UnsavedDecision>;
   save: () => Promise<boolean>;
   discardRecovery: () => Promise<void>;
-  proceed: () => Promise<void>;
+  proceed: () => Promise<boolean>;
 };
 
 export async function runDocumentTransition({
@@ -23,6 +23,9 @@ export async function runDocumentTransition({
     if (decision === "save" && !(await save())) {
       return false;
     }
+    const proceeded = await proceed();
+    if (!proceeded) return false;
+
     if (decision === "discard") {
       try {
         await discardRecovery();
@@ -30,10 +33,11 @@ export async function runDocumentTransition({
         return false;
       }
     }
+
+    return true;
   }
 
-  await proceed();
-  return true;
+  return proceed();
 }
 
 export type ApplicationCloseTransitionOptions = {

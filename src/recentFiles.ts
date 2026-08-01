@@ -15,6 +15,11 @@ export function updateRecentFiles(history: RecentFile[], path: string, now = Dat
   ].slice(0, 10);
 }
 
+export function removeRecentFile(history: RecentFile[], path: string) {
+  const target = normalizedPath(path);
+  return history.filter((entry) => normalizedPath(entry.path) !== target);
+}
+
 export function parseRecentFiles(value: string | null): RecentFile[] {
   if (!value) return [];
   try {
