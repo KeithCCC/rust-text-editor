@@ -764,45 +764,45 @@ kbd {
   flex-wrap: wrap;
   align-items: center;
   justify-content: space-between;
-  gap: 12px;
+  gap: 8px;
   min-width: 0;
-  min-height: 44px;
-  padding: 6px 12px;
+  min-height: 24px;
+  padding: 1px 10px;
   border-bottom: 1px solid var(--border);
   background: var(--pane-header-bg);
 }
 
+.pane-header.has-note-search {
+  min-height: 44px;
+  padding: 6px 12px;
+}
+
 .pane-title {
   display: flex;
-  align-items: baseline;
+  align-items: center;
   flex: 1 1 auto;
-  min-width: 180px;
-  gap: 10px;
+  min-width: 0;
 }
 
 .pane-header span {
   font-size: var(--ui-font-size);
   font-weight: 700;
-}
-
-.pane-header small {
-  overflow: hidden;
-  text-overflow: ellipsis;
-  white-space: nowrap;
+  line-height: 20px;
 }
 
 .formatting-toolbar-toggle {
   display: inline-flex;
   align-items: center;
-  gap: 5px;
+  gap: 4px;
   flex: 0 0 auto;
-  min-height: 30px;
-  padding: 3px 8px;
+  min-height: 22px;
+  padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
   background: var(--surface-bg);
   color: var(--text);
   font-size: var(--ui-font-size);
+  line-height: 18px;
 }
 
 .formatting-toolbar-toggle:hover {
@@ -1478,11 +1478,16 @@ textarea {
   border-top: 1px solid var(--border);
 }
 
-.statusbar span:first-child {
+.statusbar-file {
   min-width: 0;
-  flex: 1;
+  flex: 1 1 auto;
   overflow: hidden;
   text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.statusbar > span:not(.statusbar-file) {
+  flex: 0 0 auto;
   white-space: nowrap;
 }
 

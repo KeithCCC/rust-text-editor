@@ -272,6 +272,46 @@ describe("document session safety", () => {
     expect(japaneseToggle.getAttribute("aria-label")).toBe("書式バーを隠す");
   });
 
+  it("keeps untitled file identity in the status bar instead of the editor header", () => {
+    const pane = editorPane();
+    const paneTitle = pane.querySelector<HTMLElement>(".pane-title");
+    const statusFile = container.querySelector<HTMLElement>(".statusbar-file");
+    if (!paneTitle || !statusFile) throw new Error("File identity regions not found");
+
+    expect(paneTitle.textContent).toBe("Editor");
+    expect(paneTitle.querySelector("small")).toBeNull();
+    expect(statusFile.textContent).toBe("File: Untitled");
+    expect(statusFile.title).toBe("File: Untitled");
+  });
+
+  it("keeps a long opened path only in the shrinkable status item", async () => {
+    const path = "C:\\notes\\a-very-long-folder-name\\another-long-folder-name\\compact-header.md";
+    dialogMocks.open.mockResolvedValueOnce(path);
+    tauriMocks.readTextFile.mockResolvedValueOnce({ path, content: "# Compact" });
+
+    await shortcut(window, "o");
+
+    const pane = editorPane();
+    const statusFile = container.querySelector<HTMLElement>(".statusbar-file");
+    if (!statusFile) throw new Error("Status file item not found");
+    expect(pane.querySelector(".pane-title")?.textContent).toBe("Editor");
+    expect(pane.textContent).not.toContain(path);
+    expect(statusFile.textContent).toBe(`File: ${path}`);
+    expect(statusFile.title).toBe(`File: ${path}`);
+  });
+
+  it("marks only an active search header as expanded", async () => {
+    const pane = editorPane();
+    const header = pane.querySelector<HTMLElement>(".pane-header");
+    if (!header) throw new Error("Editor header not found");
+    expect(header.classList.contains("has-note-search")).toBe(false);
+
+    await shortcut(window, "f");
+
+    expect(header.classList.contains("has-note-search")).toBe(true);
+    expect(header.querySelector('[role="search"]')).not.toBeNull();
+  });
+
   it("focuses the replacement editor after a successful Open from the focused editor", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\focused-open.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({

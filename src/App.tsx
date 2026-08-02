@@ -499,6 +499,9 @@ export default function App() {
     "--split-percent": `${splitPercent}%`,
   }) as CSSProperties, [editorFontSize, editorLineHeight, previewFontSize, previewLineHeight, splitPercent, uiFontSize]);
   const stats = useMemo(() => getDocumentStats(content), [content]);
+  const fileStatusText = currentFile
+    ? `${text.fileStatus} ${currentFile}`
+    : `${text.fileStatus} ${text.untitled}`;
   const outlineContent = editorMode === "preview" ? previewContent : content;
   const outlineHeadings = useMemo(() => parseMarkdownOutline(outlineContent), [outlineContent]);
   const searchMatches = useMemo(() => {
@@ -1508,10 +1511,9 @@ export default function App() {
             hidden={!isEditorVisible}
             aria-hidden={!isEditorVisible}
           >
-            <header className="pane-header">
+            <header className={`pane-header${isNoteSearchVisible ? " has-note-search" : ""}`}>
               <div className="pane-title">
                 <span>{text.editor}</span>
-                <small>{currentFile ?? text.untitled}</small>
               </div>
               <button
                 type="button"
@@ -1656,7 +1658,9 @@ export default function App() {
       </section>
 
       <footer className="statusbar">
-        <span>{currentFile ? `${text.fileStatus} ${currentFile}` : `${text.fileStatus} ${text.untitled}`}</span>
+        <span className="statusbar-file" title={fileStatusText}>
+          {fileStatusText}
+        </span>
         <span>{modified ? text.unsaved : text.saved}</span>
         <span>{editorMode === "edit" ? text.previewOff : text.previewOn}</span>
         <span>{text.lines} {stats.lines}</span>
