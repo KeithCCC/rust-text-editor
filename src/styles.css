@@ -766,6 +766,7 @@ kbd {
   justify-content: space-between;
   gap: 8px;
   min-width: 0;
+  height: 24px;
   min-height: 24px;
   padding: 1px 10px;
   border-bottom: 1px solid var(--border);
@@ -773,6 +774,7 @@ kbd {
 }
 
 .pane-header.has-note-search {
+  height: auto;
   min-height: 44px;
   padding: 6px 12px;
 }
