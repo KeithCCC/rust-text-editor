@@ -62,4 +62,25 @@ describe("preview mode layout", () => {
     expect(getComputedStyle(previewHeader).height).toBe("24px");
     expect(getComputedStyle(searchHeader).height).not.toBe("24px");
   });
+
+  it("places the Preview-only status and body in separate grid rows below the compact header", () => {
+    const style = document.createElement("style");
+    style.textContent = applicationStyles;
+    const previewPane = document.createElement("article");
+    previewPane.className = "preview-pane has-preview-status";
+    const previewHeader = document.createElement("header");
+    previewHeader.className = "pane-header";
+    const previewStatus = document.createElement("p");
+    previewStatus.className = "preview-formatting-status";
+    const previewBody = document.createElement("div");
+    previewBody.className = "preview-body";
+    previewPane.append(previewHeader, previewStatus, previewBody);
+    document.head.append(style);
+    document.body.append(previewPane);
+
+    expect(getComputedStyle(previewPane).gridTemplateRows).toBe("24px auto minmax(0, 1fr)");
+    expect(getComputedStyle(previewHeader).height).toBe("24px");
+    expect(getComputedStyle(previewStatus).gridRow).toBe("2");
+    expect(getComputedStyle(previewBody).gridRow).toBe("3");
+  });
 });

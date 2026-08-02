@@ -613,7 +613,11 @@ kbd {
 }
 
 .preview-pane {
-  grid-template-rows: auto minmax(0, 1fr);
+  grid-template-rows: 24px minmax(0, 1fr);
+}
+
+.preview-pane.has-preview-status {
+  grid-template-rows: 24px auto minmax(0, 1fr);
 }
 
 .markdown-toolbar {
@@ -1223,11 +1227,18 @@ textarea {
 }
 
 .preview-formatting-status {
-  flex: 1 0 100%;
+  grid-row: 2;
   margin: 0;
+  padding: 4px 10px;
+  border-bottom: 1px solid var(--border);
+  background: var(--pane-header-bg);
   color: var(--muted);
   font-size: var(--ui-font-size);
   font-weight: 400;
+}
+
+.preview-pane.has-preview-status > .preview-body {
+  grid-row: 3;
 }
 
 .preview-formatting-status:focus-visible {

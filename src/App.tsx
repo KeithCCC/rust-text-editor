@@ -936,12 +936,13 @@ export default function App() {
   }, [clearRecoverySafely, completeStartupResolution, openFilePath, pendingStartupPath, requestDocumentTransition, showError, startupRecoveryDraft, text.startupOpenFailed]);
 
   const openNoteSearch = useCallback(() => {
+    if (editorMode === "preview") setEditorMode("split");
     setIsNoteSearchVisible(true);
     requestAnimationFrame(() => {
       searchInputRef.current?.focus();
       searchInputRef.current?.select();
     });
-  }, []);
+  }, [editorMode]);
 
   const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
     if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
@@ -1632,16 +1633,16 @@ export default function App() {
                 }}
               />}
 
-              <article className="preview-pane">
+              <article className={`preview-pane${editorMode === "preview" ? " has-preview-status" : ""}`}>
                 <header className="pane-header">
                   <span>{text.preview}</span>
                   <small>{isPreviewPending ? text.updating : text.markdownPreview}</small>
-                  {editorMode === "preview" && (
-                    <p className="preview-formatting-status" role="status" tabIndex={0}>
-                      {formattingUi.disabledReasons.preview}
-                    </p>
-                  )}
                 </header>
+                {editorMode === "preview" && (
+                  <p className="preview-formatting-status" role="status" tabIndex={0}>
+                    {formattingUi.disabledReasons.preview}
+                  </p>
+                )}
                 <MarkdownPreview
                   key={previewRefreshToken}
                   ref={previewRef}

@@ -312,6 +312,30 @@ describe("document session safety", () => {
     expect(header.querySelector('[role="search"]')).not.toBeNull();
   });
 
+  it("switches Preview to Split before Ctrl+F exposes and focuses Find", async () => {
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+    if (!switcher) throw new Error("View mode switcher not found");
+    await click(button("Preview", switcher));
+    expect(editorPane().hidden).toBe(true);
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
+
+    expect((await shortcut(window, "f")).defaultPrevented).toBe(true);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    });
+
+    const searchInput = container.querySelector<HTMLInputElement>("#note-search-input");
+    if (!searchInput) throw new Error("Find input not found");
+    expect(button("Split", switcher).getAttribute("aria-pressed")).toBe("true");
+    expect(editorPane().hidden).toBe(false);
+    expect(editorPane().getAttribute("aria-hidden")).toBe("false");
+    expect(searchInput.closest(".editor-pane")).toBe(editorPane());
+    expect(document.activeElement).toBe(searchInput);
+    expect(container.querySelector(".preview-pane")).not.toBeNull();
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("split");
+    expect(window.localStorage.getItem("koharu-toolbar-hint-dismissed")).toBe("true");
+  });
+
   it("focuses the replacement editor after a successful Open from the focused editor", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\focused-open.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({
@@ -498,11 +522,19 @@ describe("document session safety", () => {
     if (!toolbar) throw new Error("Markdown toolbar not found");
     const previewPane = container.querySelector<HTMLElement>(".preview-pane");
     if (!previewPane) throw new Error("Preview pane not found");
+    const previewHeader = previewPane.querySelector<HTMLElement>(":scope > .pane-header");
     const status = previewPane.querySelector<HTMLElement>('[role="status"]');
+    const previewBody = previewPane.querySelector<HTMLElement>(":scope > .preview-body");
+    if (!previewHeader || !status || !previewBody) throw new Error("Preview regions not found");
     expect(status?.textContent).toBe(
       "Formatting is unavailable in Preview. Switch to Edit or Split to make changes.",
     );
     expect(status?.tabIndex).toBe(0);
+    expect(previewPane.classList.contains("has-preview-status")).toBe(true);
+    expect(status.parentElement).toBe(previewPane);
+    expect(previewHeader.nextElementSibling).toBe(status);
+    expect(status.nextElementSibling).toBe(previewBody);
+    expect(previewHeader.contains(status)).toBe(false);
     expect(status?.closest(".editor-pane")).toBeNull();
     expect(toolbar.getAttribute("aria-describedby")).toBeNull();
     expect(toolbar.querySelector('[role="status"]')).toBeNull();
