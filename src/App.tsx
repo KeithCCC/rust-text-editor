@@ -1509,7 +1509,9 @@ export default function App() {
                 onClick={toggleFormattingToolbar}
               >
                 <span aria-hidden="true">{isFormattingToolbarVisible ? "−" : "+"}</span>
-                <span>{isFormattingToolbarVisible ? text.hideFormattingToolbar : text.showFormattingToolbar}</span>
+                <span className="formatting-toolbar-toggle-label">
+                  {isFormattingToolbarVisible ? text.hideFormattingToolbar : text.showFormattingToolbar}
+                </span>
               </button>
               {isNoteSearchVisible && (
                 <div className="note-search" role="search" aria-label={text.find}>

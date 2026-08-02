@@ -202,6 +202,19 @@ describe("document session safety", () => {
     expect(pane.getAttribute("aria-hidden")).toBe("true");
   });
 
+  it("keeps the Split-mode toolbar toggle compact at narrow widths without losing its accessible label", async () => {
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+    if (!switcher) throw new Error("View mode switcher not found");
+    await click(button("Split", switcher));
+
+    const toggle = button("Hide formatting toolbar", editorPane());
+    const icon = toggle.querySelector('span[aria-hidden="true"]');
+    const label = toggle.querySelector(".formatting-toolbar-toggle-label");
+    expect(icon?.textContent).toBe("−");
+    expect(label?.textContent).toBe("Hide formatting toolbar");
+    expect(toggle.getAttribute("aria-label")).toBe("Hide formatting toolbar");
+  });
+
   it("focuses the replacement editor after a successful Open from the focused editor", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\focused-open.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({

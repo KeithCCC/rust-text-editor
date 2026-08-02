@@ -1873,6 +1873,10 @@ textarea {
 }
 
 @media (max-width: 960px) {
+  .formatting-toolbar-toggle-label {
+    display: none;
+  }
+
   .markdown-toolbar {
     flex-wrap: wrap;
     align-items: center;
