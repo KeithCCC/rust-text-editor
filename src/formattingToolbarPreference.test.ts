@@ -17,6 +17,23 @@ describe("formatting toolbar preference", () => {
     expect(readFormattingToolbarVisibility({ getItem: () => { throw new Error("denied"); } })).toBe(true);
   });
 
+  it("keeps the default-storage path silent when localStorage access is denied", () => {
+    const deniedWindow = {};
+    Object.defineProperty(deniedWindow, "localStorage", {
+      get: () => {
+        throw new Error("denied");
+      },
+    });
+    vi.stubGlobal("window", deniedWindow);
+
+    try {
+      expect(readFormattingToolbarVisibility()).toBe(true);
+      expect(() => writeFormattingToolbarVisibility(false)).not.toThrow();
+    } finally {
+      vi.unstubAllGlobals();
+    }
+  });
+
   it("writes only the recognized visible and hidden values without surfacing storage errors", () => {
     const setItem = vi.fn();
     writeFormattingToolbarVisibility(false, { setItem });
