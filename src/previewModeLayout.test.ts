@@ -33,7 +33,17 @@ describe("preview mode layout", () => {
     editorPane.className = "editor-pane";
     const editorHeader = document.createElement("header");
     editorHeader.className = "pane-header";
-    editorHeader.innerHTML = '<div class="pane-title"><span>Editor</span></div><button class="formatting-toolbar-toggle is-compact">−<span class="formatting-toolbar-toggle-label">Hide formatting toolbar</span></button>';
+    const editorTitle = document.createElement("div");
+    editorTitle.className = "pane-title";
+    editorTitle.textContent = "Editor";
+    const toolbarToggle = document.createElement("button");
+    toolbarToggle.className = "formatting-toolbar-toggle is-compact";
+    toolbarToggle.textContent = "-";
+    const toolbarToggleLabel = document.createElement("span");
+    toolbarToggleLabel.className = "formatting-toolbar-toggle-label";
+    toolbarToggleLabel.textContent = "Hide formatting toolbar";
+    toolbarToggle.append(toolbarToggleLabel);
+    editorHeader.append(editorTitle, toolbarToggle);
     const previewPane = document.createElement("article");
     previewPane.className = "preview-pane";
     const previewHeader = document.createElement("header");
