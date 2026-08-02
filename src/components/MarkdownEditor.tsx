@@ -639,6 +639,10 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         view.focus();
         return change;
       }
+      if (view.state.sliceDoc(change.from, change.to) === change.insert) {
+        view.focus();
+        return change;
+      }
       view.dispatch({
         changes: { from: change.from, to: change.to, insert: change.insert },
         selection: EditorSelection.single(change.from + change.selectionStart, change.from + change.selectionEnd),
