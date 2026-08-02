@@ -17,6 +17,11 @@ describe("HelpDialog", () => {
     );
 
     expect(html).toContain("Koharuの使い方");
+    expect(html).toContain("編集・分割・プレビュー");
+    expect(html).toContain("表示・非表示");
+    expect(html).toContain("次回も引き継がれます");
+    expect(html).toContain("画面下部のステータスバー");
+    expect(html).toContain("自動的に分割表示");
     expect(html).toContain("ファイルを作る・開く・保存する");
     expect(html).toContain("Markdownの書き方");
     expect(html).toContain("文字");
@@ -57,6 +62,11 @@ describe("HelpDialog", () => {
     );
 
     expect(html).toContain("How to use Koharu");
+    expect(html).toContain("Edit, Split, and Preview");
+    expect(html).toContain("show or hide the formatting toolbar");
+    expect(html).toContain("remembered the next time you open Koharu");
+    expect(html).toContain("bottom status bar");
+    expect(html).toContain("automatically switches to Split");
     expect(html).toContain("Create, open, and save files");
     expect(html).toContain("Markdown basics");
     expect(html).toContain("Text");

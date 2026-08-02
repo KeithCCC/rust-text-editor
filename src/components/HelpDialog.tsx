@@ -47,10 +47,17 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "Write and preview",
+        title: "Choose a view",
         paragraphs: [
-          "Write in the editor. Use the Preview button at the far right of the menu bar to show or hide the rendered result.",
-          "Choose Search > Find to find text in the current document.",
+          "Use Edit when you only need the editor, Split to see the editor and rendered result together, and Preview when you only need the rendered result. Choose between Edit, Split, and Preview with the controls at the top of the window.",
+        ],
+      },
+      {
+        title: "Toolbar, file path, and Find",
+        paragraphs: [
+          "Use the control in the editor header to show or hide the formatting toolbar. Your choice is remembered the next time you open Koharu.",
+          "The full path of the current file appears in the bottom status bar.",
+          "Choose Search > Find or press Ctrl+F. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.",
         ],
       },
       {
@@ -132,10 +139,17 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "文章を書く・プレビューする",
+        title: "表示を選ぶ",
         paragraphs: [
-          "エディターに文章を入力します。メニューバー右端のPreviewボタンで、仕上がり表示を出したり隠したりできます。",
-          "文書内の文字を探すときは「検索」→「検索」を選びます。",
+          "編集だけを行うときは「編集」、編集画面と仕上がりを並べるときは「分割」、仕上がりだけを見るときは「プレビュー」を使います。画面上部の「編集・分割・プレビュー」で切り替えられます。",
+        ],
+      },
+      {
+        title: "ツールバー・ファイルパス・検索",
+        paragraphs: [
+          "エディターヘッダーのボタンで、書式ツールバーの表示・非表示を切り替えられます。選択は保存され、次回も引き継がれます。",
+          "現在のファイルの完全なパスは、画面下部のステータスバーに表示されます。",
+          "「検索」→「検索」を選ぶかCtrl+Fを押します。プレビューから検索すると、自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。",
         ],
       },
       {
