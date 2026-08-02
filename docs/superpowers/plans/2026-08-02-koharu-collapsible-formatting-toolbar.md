@@ -39,7 +39,6 @@ Create `src/formattingToolbarPreference.test.ts`:
 ```ts
 import { describe, expect, it, vi } from "vitest";
 import {
-  FORMATTING_TOOLBAR_VISIBILITY_STORAGE_KEY,
   readFormattingToolbarVisibility,
   writeFormattingToolbarVisibility,
 } from "./formattingToolbarPreference";
@@ -51,7 +50,6 @@ describe("formatting toolbar preference", () => {
       storage.getItem.mockReturnValueOnce(stored);
       expect(readFormattingToolbarVisibility(storage)).toBe(expected);
     }
-    expect(FORMATTING_TOOLBAR_VISIBILITY_STORAGE_KEY).toBe("koharu-formatting-toolbar-visibility");
   });
 
   it("falls back to visible when storage cannot be read", () => {
@@ -63,8 +61,8 @@ describe("formatting toolbar preference", () => {
     writeFormattingToolbarVisibility(false, { setItem });
     writeFormattingToolbarVisibility(true, { setItem });
     expect(setItem.mock.calls).toEqual([
-      [FORMATTING_TOOLBAR_VISIBILITY_STORAGE_KEY, "hidden"],
-      [FORMATTING_TOOLBAR_VISIBILITY_STORAGE_KEY, "visible"],
+      ["koharu-formatting-toolbar-visibility", "hidden"],
+      ["koharu-formatting-toolbar-visibility", "visible"],
     ]);
     expect(() => writeFormattingToolbarVisibility(false, {
       setItem: () => { throw new Error("denied"); },
@@ -153,11 +151,13 @@ it("toggles the formatting toolbar from the pane header and persists the choice"
   const toggle = button("Hide formatting toolbar", editorPane());
   expect(toggle.getAttribute("aria-expanded")).toBe("true");
   expect(toggle.getAttribute("aria-controls")).toBe("formatting-toolbar-region");
+  expect(editorPane().classList.contains("has-formatting-toolbar")).toBe(true);
   expect(editorPane().querySelector("#formatting-toolbar-region")).not.toBeNull();
 
   await click(toggle);
 
   expect(button("Show formatting toolbar", editorPane()).getAttribute("aria-expanded")).toBe("false");
+  expect(editorPane().classList.contains("has-formatting-toolbar")).toBe(false);
   expect(editorPane().querySelector("#formatting-toolbar-region")).toBeNull();
   expect(window.localStorage.getItem("koharu-formatting-toolbar-visibility")).toBe("hidden");
 });
@@ -268,6 +268,16 @@ const toggleFormattingToolbar = useCallback(() => {
 
 - [ ] **Step 4: Render the toggle, conditional toolbar, and bottom message area**
 
+Make the pane expose the grid variant selected by the saved state:
+
+```tsx
+<article
+  className={`editor-pane${isFormattingToolbarVisible ? " has-formatting-toolbar" : ""}`}
+  hidden={!isEditorVisible}
+  aria-hidden={!isEditorVisible}
+>
+```
+
 Inside `.pane-header`, after `.pane-title` and before the search UI, render:
 
 ```tsx
@@ -324,8 +334,12 @@ Replace the editor grid rules and split the message styling from the toolbar sty
 
 ```css
 .editor-pane {
-  grid-template-rows: auto auto minmax(0, 1fr) auto;
+  grid-template-rows: auto minmax(0, 1fr) auto;
   overflow: visible;
+}
+
+.editor-pane.has-formatting-toolbar {
+  grid-template-rows: auto auto minmax(0, 1fr) auto;
 }
 
 .formatting-toolbar-region,
