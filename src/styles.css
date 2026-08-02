@@ -809,6 +809,10 @@ kbd {
   background: var(--hover-bg);
 }
 
+.formatting-toolbar-toggle.is-compact .formatting-toolbar-toggle-label {
+  display: none;
+}
+
 .note-search {
   display: grid;
   grid-template-columns: auto minmax(0, 1fr);
@@ -1873,10 +1877,6 @@ textarea {
 }
 
 @media (max-width: 960px) {
-  .formatting-toolbar-toggle-label {
-    display: none;
-  }
-
   .markdown-toolbar {
     flex-wrap: wrap;
     align-items: center;

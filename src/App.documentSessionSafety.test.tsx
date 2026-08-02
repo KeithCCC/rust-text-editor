@@ -202,17 +202,28 @@ describe("document session safety", () => {
     expect(pane.getAttribute("aria-hidden")).toBe("true");
   });
 
-  it("keeps the Split-mode toolbar toggle compact at narrow widths without losing its accessible label", async () => {
+  it("compacts the minimum-width Split toggle while retaining localized accessible names", async () => {
     const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
     if (!switcher) throw new Error("View mode switcher not found");
+
+    const editToggle = button("Hide formatting toolbar", editorPane());
+    expect(editToggle.classList.contains("is-compact")).toBe(false);
+
     await click(button("Split", switcher));
 
-    const toggle = button("Hide formatting toolbar", editorPane());
-    const icon = toggle.querySelector('span[aria-hidden="true"]');
-    const label = toggle.querySelector(".formatting-toolbar-toggle-label");
-    expect(icon?.textContent).toBe("−");
-    expect(label?.textContent).toBe("Hide formatting toolbar");
-    expect(toggle.getAttribute("aria-label")).toBe("Hide formatting toolbar");
+    const splitToggle = button("Hide formatting toolbar", editorPane());
+    expect(splitToggle.classList.contains("is-compact")).toBe(true);
+    expect(splitToggle.getAttribute("aria-label")).toBe("Hide formatting toolbar");
+
+    await click(button("View"));
+    const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    const japaneseUi = viewMenu?.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
+    if (!japaneseUi) throw new Error("Japanese UI choice not found");
+    await click(japaneseUi);
+
+    const japaneseToggle = button("書式バーを隠す", editorPane());
+    expect(japaneseToggle.classList.contains("is-compact")).toBe(true);
+    expect(japaneseToggle.getAttribute("aria-label")).toBe("書式バーを隠す");
   });
 
   it("focuses the replacement editor after a successful Open from the focused editor", async () => {

@@ -1501,7 +1501,7 @@ export default function App() {
               </div>
               <button
                 type="button"
-                className="formatting-toolbar-toggle"
+                className={`formatting-toolbar-toggle${isSplitMode ? " is-compact" : ""}`}
                 aria-controls="formatting-toolbar-region"
                 aria-expanded={isFormattingToolbarVisible}
                 aria-label={isFormattingToolbarVisible ? text.hideFormattingToolbar : text.showFormattingToolbar}
