@@ -51,6 +51,10 @@ import {
   shouldShowToolbarHint,
   TOOLBAR_HINT_STORAGE_KEY,
 } from "./formattingGuidance";
+import {
+  readFormattingToolbarVisibility,
+  writeFormattingToolbarVisibility,
+} from "./formattingToolbarPreference";
 import { getFormattingUi } from "./formattingUi";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
 import type { FormattingContext, MarkdownCommand } from "./markdownFormatting";
@@ -174,6 +178,8 @@ const UI_TEXT = {
     clear: "Clear",
     close: "Close",
     dismiss: "Dismiss",
+    showFormattingToolbar: "Show formatting toolbar",
+    hideFormattingToolbar: "Hide formatting toolbar",
     toolbarHintTitle: "Formatting tip",
     toolbarHintBody: "Select text and choose a formatting button. Use Split to check the finished result.",
     unsavedDiscard: "The current file has unsaved changes. Discard them?",
@@ -265,6 +271,8 @@ const UI_TEXT = {
     clear: "クリア",
     close: "閉じる",
     dismiss: "閉じる",
+    showFormattingToolbar: "書式バーを表示する",
+    hideFormattingToolbar: "書式バーを隠す",
     toolbarHintTitle: "書式設定のヒント",
     toolbarHintBody: "文字を選択して書式ボタンを選びます。分割表示で仕上がりを確認できます。",
     unsavedDiscard: "現在のファイルには未保存の変更があります。破棄しますか?",
@@ -361,6 +369,9 @@ export default function App() {
   const [isToolbarHintVisible, setIsToolbarHintVisible] = useState(() => shouldShowToolbarHint(
     window.localStorage.getItem(TOOLBAR_HINT_STORAGE_KEY),
   ));
+  const [isFormattingToolbarVisible, setIsFormattingToolbarVisible] = useState(
+    readFormattingToolbarVisibility,
+  );
   const [formattingAnnouncement, setFormattingAnnouncement] = useState(EMPTY_FORMATTING_ANNOUNCEMENT);
   const [isOutlineVisible, setIsOutlineVisible] = useState(true);
   const [previewContent, setPreviewContent] = useState(initialDocument.content);
@@ -932,6 +943,14 @@ export default function App() {
     setIsToolbarHintVisible(false);
   }, []);
 
+  const toggleFormattingToolbar = useCallback(() => {
+    setIsFormattingToolbarVisible((visible) => {
+      const nextVisible = !visible;
+      writeFormattingToolbarVisibility(nextVisible);
+      return nextVisible;
+    });
+  }, []);
+
   const handleFormatJson = useCallback(() => {
     if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
     const result = formatJsonContent(content);
@@ -1470,12 +1489,28 @@ export default function App() {
           data-split-orientation={splitOrientation}
           ref={workspaceRef}
         >
-          <article className="editor-pane" hidden={!isEditorVisible} aria-hidden={!isEditorVisible}>
+          <article
+            className={`editor-pane${isFormattingToolbarVisible ? " has-formatting-toolbar" : ""}`}
+            hidden={!isEditorVisible}
+            aria-hidden={!isEditorVisible}
+          >
             <header className="pane-header">
               <div className="pane-title">
                 <span>{text.editor}</span>
                 <small>{currentFile ?? text.untitled}</small>
               </div>
+              <button
+                type="button"
+                className="formatting-toolbar-toggle"
+                aria-controls="formatting-toolbar-region"
+                aria-expanded={isFormattingToolbarVisible}
+                aria-label={isFormattingToolbarVisible ? text.hideFormattingToolbar : text.showFormattingToolbar}
+                title={isFormattingToolbarVisible ? text.hideFormattingToolbar : text.showFormattingToolbar}
+                onClick={toggleFormattingToolbar}
+              >
+                <span aria-hidden="true">{isFormattingToolbarVisible ? "−" : "+"}</span>
+                <span>{isFormattingToolbarVisible ? text.hideFormattingToolbar : text.showFormattingToolbar}</span>
+              </button>
               {isNoteSearchVisible && (
                 <div className="note-search" role="search" aria-label={text.find}>
                   <label htmlFor="note-search-input">{text.find}</label>
@@ -1519,22 +1554,17 @@ export default function App() {
                 </div>
               )}
             </header>
-            <div className="formatting-toolbar-region">
-              <MarkdownToolbar
-                language={appLanguage}
-                disabled={isFormattingDisabled}
-                disabledReason={isDocumentSafetyActive && editorMode !== "preview" ? "documentSafety" : undefined}
-                formattingContext={formattingContext}
-                onFormat={handleMarkdownFormat}
-              />
-              {isToolbarHintVisible && (
-                <aside className="toolbar-hint" aria-label={text.toolbarHintTitle}>
-                  <span>{text.toolbarHintBody}</span>
-                  <button type="button" onClick={dismissToolbarHint}>{text.dismiss}</button>
-                </aside>
-              )}
-              <FormattingFeedback announcement={formattingAnnouncement} />
-            </div>
+            {isFormattingToolbarVisible && (
+              <div id="formatting-toolbar-region" className="formatting-toolbar-region">
+                <MarkdownToolbar
+                  language={appLanguage}
+                  disabled={isFormattingDisabled}
+                  disabledReason={isDocumentSafetyActive && editorMode !== "preview" ? "documentSafety" : undefined}
+                  formattingContext={formattingContext}
+                  onFormat={handleMarkdownFormat}
+                />
+              </div>
+            )}
             <MarkdownEditor
               key={documentSessionId}
               ref={editorRef}
@@ -1546,6 +1576,18 @@ export default function App() {
               onChange={handleContentChange}
               onFormattingContextChange={setFormattingContext}
             />
+            <div className="editor-message-area">
+              {formattingAnnouncement.message ? (
+                <FormattingFeedback announcement={formattingAnnouncement} />
+              ) : isToolbarHintVisible ? (
+                <aside className="toolbar-hint" aria-label={text.toolbarHintTitle}>
+                  <span>{text.toolbarHintBody}</span>
+                  <button type="button" onClick={dismissToolbarHint}>{text.dismiss}</button>
+                </aside>
+              ) : (
+                <FormattingFeedback announcement={formattingAnnouncement} />
+              )}
+            </div>
           </article>
 
           {isPreviewVisible && (

@@ -75,6 +75,12 @@ function button(label: string, scope: ParentNode = container) {
   return match;
 }
 
+function editorPane() {
+  const pane = container.querySelector<HTMLElement>(".editor-pane");
+  if (!pane) throw new Error("Editor pane not found");
+  return pane;
+}
+
 async function click(target: HTMLElement) {
   await act(async () => {
     target.click();
@@ -127,6 +133,75 @@ afterEach(() => {
 });
 
 describe("document session safety", () => {
+  it("toggles the formatting toolbar from the pane header and persists the choice", async () => {
+    const toggle = button("Hide formatting toolbar", editorPane());
+    expect(toggle.getAttribute("aria-expanded")).toBe("true");
+    expect(toggle.getAttribute("aria-controls")).toBe("formatting-toolbar-region");
+    expect(editorPane().classList.contains("has-formatting-toolbar")).toBe(true);
+    expect(editorPane().querySelector("#formatting-toolbar-region")).not.toBeNull();
+
+    await click(toggle);
+
+    expect(button("Show formatting toolbar", editorPane()).getAttribute("aria-expanded")).toBe("false");
+    expect(editorPane().classList.contains("has-formatting-toolbar")).toBe(false);
+    expect(editorPane().querySelector("#formatting-toolbar-region")).toBeNull();
+    expect(window.localStorage.getItem("koharu-formatting-toolbar-visibility")).toBe("hidden");
+  });
+
+  it("restores a hidden formatting toolbar preference on mount", async () => {
+    act(() => root.unmount());
+    window.localStorage.setItem("koharu-formatting-toolbar-visibility", "hidden");
+    root = createRoot(container);
+    await act(async () => {
+      root.render(<App />);
+      await Promise.resolve();
+    });
+
+    expect(button("Show formatting toolbar", editorPane()).getAttribute("aria-expanded")).toBe("false");
+    expect(editorPane().querySelector("#formatting-toolbar-region")).toBeNull();
+  });
+
+  it("renders the message area after the editor and localizes the toggle", async () => {
+    const pane = editorPane();
+    const editor = pane.querySelector(".markdown-editor");
+    const messageArea = pane.querySelector(".editor-message-area");
+    if (!editor || !messageArea) throw new Error("Editor layout regions not found");
+    expect(editor.compareDocumentPosition(messageArea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
+    expect(messageArea.querySelector(".formatting-feedback")).not.toBeNull();
+
+    await click(button("View"));
+    const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+    const japaneseUi = viewMenu?.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
+    if (!japaneseUi) throw new Error("Japanese UI choice not found");
+    await click(japaneseUi);
+
+    expect(button("書式バーを隠す", editorPane()).getAttribute("aria-expanded")).toBe("true");
+  });
+
+  it("keeps guidance at the bottom and the toggle available only with a visible editor pane", async () => {
+    act(() => root.unmount());
+    window.localStorage.removeItem("koharu-toolbar-hint-dismissed");
+    root = createRoot(container);
+    await act(async () => {
+      root.render(<App />);
+      await Promise.resolve();
+    });
+
+    const pane = editorPane();
+    expect(pane.querySelector(".editor-message-area .toolbar-hint")).not.toBeNull();
+    expect(pane.querySelector(".formatting-toolbar-region .toolbar-hint")).toBeNull();
+
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+    if (!switcher) throw new Error("View mode switcher not found");
+    await click(button("Split", switcher));
+    expect(pane.hidden).toBe(false);
+    expect(button("Hide formatting toolbar", pane)).not.toBeNull();
+
+    await click(button("Preview", switcher));
+    expect(pane.hidden).toBe(true);
+    expect(pane.getAttribute("aria-hidden")).toBe("true");
+  });
+
   it("focuses the replacement editor after a successful Open from the focused editor", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\focused-open.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({
