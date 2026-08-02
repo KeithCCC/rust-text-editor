@@ -1,5 +1,6 @@
 // @vitest-environment jsdom
 
+import { EditorView } from "@codemirror/view";
 import { act } from "react";
 import { createRoot, type Root } from "react-dom/client";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
@@ -67,6 +68,13 @@ async function click(target: HTMLElement) {
   });
 }
 
+function button(label: string, scope: ParentNode = container) {
+  const match = Array.from(scope.querySelectorAll<HTMLButtonElement>("button"))
+    .find((candidate) => candidate.textContent === label);
+  if (!match) throw new Error(`${label} button not found`);
+  return match;
+}
+
 beforeEach(async () => {
   (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
   window.localStorage.clear();
@@ -104,7 +112,43 @@ afterEach(() => {
   vi.clearAllMocks();
 });
 
-describe("Preview outline navigation", () => {
+describe("Outline navigation", () => {
+  it.each(["Edit", "Split"])(
+    "uses live content for an immediate outline click after deleting headings in %s mode",
+    async (mode) => {
+      const viewModeSwitcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+      if (!viewModeSwitcher) throw new Error("View mode switcher not found");
+      await click(button(mode, viewModeSwitcher));
+
+      dialogMocks.open.mockResolvedValueOnce("C:\\notes\\live-outline.md");
+      tauriMocks.readTextFile.mockResolvedValueOnce({
+        path: "C:\\notes\\live-outline.md",
+        content: `# First\n\n${"body\n".repeat(100)}# Removed`,
+      });
+      await shortcut(window, "o");
+
+      const editorElement = container.querySelector<HTMLElement>(".cm-editor");
+      if (!editorElement) throw new Error("CodeMirror editor not found");
+      const editorView = EditorView.findFromDOM(editorElement);
+      if (!editorView) throw new Error("CodeMirror view not found");
+      act(() => {
+        editorView.dispatch({
+          changes: { from: 0, to: editorView.state.doc.length, insert: "# Now" },
+        });
+      });
+
+      const outlineButtons = Array.from(
+        container.querySelectorAll<HTMLButtonElement>('nav[aria-label="Outline"] button'),
+      );
+      const lastOutlineButton = outlineButtons[outlineButtons.length - 1];
+      if (!lastOutlineButton) throw new Error("Outline heading not found");
+      await click(lastOutlineButton);
+
+      expect(outlineButtons.map((outlineButton) => outlineButton.textContent)).toEqual(["Now"]);
+      expect(editorView.state.selection.main).toMatchObject({ from: 0, to: 5 });
+    },
+  );
+
   it("scrolls duplicate ATX headings past Setext and spoofed raw IDs and tolerates a missing target", async () => {
     dialogMocks.open.mockResolvedValueOnce("C:\\notes\\outline.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({

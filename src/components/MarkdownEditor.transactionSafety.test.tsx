@@ -66,6 +66,16 @@ afterEach(() => {
 });
 
 describe("MarkdownEditor transaction safety", () => {
+  it("normalizes an out-of-bounds reversed range before selecting it", () => {
+    const { editorRef, view } = renderEditor("Koharu");
+
+    expect(() => {
+      act(() => editorRef.current?.selectRange(100, -20));
+    }).not.toThrow();
+
+    expect(view.state.selection.main).toMatchObject({ from: 0, to: 6 });
+  });
+
   it.each([
     {
       label: "whitespace-only bold",

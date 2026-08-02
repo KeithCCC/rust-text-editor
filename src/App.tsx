@@ -308,12 +308,25 @@ const UI_TEXT = {
 } as const;
 
 function readStoredValue(key: string, legacyKey?: string) {
-  return window.localStorage.getItem(key) ?? (legacyKey ? window.localStorage.getItem(legacyKey) : null);
+  try {
+    const storage = window.localStorage;
+    return storage.getItem(key) ?? (legacyKey ? storage.getItem(legacyKey) : null);
+  } catch {
+    return null;
+  }
 }
 
 function readStoredNumber(key: string, fallback: number, min: number, max: number) {
-  const value = Number(window.localStorage.getItem(key));
+  const value = Number(readStoredValue(key));
   return Number.isFinite(value) && value >= min && value <= max ? value : fallback;
+}
+
+function writeStoredValue(key: string, value: string) {
+  try {
+    window.localStorage.setItem(key, value);
+  } catch {
+    // Preferences remain in memory when browser storage is unavailable.
+  }
 }
 
 function getDocumentStats(markdown: string) {
@@ -358,7 +371,7 @@ export default function App() {
   const [documentSessionId, setDocumentSessionId] = useState(0);
   const [currentFile, setCurrentFile] = useState<string | null>(initialDocument.path);
   const [recentFiles, setRecentFiles] = useState(() => parseRecentFiles(
-    window.localStorage.getItem(RECENT_FILES_STORAGE_KEY),
+    readStoredValue(RECENT_FILES_STORAGE_KEY),
   ));
   const [modified, setModified] = useState(initialDocument.modified);
   const [error, setError] = useState<EditorError | null>(null);
@@ -367,7 +380,7 @@ export default function App() {
   const [isAppearanceSettingsOpen, setIsAppearanceSettingsOpen] = useState(false);
   const [isHelpOpen, setIsHelpOpen] = useState(false);
   const [isToolbarHintVisible, setIsToolbarHintVisible] = useState(() => shouldShowToolbarHint(
-    window.localStorage.getItem(TOOLBAR_HINT_STORAGE_KEY),
+    readStoredValue(TOOLBAR_HINT_STORAGE_KEY),
   ));
   const [isFormattingToolbarVisible, setIsFormattingToolbarVisible] = useState(
     readFormattingToolbarVisibility,
@@ -378,7 +391,7 @@ export default function App() {
   const [isPreviewPending, setIsPreviewPending] = useState(false);
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
   const [editorMode, setEditorMode] = useState<ViewMode>(() => resolveViewMode(
-    window.localStorage.getItem(EDITOR_MODE_STORAGE_KEY),
+    readStoredValue(EDITOR_MODE_STORAGE_KEY),
   ));
   const [formattingContext, setFormattingContext] = useState<FormattingContext>({
     headingLevel: null,
@@ -393,7 +406,7 @@ export default function App() {
   });
   const [appLanguage, setAppLanguage] = useState<AppLanguage>(() => {
     return resolveInitialAppLanguage(
-      window.localStorage.getItem(LANGUAGE_STORAGE_KEY),
+      readStoredValue(LANGUAGE_STORAGE_KEY),
       navigator.languages.length > 0 ? navigator.languages : [navigator.language],
     );
   });
@@ -486,7 +499,8 @@ export default function App() {
     "--split-percent": `${splitPercent}%`,
   }) as CSSProperties, [editorFontSize, editorLineHeight, previewFontSize, previewLineHeight, splitPercent, uiFontSize]);
   const stats = useMemo(() => getDocumentStats(content), [content]);
-  const outlineHeadings = useMemo(() => parseMarkdownOutline(previewContent), [previewContent]);
+  const outlineContent = editorMode === "preview" ? previewContent : content;
+  const outlineHeadings = useMemo(() => parseMarkdownOutline(outlineContent), [outlineContent]);
   const searchMatches = useMemo(() => {
     if (!searchQuery) {
       return [];
@@ -939,7 +953,7 @@ export default function App() {
   }, [editorMode, formattingUi]);
 
   const dismissToolbarHint = useCallback(() => {
-    window.localStorage.setItem(TOOLBAR_HINT_STORAGE_KEY, "true");
+    writeStoredValue(TOOLBAR_HINT_STORAGE_KEY, "true");
     setIsToolbarHintVisible(false);
   }, []);
 
@@ -1037,19 +1051,19 @@ export default function App() {
   }, [currentFile, modified]);
 
   useEffect(() => {
-    window.localStorage.setItem(THEME_STORAGE_KEY, themeMode);
+    writeStoredValue(THEME_STORAGE_KEY, themeMode);
   }, [themeMode]);
 
   useEffect(() => {
-    window.localStorage.setItem(LANGUAGE_STORAGE_KEY, appLanguage);
+    writeStoredValue(LANGUAGE_STORAGE_KEY, appLanguage);
   }, [appLanguage]);
 
   useEffect(() => {
-    window.localStorage.setItem(EDITOR_MODE_STORAGE_KEY, editorMode);
+    writeStoredValue(EDITOR_MODE_STORAGE_KEY, editorMode);
   }, [editorMode]);
 
   useEffect(() => {
-    window.localStorage.setItem(SPLIT_STORAGE_KEY, String(splitPercent));
+    writeStoredValue(SPLIT_STORAGE_KEY, String(splitPercent));
   }, [splitPercent]);
 
   useEffect(() => {
@@ -1063,27 +1077,27 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.localStorage.setItem(EDITOR_FONT_SIZE_STORAGE_KEY, String(editorFontSize));
+    writeStoredValue(EDITOR_FONT_SIZE_STORAGE_KEY, String(editorFontSize));
   }, [editorFontSize]);
 
   useEffect(() => {
-    window.localStorage.setItem(EDITOR_LINE_HEIGHT_STORAGE_KEY, String(editorLineHeight));
+    writeStoredValue(EDITOR_LINE_HEIGHT_STORAGE_KEY, String(editorLineHeight));
   }, [editorLineHeight]);
 
   useEffect(() => {
-    window.localStorage.setItem(PREVIEW_FONT_SIZE_STORAGE_KEY, String(previewFontSize));
+    writeStoredValue(PREVIEW_FONT_SIZE_STORAGE_KEY, String(previewFontSize));
   }, [previewFontSize]);
 
   useEffect(() => {
-    window.localStorage.setItem(PREVIEW_LINE_HEIGHT_STORAGE_KEY, String(previewLineHeight));
+    writeStoredValue(PREVIEW_LINE_HEIGHT_STORAGE_KEY, String(previewLineHeight));
   }, [previewLineHeight]);
 
   useEffect(() => {
-    window.localStorage.setItem(UI_FONT_SIZE_STORAGE_KEY, String(uiFontSize));
+    writeStoredValue(UI_FONT_SIZE_STORAGE_KEY, String(uiFontSize));
   }, [uiFontSize]);
 
   useEffect(() => {
-    window.localStorage.setItem(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
+    writeStoredValue(RECENT_FILES_STORAGE_KEY, JSON.stringify(recentFiles));
   }, [recentFiles]);
 
   useEffect(() => {

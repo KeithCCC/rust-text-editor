@@ -133,6 +133,52 @@ afterEach(() => {
 });
 
 describe("document session safety", () => {
+  it.each(["getter", "getItem", "setItem"] as const)(
+    "mounts with a visible, usable formatting toolbar when the localStorage %s throws",
+    async (failure) => {
+      act(() => root.unmount());
+      const localStorageDescriptor = Object.getOwnPropertyDescriptor(window, "localStorage");
+      if (!localStorageDescriptor) throw new Error("localStorage descriptor not found");
+      Object.defineProperty(window, "localStorage", failure === "getter" ? {
+        configurable: true,
+        get: () => {
+          throw new Error("storage denied");
+        },
+      } : {
+        configurable: true,
+        value: {
+          getItem: () => {
+            if (failure === "getItem") throw new Error("storage denied");
+            return null;
+          },
+          setItem: () => {
+            if (failure === "setItem") throw new Error("storage denied");
+          },
+        },
+      });
+      root = createRoot(container);
+
+      try {
+        await act(async () => {
+          root.render(<App />);
+          await Promise.resolve();
+        });
+
+        const toggle = container.querySelector<HTMLButtonElement>(".formatting-toolbar-toggle");
+        expect(toggle?.getAttribute("aria-expanded")).toBe("true");
+        expect(editorPane().querySelector("#formatting-toolbar-region")).not.toBeNull();
+
+        if (!toggle) throw new Error("Formatting toolbar toggle not found");
+        await click(toggle);
+
+        expect(toggle.getAttribute("aria-expanded")).toBe("false");
+        expect(container.querySelector('[role="alert"]')).toBeNull();
+      } finally {
+        Object.defineProperty(window, "localStorage", localStorageDescriptor);
+      }
+    },
+  );
+
   it("toggles the formatting toolbar from the pane header and persists the choice", async () => {
     const toggle = button("Hide formatting toolbar", editorPane());
     expect(toggle.getAttribute("aria-expanded")).toBe("true");

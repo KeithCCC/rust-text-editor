@@ -599,9 +599,19 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         return;
       }
 
+      const documentLength = view.state.doc.length;
+      const clampPosition = (position: number) => (
+        Number.isNaN(position)
+          ? 0
+          : Math.min(documentLength, Math.max(0, Math.trunc(position)))
+      );
+      const clampedStart = clampPosition(start);
+      const clampedEnd = clampPosition(end);
+      const from = Math.min(clampedStart, clampedEnd);
+      const to = Math.max(clampedStart, clampedEnd);
       view.dispatch({
-        selection: EditorSelection.single(start, end),
-        effects: EditorView.scrollIntoView(start, { y: "center" }),
+        selection: EditorSelection.single(from, to),
+        effects: EditorView.scrollIntoView(from, { y: "center" }),
       });
       view.focus();
     },

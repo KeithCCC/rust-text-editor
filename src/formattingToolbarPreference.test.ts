@@ -5,7 +5,7 @@ import {
 } from "./formattingToolbarPreference";
 
 describe("formatting toolbar preference", () => {
-  it("defaults to visible unless storage contains a recognized value", () => {
+  it("keeps the toolbar visible by default and hides it only for the hidden value", () => {
     const storage = { getItem: vi.fn() };
     for (const [stored, expected] of [[null, true], ["visible", true], ["hidden", false], ["broken", true]] as const) {
       storage.getItem.mockReturnValueOnce(stored);
