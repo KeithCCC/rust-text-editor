@@ -23,4 +23,10 @@ describe("preview mode layout", () => {
 
     expect(getComputedStyle(editorPane).display).toBe("none");
   });
+
+  it("keeps the toolbar toggle within a 24px compact pane header", () => {
+    expect(applicationStyles).toMatch(
+      /\.formatting-toolbar-toggle\s*\{[^}]*height:\s*20px;[^}]*min-height:\s*20px;/s,
+    );
+  });
 });

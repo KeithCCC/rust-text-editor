@@ -795,7 +795,8 @@ kbd {
   align-items: center;
   gap: 4px;
   flex: 0 0 auto;
-  min-height: 22px;
+  height: 20px;
+  min-height: 20px;
   padding: 0 6px;
   border: 1px solid var(--border);
   border-radius: 4px;
