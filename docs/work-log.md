@@ -1,5 +1,32 @@
 # Work Log
 
+## 2026-08-04 03:05:13 +09:00 - master
+
+### Summary
+
+Prepared the Koharu 1.1 Microsoft Store update, including the completed quick-win editor improvements, refreshed help content, release versioning, and organized Store listing assets.
+
+### Notable Changes
+
+- Added Edit, Split, and Preview modes, a document outline, recent files, a redesigned Markdown toolbar, and Mermaid PNG/SVG/image export.
+- Improved toolbar visibility preferences, compact pane headers, file-path placement, Preview search behavior, accessibility, and document-safety handling.
+- Updated the bilingual in-app help and README guidance for the current interface.
+- Bumped the application and Store package version to 1.1.0 / 1.1.0.0.
+- Moved the original Store screenshots into `asset/version1desc/` and added Japanese and English 1.1 screenshots plus an English Markdown sample under `asset/version1.1desc/`.
+
+### Validation
+
+- `npm test -- --exclude ".worktrees/**"` passed: 41 test files and 285 tests.
+- `npx tsc --noEmit` passed.
+- All eight Store screenshot files passed PNG signature checks.
+- The English sample contains the expected Markdown heading and Mermaid fenced block.
+- The 1.1.0.0 Store MSIX previously passed MakeAppx semantic validation and WACK with an overall `PASS` result before Partner Center submission.
+
+### Risks And Follow-Ups
+
+- Microsoft Store screenshots and listing copy can be revised through a listing-only submission without changing the application package.
+- Store certification and publishing status remain external Partner Center processes.
+
 ## 2026-07-27 09:12:00 +09:00 - master
 
 ### Summary
