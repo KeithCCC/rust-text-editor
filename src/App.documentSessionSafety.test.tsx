@@ -65,7 +65,9 @@ async function shortcut(target: EventTarget, key: string, options: KeyboardEvent
 function editorContent() {
   const editor = container.querySelector<HTMLElement>(".cm-content");
   if (!editor) throw new Error("CodeMirror content element not found");
-  return editor.textContent ?? "";
+  const content = editor.cloneNode(true) as HTMLElement;
+  content.querySelector(".cm-placeholder")?.remove();
+  return content.textContent ?? "";
 }
 
 function button(label: string, scope: ParentNode = container) {
@@ -484,6 +486,37 @@ describe("document session safety", () => {
     expect((await shortcut(window, "b")).defaultPrevented).toBe(true);
     expect((await shortcut(window, "i")).defaultPrevented).toBe(true);
     expect(editorContent()).toBe(before);
+  });
+
+  it("switches a successfully created blank document to Edit without replacing the saved startup mode", async () => {
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+    if (!switcher) throw new Error("View mode switcher not found");
+    await click(button("Preview", switcher));
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
+
+    await shortcut(window, "n");
+
+    expect(switcher.getAttribute("data-mode")).toBe("edit");
+    expect(editorContent()).toBe("");
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
+  });
+
+  it("preserves Preview and the current document when New is canceled", async () => {
+    await shortcut(window, "b");
+    const contentBeforeNew = editorContent();
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+    if (!switcher) throw new Error("View mode switcher not found");
+    await click(button("Preview", switcher));
+
+    await shortcut(window, "n");
+    const dialog = container.querySelector<HTMLElement>('[role="dialog"]');
+    if (!dialog) throw new Error("Unsaved-decision dialog not found");
+    await click(button("Cancel", dialog));
+    await act(async () => { await Promise.resolve(); });
+
+    expect(switcher.getAttribute("data-mode")).toBe("preview");
+    expect(editorContent()).toBe(contentBeforeNew);
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
   });
 
   it("disables Markdown and JSON Format-menu actions while Preview is active", async () => {

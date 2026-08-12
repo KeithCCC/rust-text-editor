@@ -455,6 +455,7 @@ export default function App() {
     promise: Promise<UnsavedDecision>;
     resolve: (decision: UnsavedDecision) => void;
   } | null>(null);
+  const skipNextEditorModePersistenceRef = useRef(false);
   const transitionInProgressRef = useRef(false);
   const lastRecoveryWriteMsRef = useRef(0);
   const startupLoadedRef = useRef(false);
@@ -690,6 +691,11 @@ export default function App() {
     if (actionGateRef.current.isBlocked()) return;
     await requestDocumentTransition(async () => {
       resetDocument();
+      setEditorMode((mode) => {
+        if (mode === "edit") return mode;
+        skipNextEditorModePersistenceRef.current = true;
+        return "edit";
+      });
       return true;
     });
   }, [requestDocumentTransition, resetDocument]);
@@ -1067,6 +1073,10 @@ export default function App() {
   }, [appLanguage]);
 
   useEffect(() => {
+    if (skipNextEditorModePersistenceRef.current) {
+      skipNextEditorModePersistenceRef.current = false;
+      return;
+    }
     writeStoredValue(EDITOR_MODE_STORAGE_KEY, editorMode);
   }, [editorMode]);
 
