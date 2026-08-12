@@ -328,6 +328,11 @@ button[aria-disabled="true"] {
   box-shadow: 0 12px 24px var(--shadow);
 }
 
+.history-menu-popover {
+  width: 280px;
+  max-width: calc(100vw - 16px);
+}
+
 .menu-root[data-open="true"] .menu-popover {
   display: flex;
   flex-direction: column;
@@ -524,17 +529,9 @@ kbd {
   color: var(--muted);
 }
 
-.recent-files-label {
-  padding: 6px 12px 3px;
-  color: var(--muted);
-  font-size: 11px;
-  font-weight: 700;
-  text-transform: uppercase;
-}
-
 .recent-file-row {
   display: grid;
-  grid-template-columns: minmax(0, 1fr) auto;
+  grid-template-columns: minmax(0, 1fr) 30px;
   align-items: stretch;
 }
 
@@ -546,14 +543,14 @@ kbd {
 }
 
 .recent-file-row > button:first-child {
-  display: grid;
+  display: block;
   min-width: 0;
+  overflow: hidden;
 }
 
-.recent-file-row small {
+.recent-file-name {
+  display: block;
   overflow: hidden;
-  color: var(--muted);
-  font-size: 10px;
   text-overflow: ellipsis;
   white-space: nowrap;
 }

@@ -100,7 +100,7 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type MenuId = "file" | "view" | "settings" | "search" | "format" | "help";
+type MenuId = "file" | "history" | "view" | "settings" | "search" | "format" | "help";
 
 const THEME_STORAGE_KEY = "koharu-theme";
 const LEGACY_THEME_STORAGE_KEY = "hotaru-theme";
@@ -133,6 +133,8 @@ const UI_TEXT = {
     saveAs: "Save As...",
     exportHtml: "Export as HTML...",
     fileProperties: "File Properties...",
+    history: "History",
+    noRecentFiles: "No Recent Files",
     recentFiles: "Recent Files",
     clearRecentFiles: "Clear Recent Files",
     removeRecentFile: "Remove from recent files",
@@ -226,6 +228,8 @@ const UI_TEXT = {
     saveAs: "名前を付けて保存...",
     exportHtml: "HTMLとしてエクスポート...",
     fileProperties: "ファイル情報...",
+    history: "螻･豁ｴ",
+    noRecentFiles: "譛霑台ｽｿ縺｣縺溘ヵ繧｡繧､繝ｫ縺ｯ縺ゅｊ縺ｾ縺帙ｓ",
     recentFiles: "最近使ったファイル",
     clearRecentFiles: "履歴をすべて削除",
     removeRecentFile: "履歴から削除",
@@ -1362,35 +1366,6 @@ export default function App() {
             <div className="menu-popover" role="menu">
               <button role="menuitem" onClick={() => runMenuAction(handleNew)}>{text.new} <kbd>Ctrl+N</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>{text.open} <kbd>Ctrl+O</kbd></button>
-              {recentFiles.length > 0 && (
-                <>
-                  <div className="menu-separator" />
-                  <div className="recent-files-label">{text.recentFiles}</div>
-                  {recentFiles.map((entry) => (
-                    <div className="recent-file-row" key={entry.path.toLocaleLowerCase()}>
-                      <button
-                        role="menuitem"
-                        title={entry.path}
-                        onClick={() => runMenuAction(() => requestDocumentTransition(() => openFilePath(entry.path, {
-                          title: "File not found",
-                          onFailure: () => setRecentFiles((history) => removeRecentFile(history, entry.path)),
-                        })))}
-                      >
-                        <span>{fileNameFromPath(entry.path)}</span>
-                        <small>{entry.path}</small>
-                      </button>
-                      <button
-                        type="button"
-                        className="recent-file-remove"
-                        aria-label={`${text.removeRecentFile}: ${fileNameFromPath(entry.path)}`}
-                        title={text.removeRecentFile}
-                        onClick={() => setRecentFiles((history) => removeRecentFile(history, entry.path))}
-                      >×</button>
-                    </div>
-                  ))}
-                  <button role="menuitem" onClick={() => setRecentFiles([])}>{text.clearRecentFiles}</button>
-                </>
-              )}
               <button role="menuitem" onClick={() => runMenuAction(handleSaveAction)}>{text.save} <kbd>Ctrl+S</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleSaveAsAction)}>{text.saveAs}</button>
               <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>{text.exportHtml}</button>
@@ -1398,6 +1373,46 @@ export default function App() {
               <button role="menuitem" onClick={() => runMenuAction(handleFileProperties)} disabled={!currentFile}>{text.fileProperties}</button>
               <div className="menu-separator" />
               <button role="menuitem" onClick={() => runMenuAction(handleExit)}>{text.exit}</button>
+            </div>
+          </div>
+
+          <div className="menu-root" data-open={activeMenu === "history"} onMouseEnter={() => activeMenu && setActiveMenu("history")}>
+            <button className="menu-title" aria-expanded={activeMenu === "history"} onClick={() => setActiveMenu((menu) => (menu === "history" ? null : "history"))}>{text.history}</button>
+            <div className="menu-popover history-menu-popover" role="menu">
+              {recentFiles.length === 0 ? (
+                <div className="menu-empty" role="menuitem" aria-disabled="true">
+                  {text.noRecentFiles}
+                </div>
+              ) : (
+                <>
+                  {recentFiles.map((entry) => {
+                    const fileName = fileNameFromPath(entry.path);
+                    return (
+                      <div className="recent-file-row" key={entry.path.toLocaleLowerCase()}>
+                        <button
+                          role="menuitem"
+                          title={fileName}
+                          onClick={() => runMenuAction(() => requestDocumentTransition(() => openFilePath(entry.path, {
+                            title: "File not found",
+                            onFailure: () => setRecentFiles((history) => removeRecentFile(history, entry.path)),
+                          })))}
+                        >
+                          <span className="recent-file-name">{fileName}</span>
+                        </button>
+                        <button
+                          type="button"
+                          className="recent-file-remove"
+                          aria-label={`${text.removeRecentFile}: ${fileName}`}
+                          title={text.removeRecentFile}
+                          onClick={() => setRecentFiles((history) => removeRecentFile(history, entry.path))}
+                        >×</button>
+                      </div>
+                    );
+                  })}
+                  <div className="menu-separator" />
+                  <button role="menuitem" onClick={() => setRecentFiles([])}>{text.clearRecentFiles}</button>
+                </>
+              )}
             </div>
           </div>
 
