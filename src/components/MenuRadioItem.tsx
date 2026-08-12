@@ -4,9 +4,10 @@ type MenuRadioItemProps = {
   checked: boolean;
   label: string;
   onSelect: () => void;
+  onReselect?: () => void;
 };
 
-export function MenuRadioItem({ name, value, checked, label, onSelect }: MenuRadioItemProps) {
+export function MenuRadioItem({ name, value, checked, label, onSelect, onReselect }: MenuRadioItemProps) {
   return (
     <label className="menu-choice-item" role="menuitemradio" aria-checked={checked}>
       <input
@@ -14,6 +15,9 @@ export function MenuRadioItem({ name, value, checked, label, onSelect }: MenuRad
         name={name}
         value={value}
         checked={checked}
+        onClick={() => {
+          if (checked) onReselect?.();
+        }}
         onChange={onSelect}
       />
       <span>{label}</span>

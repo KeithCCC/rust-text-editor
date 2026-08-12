@@ -90,6 +90,15 @@ async function click(target: HTMLElement) {
   });
 }
 
+async function remountApp() {
+  act(() => root.unmount());
+  root = createRoot(container);
+  await act(async () => {
+    root.render(<App />);
+    await Promise.resolve();
+  });
+}
+
 function focus(target: HTMLElement) {
   act(() => target.focus());
 }
@@ -499,6 +508,45 @@ describe("document session safety", () => {
     expect(switcher.getAttribute("data-mode")).toBe("edit");
     expect(editorContent()).toBe("");
     expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
+  });
+
+  it.each([
+    ["View mode switcher", async () => {
+      const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+      if (!switcher) throw new Error("View mode switcher not found");
+      await click(button("Edit", switcher));
+    }],
+    ["View menu", async () => {
+      await click(button("View"));
+      const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
+      const editChoice = viewMenu?.querySelector<HTMLInputElement>('input[name="view-mode"][value="edit"]');
+      if (!editChoice) throw new Error("Edit menu choice not found");
+      expect(editChoice.checked).toBe(true);
+      await click(editChoice);
+    }],
+  ])("saves Edit as the startup preference when active Edit is explicitly selected from the %s", async (_control, selectEdit) => {
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
+    if (!switcher) throw new Error("View mode switcher not found");
+    await click(button("Preview", switcher));
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
+
+    await shortcut(window, "n");
+    expect(switcher.getAttribute("data-mode")).toBe("edit");
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
+
+    await selectEdit();
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("edit");
+
+    await remountApp();
+    expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
+  });
+
+  it("keeps keyboard mode cycling as the saved startup preference", async () => {
+    expect((await shortcut(window, "m", { altKey: true })).defaultPrevented).toBe(true);
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("split");
+
+    await remountApp();
+    expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("split");
   });
 
   it("preserves Preview and the current document when New is canceled", async () => {

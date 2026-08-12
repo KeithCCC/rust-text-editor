@@ -474,6 +474,11 @@ export default function App() {
   const dragDropErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
   const startupRecoveryDecisionInProgressRef = useRef(false);
 
+  const selectEditorMode = useCallback((mode: ViewMode) => {
+    writeStoredValue(EDITOR_MODE_STORAGE_KEY, mode);
+    setEditorMode(mode);
+  }, []);
+
   const isNativeRuntime = isTauriRuntime();
   const isSplitMode = editorMode === "split";
   const { editorVisible: isEditorVisible, previewVisible: isPreviewVisible } = resolvePaneVisibility(editorMode);
@@ -1436,9 +1441,9 @@ export default function App() {
               <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
               <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
               <div className="menu-separator" />
-              <MenuRadioItem name="view-mode" value="edit" checked={editorMode === "edit"} label={text.editMode} onSelect={() => runMenuAction(() => setEditorMode("edit"))} />
-              <MenuRadioItem name="view-mode" value="split" checked={editorMode === "split"} label={text.splitMode} onSelect={() => runMenuAction(() => setEditorMode("split"))} />
-              <MenuRadioItem name="view-mode" value="preview" checked={editorMode === "preview"} label={text.previewMode} onSelect={() => runMenuAction(() => setEditorMode("preview"))} />
+              <MenuRadioItem name="view-mode" value="edit" checked={editorMode === "edit"} label={text.editMode} onSelect={() => runMenuAction(() => selectEditorMode("edit"))} onReselect={() => runMenuAction(() => selectEditorMode("edit"))} />
+              <MenuRadioItem name="view-mode" value="split" checked={editorMode === "split"} label={text.splitMode} onSelect={() => runMenuAction(() => selectEditorMode("split"))} onReselect={() => runMenuAction(() => selectEditorMode("split"))} />
+              <MenuRadioItem name="view-mode" value="preview" checked={editorMode === "preview"} label={text.previewMode} onSelect={() => runMenuAction(() => selectEditorMode("preview"))} onReselect={() => runMenuAction(() => selectEditorMode("preview"))} />
               <MenuCheckboxItem checked={isOutlineVisible} label={text.outline} onToggle={() => runMenuAction(() => setIsOutlineVisible((visible) => !visible))} />
               <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
             </div>
@@ -1494,7 +1499,7 @@ export default function App() {
           <ViewModeSwitcher
             mode={editorMode}
             labels={{ edit: text.editMode, split: text.splitMode, preview: text.previewMode }}
-            onChange={setEditorMode}
+            onChange={selectEditorMode}
           />
         </nav>
 
