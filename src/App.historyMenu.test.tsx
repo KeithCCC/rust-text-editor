@@ -151,8 +151,8 @@ describe("History menu", () => {
   it("localizes the History menu in Japanese", async () => {
     window.localStorage.setItem("koharu-language", "ja");
     await renderApp();
-    await click(button("螻･豁ｴ"));
-    expect(openMenu().textContent).toContain("譛霑台ｽｿ縺｣縺溘ヵ繧｡繧､繝ｫ縺ｯ縺ゅｊ縺ｾ縺帙ｓ");
+    await click(button("履歴"));
+    expect(openMenu().textContent).toContain("最近使ったファイルはありません");
   });
 
   it("opens a recent file by its stored full path", async () => {
