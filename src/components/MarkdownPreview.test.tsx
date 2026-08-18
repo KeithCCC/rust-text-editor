@@ -10,6 +10,7 @@ describe("MarkdownPreview", () => {
         currentFile={null}
         themeMode="light"
         onOpenExcalidraw={() => undefined}
+        onOpenExternalLink={() => undefined}
         onOpenRelativeMarkdownLink={() => undefined}
       />,
     );
@@ -24,6 +25,7 @@ describe("MarkdownPreview", () => {
         currentFile={null}
         themeMode="light"
         onOpenExcalidraw={() => undefined}
+        onOpenExternalLink={() => undefined}
         onOpenRelativeMarkdownLink={() => undefined}
       />,
     );
@@ -41,6 +43,7 @@ describe("MarkdownPreview", () => {
         currentFile={null}
         themeMode="light"
         onOpenExcalidraw={() => undefined}
+        onOpenExternalLink={() => undefined}
         onOpenRelativeMarkdownLink={() => undefined}
       />,
     );
@@ -56,6 +59,7 @@ describe("MarkdownPreview", () => {
         currentFile={null}
         themeMode="light"
         onOpenExcalidraw={() => undefined}
+        onOpenExternalLink={() => undefined}
         onOpenRelativeMarkdownLink={() => undefined}
       />,
     );

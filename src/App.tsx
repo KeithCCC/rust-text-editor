@@ -11,6 +11,7 @@ import type { CSSProperties } from "react";
 import { getCurrentWebview } from "@tauri-apps/api/webview";
 import { getCurrentWindow } from "@tauri-apps/api/window";
 import { open, save } from "@tauri-apps/plugin-dialog";
+import { openUrl } from "@tauri-apps/plugin-opener";
 import { BUILD_INFO } from "./buildInfo";
 import { resolveInitialAppLanguage, type AppLanguage } from "./appLanguage";
 import { formatBuildLabel } from "./buildLabel";
@@ -885,6 +886,15 @@ export default function App() {
     );
   }, [currentFile, openFilePath, requestDocumentTransition, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
 
+  const handleOpenExternalLink = useCallback((url: string) => {
+    void openUrl(url).catch((linkError) => {
+      showError(
+        text.linkOpenFailed,
+        linkError instanceof Error ? linkError.message : String(linkError),
+      );
+    });
+  }, [showError, text.linkOpenFailed]);
+
   const handleExcalidrawSaved = useCallback(async (path: string) => {
     if (path === currentFile) {
       try {
@@ -1680,6 +1690,7 @@ export default function App() {
                   currentFile={currentFile}
                   themeMode={themeMode}
                   onOpenExcalidraw={handleOpenExcalidrawPreview}
+                  onOpenExternalLink={handleOpenExternalLink}
                   onOpenRelativeMarkdownLink={handleOpenRelativeMarkdownLink}
                 />
               </article>

@@ -25,6 +25,7 @@ type MarkdownPreviewProps = {
   currentFile: string | null;
   themeMode: "system" | "light" | "dark";
   onOpenExcalidraw: (path: string, scene: ExcalidrawScene | null) => void;
+  onOpenExternalLink: (url: string) => void;
   onOpenRelativeMarkdownLink: (path: string) => void;
 };
 
@@ -66,7 +67,7 @@ function createPreviewHeading(
 }
 
 const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(function MarkdownPreview(
-  { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenRelativeMarkdownLink },
+  { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenExternalLink, onOpenRelativeMarkdownLink },
   ref,
 ) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -109,6 +110,21 @@ const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPrevi
                   onClick={(event) => {
                     event.preventDefault();
                     onOpenRelativeMarkdownLink(relativeMarkdownPath);
+                  }}
+                >
+                  {children}
+                </a>
+              );
+            }
+
+            if (href && /^https?:\/\//i.test(href)) {
+              return (
+                <a
+                  href={href}
+                  {...props}
+                  onClick={(event) => {
+                    event.preventDefault();
+                    onOpenExternalLink(href);
                   }}
                 >
                   {children}

@@ -70,7 +70,7 @@ body {
   --editor-line-height: 1.55;
   --preview-font-size: 16px;
   --preview-line-height: 1.65;
-  --ui-font-size: 13px;
+  --ui-font-size: 12px;
 }
 
 .app-shell[data-theme="dark"] {
