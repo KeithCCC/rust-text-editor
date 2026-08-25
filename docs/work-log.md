@@ -1,5 +1,31 @@
 # Work Log
 
+## 2026-08-25 22:45:30 +09:00 - master
+
+### Summary
+
+Prepared Koharu 1.2.2 for Microsoft Store submission with Explorer Markdown activation and menu typography aligned to Windows Notepad.
+
+### Notable Changes
+
+- Added a Store MSIX `.md` file association that forwards one quoted document path to Koharu.
+- Refactored native startup argument handling and added coverage for file paths containing spaces.
+- Increased top-level menu labels to 14 px and added a rendered-style regression test.
+- Synchronized npm, Cargo, Tauri, lockfile, and generated build metadata at version 1.2.2.
+- Built the unsigned x64 Store artifact `Koharu_1.2.2.0_x64.msix` with the validated Partner Center identity.
+
+### Validation
+
+- `npm test -- --reporter=dot` passed: 63 test files and 381 tests.
+- `cargo test --manifest-path src-tauri/Cargo.toml` passed: 8 tests.
+- `.codex/skill-tests/build-koharu-msix.Tests.ps1` passed.
+- The release build and MakeAppx packaging completed successfully; SHA-256 is `1A8BB035EC948DF2446EBD6882EC29970EEFE6C8E09C9726B81E611F40EE73DD`.
+
+### Risks And Follow-Ups
+
+- The Store MSIX is unsigned for Partner Center upload and cannot be installed locally without a trusted test signature.
+- Vite continues to report its existing large-chunk optimization advisory.
+
 ## 2026-08-04 03:05:13 +09:00 - master
 
 ### Summary

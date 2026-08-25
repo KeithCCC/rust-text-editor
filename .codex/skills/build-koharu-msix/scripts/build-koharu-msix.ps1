@@ -215,8 +215,9 @@ try {
 <Package
   xmlns="http://schemas.microsoft.com/appx/manifest/foundation/windows10"
   xmlns:uap="http://schemas.microsoft.com/appx/manifest/uap/windows10"
+  xmlns:uap3="http://schemas.microsoft.com/appx/manifest/uap/windows10/3"
   xmlns:rescap="http://schemas.microsoft.com/appx/manifest/foundation/windows10/restrictedcapabilities"
-  IgnorableNamespaces="uap rescap">
+  IgnorableNamespaces="uap uap3 rescap">
   <Identity Name="$escapedIdentityName" Publisher="$escapedPublisher" Version="$msixVersion" ProcessorArchitecture="$Architecture" />
   <Properties>
     <DisplayName>Koharu</DisplayName>
@@ -239,6 +240,15 @@ try {
         BackgroundColor="transparent"
         Square150x150Logo="Assets\Square150x150Logo.png"
         Square44x44Logo="Assets\Square44x44Logo.png" />
+      <Extensions>
+        <uap3:Extension Category="windows.fileTypeAssociation">
+          <uap3:FileTypeAssociation Name="markdown" Parameters="&quot;%1&quot;">
+            <uap:SupportedFileTypes>
+              <uap:FileType>.md</uap:FileType>
+            </uap:SupportedFileTypes>
+          </uap3:FileTypeAssociation>
+        </uap3:Extension>
+      </Extensions>
     </Application>
   </Applications>
   <Capabilities>

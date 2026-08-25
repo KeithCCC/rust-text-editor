@@ -88,15 +88,18 @@ fn open_file_in_new_instance(path: String) -> Result<(), String> {
 
 #[tauri::command]
 fn get_startup_file_path() -> Result<Option<String>, String> {
-    let mut args = std::env::args_os();
-    let _ = args.next();
+    startup_file_path_from_args(std::env::args_os())
+        .map(|path| path.map(|path| path.to_string_lossy().to_string()))
+        .map_err(|error| format!("Failed to resolve startup file path: {}", error))
+}
 
-    for arg in args {
+fn startup_file_path_from_args(
+    args: impl IntoIterator<Item = std::ffi::OsString>,
+) -> std::io::Result<Option<PathBuf>> {
+    for arg in args.into_iter().skip(1) {
         let path = PathBuf::from(arg);
         if path.is_file() {
-            return normalize_path(path)
-                .map(|path| Some(path.to_string_lossy().to_string()))
-                .map_err(|error| format!("Failed to resolve startup file path: {}", error));
+            return normalize_path(path).map(Some);
         }
     }
 
@@ -240,7 +243,8 @@ pub fn run() {
 
 #[cfg(test)]
 mod binary_file_tests {
-    use super::write_binary_file;
+    use super::{startup_file_path_from_args, write_binary_file};
+    use std::ffi::OsString;
 
     #[test]
     fn writes_binary_export_bytes() {
@@ -248,5 +252,21 @@ mod binary_file_tests {
         let path = directory.path().join("diagram.png");
         write_binary_file(path.to_string_lossy().to_string(), vec![0, 1, 2, 255]).expect("write");
         assert_eq!(std::fs::read(path).expect("read"), vec![0, 1, 2, 255]);
+    }
+
+    #[test]
+    fn selects_existing_file_from_startup_arguments() {
+        let directory = tempfile::tempdir().expect("tempdir");
+        let markdown_path = directory.path().join("notes with spaces.md");
+        std::fs::write(&markdown_path, "# Opened from Explorer").expect("fixture");
+        let args = vec![
+            OsString::from("koharu.exe"),
+            OsString::from("--ignored"),
+            markdown_path.clone().into_os_string(),
+        ];
+
+        let selected = startup_file_path_from_args(args).expect("startup path");
+
+        assert_eq!(selected, Some(markdown_path.canonicalize().expect("canonical path")));
     }
 }

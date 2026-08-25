@@ -1,6 +1,6 @@
 [package]
 name = "koharu"
-version = "1.2.0"
+version = "1.2.2"
 description = "Single-file text editor with optional Markdown preview"
 authors = ["Daily AI Lab"]
 edition = "2024"

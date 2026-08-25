@@ -96,7 +96,8 @@ try {
     -PackageIdentityName "12345DailyAILab.Koharu" `
     -Publisher "CN=01234567-89AB-CDEF-0123-456789ABCDEF" `
     -PublisherDisplayName "Daily AI Lab" `
-    -OutputPath $output
+    -OutputPath $output `
+    -SkipBuild
 
   if ($LASTEXITCODE -ne 0) {
     throw "MSIX build script exited with code $LASTEXITCODE"
@@ -128,6 +129,19 @@ try {
   $resourceLanguages = @($manifest.Package.Resources.Resource | ForEach-Object { $_.Language })
   if ($resourceLanguages -notcontains "en-US") { throw "English package resource declaration is missing" }
   if ($resourceLanguages -notcontains "ja-JP") { throw "Japanese package resource declaration is missing" }
+
+  $namespaceManager = [System.Xml.XmlNamespaceManager]::new($manifest.NameTable)
+  $namespaceManager.AddNamespace("f", "http://schemas.microsoft.com/appx/manifest/foundation/windows10")
+  $namespaceManager.AddNamespace("uap", "http://schemas.microsoft.com/appx/manifest/uap/windows10")
+  $namespaceManager.AddNamespace("uap3", "http://schemas.microsoft.com/appx/manifest/uap/windows10/3")
+  $association = $manifest.SelectSingleNode(
+    "/f:Package/f:Applications/f:Application/f:Extensions/uap3:Extension[@Category='windows.fileTypeAssociation']/uap3:FileTypeAssociation[@Name='markdown']",
+    $namespaceManager
+  )
+  if (-not $association) { throw "Markdown file type association is missing" }
+  if ($association.Parameters -ne '"%1"') { throw "Markdown activation must pass one quoted file path" }
+  $markdownFileType = $association.SelectSingleNode("uap:SupportedFileTypes/uap:FileType[text()='.md']", $namespaceManager)
+  if (-not $markdownFileType) { throw "The .md file type is missing from the Markdown association" }
 
   foreach ($relativePath in @(
     "koharu.exe",
