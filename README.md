@@ -35,7 +35,7 @@ Use **Hotaru** if you are interested in experimental notebook or vault workflows
 1. Choose **File > New** to create a document, or **File > Open** to open an existing Markdown or text file.
 2. Use **Edit** for writing, **Split** to see the editor and rendered result together, or **Preview** to see only the rendered result.
 3. Use the control in the editor header to show or hide the formatting toolbar. Koharu remembers this choice. The current file path is shown in the bottom status bar; hover it to see the full path when it is truncated.
-4. Choose **Search > Find** or press `Ctrl+F` to search the document. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.
+4. Click **Search** in the menu bar or press `Ctrl+F` to search the document. Click **Search** again or press `Escape` to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.
 
 ## Hotaru Direction
 
@@ -132,7 +132,7 @@ Vault やノートブック的な使い方、実験的なナレッジ管理機�
 1. **「ファイル」→「新規」**で文書を作るか、**「ファイル」→「開く」**で既存のMarkdownファイルまたはテキストファイルを開きます。
 2. 文章を書くときは**編集**、編集画面と仕上がりを並べるときは**分割**、仕上がりだけを見るときは**プレビュー**を選びます。
 3. エディターヘッダーのボタンで書式ツールバーの表示・非表示を切り替えられます。この設定は次回も引き継がれます。現在のファイルパスは画面下部のステータスバーに表示され、省略されている場合はマウスを重ねると完全なパスを確認できます。
-4. **「検索」→「検索」**を選ぶか`Ctrl+F`を押すと、文書内を検索できます。プレビューから検索した場合は自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。
+4. メニューバーの**「検索」**をクリックするか`Ctrl+F`を押すと、文書内を検索できます。もう一度**「検索」**をクリックするか`Escape`を押すと閉じます。プレビューから検索した場合は自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。
 
 ## Hotaru の方向性
 

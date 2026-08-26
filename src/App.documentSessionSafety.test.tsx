@@ -323,6 +323,25 @@ describe("document session safety", () => {
     expect(header.querySelector('[role="search"]')).not.toBeNull();
   });
 
+  it("toggles the search row directly from the top-level Search button", async () => {
+    const searchToggle = button("Search");
+    expect(container.querySelector('[role="search"]')).toBeNull();
+
+    await click(searchToggle);
+    await act(async () => {
+      await new Promise((resolve) => window.setTimeout(resolve, 25));
+    });
+
+    expect(container.querySelector('[role="search"]')).not.toBeNull();
+    expect(searchToggle.getAttribute("aria-pressed")).toBe("true");
+    expect(container.querySelector('.menu-root[data-open="true"] .menu-popover')).toBeNull();
+
+    await click(searchToggle);
+
+    expect(container.querySelector('[role="search"]')).toBeNull();
+    expect(searchToggle.getAttribute("aria-pressed")).toBe("false");
+  });
+
   it("switches Preview to Split before Ctrl+F exposes and focuses Find", async () => {
     const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
     if (!switcher) throw new Error("View mode switcher not found");

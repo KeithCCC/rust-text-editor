@@ -1,5 +1,32 @@
 # Work Log
 
+## 2026-08-26 13:52:00 +09:00 - master
+
+### Summary
+
+Prepared Koharu 1.2.5 with a direct Search menu toggle and consistent compact interface typography, then rebuilt the Microsoft Store MSIX.
+
+### Notable Changes
+
+- Replaced the nested Search submenu with a top-level toggle that opens and closes document search directly.
+- Unified ordinary interface text at 13 px across menus, panes, toolbars, search controls, settings, status text, and the editor placeholder.
+- Replaced invalid font shorthand declarations that caused dropdowns and other controls to fall back to the browser's larger `medium` size.
+- Expanded interaction and computed-style regression coverage and updated bilingual README and in-app help guidance.
+- Synchronized npm, Cargo, Tauri, lockfile, and generated build metadata at version 1.2.5.
+- Built the unsigned x64 Store artifact `Koharu_1.2.5.0_x64.msix` with the validated Partner Center identity.
+
+### Validation
+
+- `npm test -- --reporter=dot` passed: 63 test files and 382 tests.
+- The Tauri release build and MakeAppx packaging completed successfully.
+- The MSIX manifest independently reports version 1.2.5.0, x64 architecture, and the validated Koharu Store identity.
+- MSIX SHA-256: `BF841DDE5588A927E2BDC40F903A88B2F6604026766EEE4349C320631826A33B`.
+
+### Risks And Follow-Ups
+
+- The Store MSIX is unsigned for Partner Center upload and cannot be installed locally without a trusted test signature.
+- Vite continues to report its existing large-chunk optimization advisory.
+
 ## 2026-08-25 22:45:30 +09:00 - master
 
 ### Summary

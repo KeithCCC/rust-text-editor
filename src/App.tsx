@@ -101,7 +101,7 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type MenuId = "file" | "history" | "view" | "settings" | "search" | "format" | "help";
+type MenuId = "file" | "history" | "view" | "settings" | "format" | "help";
 
 const THEME_STORAGE_KEY = "koharu-theme";
 const LEGACY_THEME_STORAGE_KEY = "hotaru-theme";
@@ -969,6 +969,14 @@ export default function App() {
     });
   }, [editorMode]);
 
+  const toggleNoteSearch = useCallback(() => {
+    if (isNoteSearchVisible) {
+      closeNoteSearch();
+      return;
+    }
+    openNoteSearch();
+  }, [closeNoteSearch, isNoteSearchVisible, openNoteSearch]);
+
   const handleMarkdownFormat = useCallback((command: MarkdownCommand) => {
     if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
     const result = editorRef.current?.applyFormat(command, formattingUi.placeholders);
@@ -1466,12 +1474,13 @@ export default function App() {
             </div>
           </div>
 
-          <div className="menu-root" data-open={activeMenu === "search"} onMouseEnter={() => activeMenu && setActiveMenu("search")}>
-            <button className="menu-title" aria-expanded={activeMenu === "search"} onClick={() => setActiveMenu((menu) => (menu === "search" ? null : "search"))}>{text.search}</button>
-            <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(openNoteSearch)}>{text.find} <kbd>Ctrl+F</kbd></button>
-            </div>
-          </div>
+          <button
+            type="button"
+            className="menu-title"
+            aria-pressed={isNoteSearchVisible}
+            title={`${text.search} (Ctrl+F)`}
+            onClick={toggleNoteSearch}
+          >{text.search}</button>
 
           <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
             <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>

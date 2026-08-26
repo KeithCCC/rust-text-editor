@@ -57,7 +57,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         paragraphs: [
           "Use the control in the editor header to show or hide the formatting toolbar. Your choice is remembered the next time you open Koharu.",
           "The current file path appears in the bottom status bar. If it is truncated, hover it to see the full path.",
-          "Choose Search > Find or press Ctrl+F. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.",
+          "Click Search in the menu bar or press Ctrl+F. Click Search again or press Escape to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.",
         ],
       },
       {
@@ -149,7 +149,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         paragraphs: [
           "エディターヘッダーのボタンで、書式ツールバーの表示・非表示を切り替えられます。選択は保存され、次回も引き継がれます。",
           "現在のファイルパスは画面下部のステータスバーに表示されます。省略されている場合は、マウスを重ねると完全なパスを確認できます。",
-          "「検索」→「検索」を選ぶかCtrl+Fを押します。プレビューから検索すると、自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。",
+          "メニューバーの「検索」をクリックするかCtrl+Fを押します。もう一度「検索」をクリックするかEscapeを押すと閉じます。プレビューから検索すると、自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。",
         ],
       },
       {
