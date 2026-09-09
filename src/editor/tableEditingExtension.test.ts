@@ -168,5 +168,35 @@ describe("direct table editing", () => {
     input(area, "two words again");
     expect(view.state.doc.toString()).toBe(raw.replace("| x |", "| two words again |"));
   });
+  it.each(["insert", "delete"])("keeps source mode when editing its first delimiter (%s)", action => {
+    const view = mount(action === "insert" ? "A | B\n--- | ---\nx | y" : raw);
+    button(view, "Edit source").click();
+    view.dispatch({ changes: action === "insert" ? { from: 0, insert: "X" } : { from: 0, to: 1 } });
+    expect(view.dom.querySelector("table")).toBeNull();
+    expect(view.dom.querySelectorAll(".koharu-table-source-controls")).toHaveLength(1);
+    button(view, "Show table").click(); expect(view.dom.querySelector("table")).not.toBeNull();
+  });
+  it("opens cell actions with Alt+Down and returns to the cell with Escape", () => {
+    const view = mount(); const area = cell(view); area.focus();
+    key(area, "ArrowDown", { altKey: true });
+    expect(area.parentElement!.querySelector("details")!.open).toBe(true);
+    expect(document.activeElement).toBe(area.parentElement!.querySelector("button"));
+    key(document.activeElement as HTMLElement, "Escape");
+    expect(document.activeElement).toBe(area);
+  });
+  it.each([0, 1])("keeps a borderless table editable when clearing boundary column %s", column => {
+    const view = mount("A | B\n--- | ---\nx | y"); const area = cell(view, 1, column);
+    input(area, ""); expect(cell(view, 1, column)).toBe(area);
+    input(area, "next "); expect(area.value).toBe("next ");
+    input(area, "next word"); expect(area.value).toBe("next word");
+    expect(cell(view, 1, column === 0 ? 1 : 0).value).toBe(column === 0 ? "y" : "x");
+  });
+  it("keeps keyboard undo and redo reachable after the focused row is removed", () => {
+    const view = mount(); cell(view, 1, 1).focus(); key(cell(view, 1, 1), "Tab");
+    key(cell(view, 2, 0), "z", { ctrlKey: true });
+    expect(document.activeElement).toBe(cell(view, 1, 0));
+    key(document.activeElement as HTMLElement, "y", { ctrlKey: true });
+    expect(view.dom.querySelectorAll("tbody tr")).toHaveLength(2);
+  });
 });
 

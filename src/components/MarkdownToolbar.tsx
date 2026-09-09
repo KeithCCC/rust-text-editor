@@ -171,8 +171,8 @@ export function MarkdownFormatMenu({
         type="button"
         role="menuitem"
         aria-label={formatJsonLabel}
-        disabled={disabled}
-        aria-disabled={disabled || undefined}
+        disabled={disabled || formattingContext?.tableCell}
+        aria-disabled={disabled || formattingContext?.tableCell || undefined}
         onClick={onFormatJson}
       >
         {formatJsonLabel}

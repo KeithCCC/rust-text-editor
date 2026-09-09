@@ -76,7 +76,9 @@ export class TableEditingRuntime {
     if (!change) return;
     const separate = key !== this.historyCell;
     this.historyCell = isolate ? "" : key;
-    this.draft = { key, from: change.from, to: change.from + change.insert.length, raw: change.insert, text: input.value };
+    const target = (address.row === 0 ? table.headers : table.rows[address.row - 1].cells)[address.column];
+    this.draft = change.from === target.range?.from && change.to === target.range.to
+      ? { key, from: change.from, to: change.from + change.insert.length, raw: change.insert, text: input.value } : null;
     this.inputDispatching = true;
     try {
       this.view.dispatch({ changes: change, annotations: [
@@ -85,8 +87,12 @@ export class TableEditingRuntime {
     } finally { this.inputDispatching = false; }
   }
   focus(address: TableCellAddress) {
+    const entry = this.entry(address.tableId);
+    if (!entry?.table || entry.source) { this.clear(); this.view.focus(); return; }
+    const row = Math.max(0, Math.min(address.row, entry.table.rows.length));
+    const column = Math.max(0, Math.min(address.column, entry.table.headers.length - 1));
     const wrapper = Array.from(this.view.dom.querySelectorAll<HTMLElement>(".koharu-table-wrap")).find(el => el.dataset.tableId === address.tableId);
-    const input = wrapper?.querySelector<HTMLTextAreaElement>(`[data-table-cell="${address.row}:${address.column}"]`);
+    const input = wrapper?.querySelector<HTMLTextAreaElement>(`[data-table-cell="${row}:${column}"]`);
     input?.focus(); input?.select();
   }
   changeTable(id: string, transform: (table: MarkdownTable) => MarkdownTable, target?: TableCellAddress) {
@@ -119,6 +125,12 @@ export class TableEditingRuntime {
   }
   key(address: TableCellAddress, input: HTMLTextAreaElement, event: KeyboardEvent) {
     if (this.composing || event.isComposing || event.keyCode === 229) return;
+    if (event.altKey && event.key === "ArrowDown") {
+      event.preventDefault(); event.stopPropagation();
+      const menu = input.parentElement?.querySelector("details");
+      if (menu) { menu.open = true; (menu.querySelector<HTMLButtonElement>("button:not(:disabled)") ?? menu.querySelector("summary"))?.focus(); }
+      return;
+    }
     if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) {
       event.preventDefault(); event.stopPropagation();
       if (this.view.state.readOnly) return;

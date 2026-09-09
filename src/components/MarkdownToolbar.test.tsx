@@ -163,6 +163,16 @@ describe("MarkdownToolbar", () => {
 });
 
 describe("MarkdownFormatMenu", () => {
+  it("disables whole-document JSON formatting while editing a table cell", () => {
+    const html = renderToStaticMarkup(
+      <MarkdownFormatMenu language="en" formatJsonLabel="Format JSON"
+        formattingContext={{ headingLevel: null, bold: false, italic: false,
+          strikethrough: false, inlineCode: false, tableCell: true }}
+        onFormat={() => undefined} onFormatJson={() => undefined} />,
+    );
+    expect(html).toMatch(/aria-label="Format JSON"[^>]*disabled=""/);
+  });
+
   it("offers the same localized semantic actions as the toolbar", () => {
     const html = renderToStaticMarkup(
       <MarkdownFormatMenu

@@ -87,6 +87,7 @@ export class TableWidget extends WidgetType {
         const area = document.createElement("textarea"); area.value = cell.text;
         area.dataset.tableCell = `${row}:${column}`; area.className = "koharu-table-cell";
         area.setAttribute("aria-label", ui.cell(row, column)); area.readOnly = this.readOnly;
+        area.setAttribute("aria-keyshortcuts", "Alt+ArrowDown");
         area.rows = Math.max(1, cell.text.split("\n").length);
         area.addEventListener("focus", () => runtime.activate(address, area));
         area.addEventListener("select", () => { if (runtime.active?.input === area) runtime.notify(); });
@@ -97,6 +98,7 @@ export class TableWidget extends WidgetType {
         td.append(area);
         const menu = document.createElement("details"); menu.className = "koharu-table-actions";
         const summary = document.createElement("summary"); summary.textContent = "⋯"; summary.setAttribute("aria-label", `${ui.actions}: ${ui.cell(row, column)}`);
+        summary.title = `${ui.actions} (Alt+↓)`;
         const controls = document.createElement("div"); controls.className = "koharu-table-action-list";
         const mutate = (transform: Parameters<typeof runtime.changeTable>[1]) => { menu.open = false; runtime.changeTable(entry.id, transform, address); };
         controls.append(

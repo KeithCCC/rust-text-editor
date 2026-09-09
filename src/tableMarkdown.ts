@@ -330,6 +330,21 @@ export function createTableCellChange(
   }
 
   let insert = encodeCellText(text);
+  if (!text.trim() && (column === 0 || column === table.headers.length - 1)) {
+    const lineFrom = source.lastIndexOf("\n", range.from - 1) + 1;
+    const newline = source.indexOf("\n", range.to);
+    const lineTo = newline < 0 ? source.length : source[newline - 1] === "\r" ? newline - 1 : newline;
+    const rowText = source.slice(lineFrom, lineTo);
+    const trimmed = rowText.trim();
+    const hasStart = trimmed.startsWith("|");
+    const hasEnd = trimmed.endsWith("|") && !isEscapedPipe(trimmed, trimmed.length - 1);
+    if (column === 0 && !hasStart || column === table.headers.length - 1 && !hasEnd) {
+      // Empty edge cells in a borderless row would turn its only separators
+      // into optional borders. Add borders while retaining every other byte.
+      const row = source.slice(lineFrom, range.from) + insert + source.slice(range.to, lineTo);
+      return { from: lineFrom, to: lineTo, insert: `${hasStart ? "" : "| "}${row}${hasEnd ? "" : " |"}` };
+    }
+  }
   // An unpadded cell must not let a trailing backslash escape its delimiter.
   if (source[range.to] === "|" && /(?:^|[^\\])(?:\\\\)*\\$/.test(insert)) insert += " ";
   return { from: range.from, to: range.to, insert };

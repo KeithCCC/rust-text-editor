@@ -15,11 +15,13 @@ function discover(state: EditorState, previous: TableEntry[]): TableEntry[] {
   for (let node = syntaxTree(state).topNode.firstChild; node; node = node.nextSibling) {
     if (node.name !== "Table") continue;
     source ??= state.doc.toString();
-    const prior = previous.find(entry => entry.from === node!.from);
+    const prior = previous.find(entry => entry.from === node!.from)
+      ?? previous.find(entry => entry.source && entry.from <= node!.from && entry.to >= node!.to);
     const raw = source.slice(node.from, node.to);
     const table = prior?.raw === raw && prior.table?.from === node.from ? prior.table : parseMarkdownTable(source, node.from, node.to);
     if (!table) continue;
-    entries.push({ id: prior?.id ?? `table-${++nextId}`, from: node.from, to: node.to, table, source: prior?.source ?? false, raw });
+    const id = prior && !entries.some(entry => entry.id === prior.id) ? prior.id : `table-${++nextId}`;
+    entries.push({ id, from: node.from, to: node.to, table, source: prior?.source ?? false, raw });
   }
   // Keep a source-mode anchor even while its syntax is temporarily invalid.
   for (const prior of previous) {
@@ -42,7 +44,7 @@ const tableField = StateField.define<Tables>({
   update(value, tr) {
     let entries = value.entries;
     if (tr.docChanged || syntaxTree(tr.startState) !== syntaxTree(tr.state)) {
-      const mapped = entries.map(entry => ({ ...entry, from: tr.changes.mapPos(entry.from, 1), to: tr.changes.mapPos(entry.to, -1) }));
+      const mapped = entries.map(entry => ({ ...entry, from: tr.changes.mapPos(entry.from, entry.source ? -1 : 1), to: tr.changes.mapPos(entry.to, entry.source ? 1 : -1) }));
       // Replacing a whole table maps its start to the replacement end with assoc=1.
       tr.changes.iterChangedRanges((fromA, toA, fromB) => {
         entries.forEach((entry, index) => { if (entry.from === fromA && toA > fromA) mapped[index].from = fromB; });
