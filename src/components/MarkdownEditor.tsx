@@ -1,22 +1,12 @@
 import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
 import CodeMirror from "@uiw/react-codemirror";
-import { markdown } from "@codemirror/lang-markdown";
+import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { json } from "@codemirror/lang-json";
 import { EditorSelection, EditorState, StateField, type Extension, type Range } from "@codemirror/state";
 import { Decoration, EditorView, keymap, WidgetType } from "@codemirror/view";
 import { defaultKeymap, history, historyKeymap, isolateHistory } from "@codemirror/commands";
-import {
-  deleteTableColumn,
-  deleteTableRow,
-  insertTableColumnAfter,
-  insertTableRowAfter,
-  isMarkdownTableDivider,
-  isMarkdownTableRow,
-  parseMarkdownTable,
-  serializeMarkdownTable,
-  updateTableCell,
-  type MarkdownTable,
-} from "../tableMarkdown";
+import { prepareTableEditing, revealTableSelection, tableEditingExtension } from "../editor/tableEditingExtension";
+import { tableInput, tableRuntime } from "../editor/tableEditingState";
 import {
   detectFormattingContext,
   formatMarkdownSelection,
@@ -30,6 +20,7 @@ export type EditorMode = "live" | "source" | "split";
 
 export type MarkdownEditorHandle = {
   focus: () => void;
+  preparePendingEdits: () => Promise<boolean>;
   selectRange: (start: number, end: number) => void;
   getScrollElement: () => HTMLElement | null;
   wrapSelection: (before: string, after: string, placeholder: string) => void;
@@ -42,6 +33,7 @@ type MarkdownEditorProps = {
   themeMode: "system" | "light" | "dark";
   placeholder: string;
   readOnly?: boolean;
+  language?: "ja" | "en";
   onChange: (value: string) => void;
   onFormattingContextChange: (context: FormattingContext) => void;
 };
@@ -106,155 +98,6 @@ class HtmlBreakWidget extends WidgetType {
   }
 }
 
-class TableWidget extends WidgetType {
-  constructor(private readonly table: MarkdownTable) {
-    super();
-  }
-
-  toDOM(view: EditorView) {
-    const wrapper = document.createElement("div");
-    wrapper.className = "hotaru-live-table-wrap";
-
-    const toolbar = document.createElement("div");
-    toolbar.className = "hotaru-live-table-toolbar";
-    toolbar.append(
-      this.createButton("Add row", () => this.replaceTable(view, insertTableRowAfter(this.table, this.table.rows.length - 1))),
-      this.createButton("Add column", () => this.replaceTable(view, insertTableColumnAfter(this.table, this.table.headers.length - 1, "New column"))),
-    );
-    wrapper.append(toolbar);
-
-    const table = document.createElement("table");
-    table.className = "hotaru-live-table";
-
-    const thead = document.createElement("thead");
-    const headerRow = document.createElement("tr");
-    for (const [index, header] of this.table.headers.entries()) {
-      const th = document.createElement("th");
-      th.append(this.createCellEditor(view, 0, index, header.text, true));
-      th.append(this.createColumnControls(view, index));
-      headerRow.append(th);
-    }
-    thead.append(headerRow);
-    table.append(thead);
-
-    const tbody = document.createElement("tbody");
-    for (const [rowIndex, row] of this.table.rows.entries()) {
-      const tr = document.createElement("tr");
-      for (let index = 0; index < this.table.headers.length; index += 1) {
-        const td = document.createElement("td");
-        td.append(this.createCellEditor(view, rowIndex + 1, index, row.cells[index]?.text ?? ""));
-        tr.append(td);
-      }
-      const controls = document.createElement("td");
-      controls.className = "hotaru-live-table-row-controls";
-      controls.append(
-        this.createButton("+", () => this.replaceTable(view, insertTableRowAfter(this.table, rowIndex)), "Add row below"),
-        this.createButton("Delete", () => this.replaceTable(view, deleteTableRow(this.table, rowIndex)), "Delete row"),
-      );
-      tr.append(controls);
-      tbody.append(tr);
-    }
-    table.append(tbody);
-    wrapper.append(table);
-
-    return wrapper;
-  }
-
-  ignoreEvent() {
-    return true;
-  }
-
-  private replaceTable(view: EditorView, table: MarkdownTable, focusCell?: { row: number; column: number }) {
-    view.dispatch({
-      changes: { from: this.table.from, to: this.table.to, insert: serializeMarkdownTable(table) },
-      selection: EditorSelection.single(this.table.from),
-    });
-
-    if (focusCell) {
-      this.focusCell(view, focusCell);
-    }
-  }
-
-  private focusCell(view: EditorView, focusCell: { row: number; column: number }) {
-    window.requestAnimationFrame(() => {
-      const selector = `[data-hotaru-table-cell="${focusCell.row}:${focusCell.column}"]`;
-      const input = view.dom.querySelector<HTMLTextAreaElement>(selector);
-      input?.focus();
-      input?.select();
-    });
-  }
-
-  private createButton(label: string, onClick: () => void, title = label) {
-    const button = document.createElement("button");
-    button.type = "button";
-    button.textContent = label;
-    button.title = title;
-    button.className = "hotaru-live-table-button";
-    button.addEventListener("click", (event) => {
-      event.preventDefault();
-      event.stopPropagation();
-      onClick();
-    });
-    return button;
-  }
-
-  private createColumnControls(view: EditorView, columnIndex: number) {
-    const controls = document.createElement("span");
-    controls.className = "hotaru-live-table-column-controls";
-    controls.append(
-      this.createButton("+", () => this.replaceTable(view, insertTableColumnAfter(this.table, columnIndex, "New column")), "Add column after"),
-      this.createButton("Delete", () => this.replaceTable(view, deleteTableColumn(this.table, columnIndex)), "Delete column"),
-    );
-    return controls;
-  }
-
-  private createCellEditor(view: EditorView, rowIndex: number, columnIndex: number, value: string, isHeader = false) {
-    const textarea = document.createElement("textarea");
-    textarea.className = `hotaru-live-table-cell-editor${isHeader ? " is-header" : ""}`;
-    textarea.value = value;
-    textarea.rows = Math.max(1, value.split(/\r?\n/).length);
-    textarea.dataset.hotaruTableCell = `${rowIndex}:${columnIndex}`;
-    textarea.setAttribute("aria-label", `Table ${isHeader ? "header" : "cell"} ${rowIndex + 1}, ${columnIndex + 1}`);
-
-    const commit = (focusCell?: { row: number; column: number }) => {
-      if (textarea.value === value) {
-        if (focusCell) {
-          this.focusCell(view, focusCell);
-        }
-        return;
-      }
-      this.replaceTable(view, updateTableCell(this.table, rowIndex, columnIndex, textarea.value), focusCell);
-    };
-
-    textarea.addEventListener("input", () => {
-      textarea.rows = Math.max(1, textarea.value.split(/\r?\n/).length);
-    });
-    textarea.addEventListener("blur", () => commit());
-    textarea.addEventListener("keydown", (event) => {
-      if (event.key === "Tab") {
-        event.preventDefault();
-        const next = this.nextCell(rowIndex, columnIndex, event.shiftKey ? -1 : 1);
-        commit(next);
-      }
-      if (event.key === "Escape") {
-        textarea.value = value;
-        textarea.blur();
-        view.focus();
-      }
-    });
-
-    return textarea;
-  }
-
-  private nextCell(rowIndex: number, columnIndex: number, direction: 1 | -1) {
-    const columnCount = this.table.headers.length;
-    const rowCount = this.table.rows.length + 1;
-    const flatIndex = rowIndex * columnCount + columnIndex + direction;
-    const clamped = Math.max(0, Math.min(flatIndex, rowCount * columnCount - 1));
-    return { row: Math.floor(clamped / columnCount), column: clamped % columnCount };
-  }
-}
-
 function findActiveBlock(context: LivePreviewContext) {
   const cursor = context.state.selection.main.head;
   let startLine = context.state.doc.lineAt(cursor);
@@ -277,112 +120,6 @@ function findActiveBlock(context: LivePreviewContext) {
   }
 
   return { from: startLine.from, to: endLine.to };
-}
-
-function appendText(parent: HTMLElement, text: string) {
-  if (text) {
-    parent.append(document.createTextNode(text));
-  }
-}
-
-function appendInlinePreview(parent: HTMLElement, source: string) {
-  const tokenPattern = /(<br\s*\/?>|\*\*([^*]+)\*\*|__([^_]+)__|`([^`]+)`|\[([^\]]+)\]\(([^)]+)\))/gi;
-  let lastIndex = 0;
-
-  for (const match of source.matchAll(tokenPattern)) {
-    const index = match.index ?? 0;
-    appendText(parent, source.slice(lastIndex, index));
-
-    if (match[1].toLowerCase().startsWith("<br")) {
-      parent.append(document.createElement("br"));
-    } else if (match[2] || match[3]) {
-      const strong = document.createElement("strong");
-      strong.textContent = match[2] ?? match[3];
-      parent.append(strong);
-    } else if (match[4]) {
-      const code = document.createElement("code");
-      code.textContent = match[4];
-      parent.append(code);
-    } else if (match[5]) {
-      const span = document.createElement("span");
-      span.className = "hotaru-live-link";
-      span.textContent = match[5];
-      parent.append(span);
-    }
-
-    lastIndex = index + match[0].length;
-  }
-
-  appendText(parent, source.slice(lastIndex));
-}
-
-function findTableHeaderLine(context: LivePreviewContext, lineNumber: number) {
-  if (lineNumber >= context.state.doc.lines) {
-    return null;
-  }
-
-  const current = context.state.doc.line(lineNumber);
-  if (!isMarkdownTableRow(current.text)) {
-    return null;
-  }
-
-  let firstTableLineNumber = lineNumber;
-  while (firstTableLineNumber > 1) {
-    const previous = context.state.doc.line(firstTableLineNumber - 1);
-    if (!isMarkdownTableRow(previous.text) || previous.text.trim() === "") {
-      break;
-    }
-    firstTableLineNumber -= 1;
-  }
-
-  for (let candidate = firstTableLineNumber; candidate <= lineNumber; candidate += 1) {
-    if (candidate >= context.state.doc.lines) {
-      break;
-    }
-    const header = context.state.doc.line(candidate);
-    const divider = context.state.doc.line(candidate + 1);
-    if (isMarkdownTableRow(header.text) && isMarkdownTableDivider(divider.text)) {
-      return header;
-    }
-  }
-
-  return null;
-}
-
-function readTableAt(context: LivePreviewContext, lineNumber: number) {
-  const header = findTableHeaderLine(context, lineNumber);
-  if (!header) {
-    return null;
-  }
-
-  const divider = context.state.doc.line(header.number + 1);
-  if (!isMarkdownTableDivider(divider.text)) {
-    return null;
-  }
-
-  let endLine = divider;
-  let nextLineNumber = header.number + 2;
-  while (nextLineNumber <= context.state.doc.lines) {
-    const row = context.state.doc.line(nextLineNumber);
-    if (!isMarkdownTableRow(row.text) || row.text.trim() === "") {
-      break;
-    }
-    endLine = row;
-    nextLineNumber += 1;
-  }
-
-  const source = context.state.sliceDoc(header.from, endLine.to);
-  const table = parseMarkdownTable(source, header.from, endLine.to);
-  if (!table) {
-    return null;
-  }
-
-  return {
-    from: header.from,
-    to: endLine.to,
-    endLineNumber: endLine.number,
-    table,
-  };
 }
 
 function addHiddenRange(decorations: Range<Decoration>[], from: number, to: number) {
@@ -448,23 +185,6 @@ function buildLivePreviewDecorations(context: LivePreviewContext) {
       const text = line.text;
       const isActiveBlock = line.from <= activeBlock.to && line.to >= activeBlock.from;
       addHtmlBreakDecorations(decorations, line.from, text);
-
-      const table = readTableAt(context, line.number);
-      if (table && table.from >= from) {
-        decorations.push(
-          Decoration.widget({
-              widget: new TableWidget(table.table),
-              block: true,
-            }).range(table.from),
-        );
-        for (let tableLineNumber = line.number; tableLineNumber <= table.endLineNumber; tableLineNumber += 1) {
-          decorations.push(
-            Decoration.line({ class: "hotaru-live-hidden-table-source" }).range(context.state.doc.line(tableLineNumber).from),
-          );
-        }
-        position = table.to + 1;
-        continue;
-      }
 
       if (isActiveBlock) {
       } else {
@@ -570,15 +290,23 @@ function sourceHeadingExtension() {
 }
 
 export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorProps>(function MarkdownEditor(
-  { value, mode, themeMode, placeholder, readOnly = false, onChange, onFormattingContextChange },
+  { value, mode, themeMode, placeholder, readOnly = false, language = "en", onChange, onFormattingContextChange },
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null);
   const effectiveTheme = getEffectiveTheme(themeMode);
+  const contextCallback = useRef(onFormattingContextChange);
+  contextCallback.current = onFormattingContextChange;
+  const tables = useMemo(() => tableEditingExtension({ language, onContextChange: () => {
+    const view = viewRef.current;
+    if (!view) return;
+    contextCallback.current(tableRuntime(view).formattingContext() ?? detectFormattingContext(view.state.doc.toString(), view.state.selection.main));
+  } }), [language]);
   const extensions = useMemo<Extension[]>(
     () => [
       history(),
-      markdown(),
+      markdown({ base: markdownLanguage }),
+      tables,
       json(),
       keymap.of([...defaultKeymap, ...historyKeymap]),
       EditorView.lineWrapping,
@@ -586,10 +314,13 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       EditorState.readOnly.of(readOnly),
       mode === "live" ? livePreviewExtension() : sourceHeadingExtension(),
     ],
-    [mode, readOnly],
+    [mode, readOnly, tables],
   );
 
   useImperativeHandle(ref, () => ({
+    preparePendingEdits() {
+      return viewRef.current ? prepareTableEditing(viewRef.current) : Promise.resolve(true);
+    },
     focus() {
       viewRef.current?.focus();
     },
@@ -609,10 +340,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       const clampedEnd = clampPosition(end);
       const from = Math.min(clampedStart, clampedEnd);
       const to = Math.max(clampedStart, clampedEnd);
-      view.dispatch({
-        selection: EditorSelection.single(from, to),
-        effects: EditorView.scrollIntoView(from, { y: "center" }),
-      });
+      revealTableSelection(view, from, to);
       view.focus();
     },
     getScrollElement() {
@@ -624,6 +352,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         return;
       }
 
+      if (view.state.readOnly) return;
+      if (tableRuntime(view).active) { tableRuntime(view).wrap(before, after, placeholder); return; }
       const selection = view.state.selection.main;
       const selected = view.state.sliceDoc(selection.from, selection.to);
       const insert = `${before}${selected || placeholder}${after}`;
@@ -637,7 +367,8 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
     },
     applyFormat(command: MarkdownCommand, placeholders: FormattingPlaceholders) {
       const view = viewRef.current;
-      if (!view) return;
+      if (!view || view.state.readOnly) return;
+      if (tableRuntime(view).active) return tableRuntime(view).format(command, placeholders);
       const selection = view.state.selection.main;
       const change: FormatResult = formatMarkdownSelection(
         view.state.doc.toString(),
@@ -656,8 +387,12 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
       view.dispatch({
         changes: { from: change.from, to: change.to, insert: change.insert },
         selection: EditorSelection.single(change.from + change.selectionStart, change.from + change.selectionEnd),
-        annotations: isolateHistory.of("full"),
+        annotations: [isolateHistory.of("full"), ...(command.kind === "table" ? [tableInput.of(true)] : [])],
       });
+      if (command.kind === "table") {
+        const entry = tableRuntime(view).getEntries().find(table => table.from >= change.from && table.to <= change.from + change.insert.length);
+        if (entry) { tableRuntime(view).focus({ tableId: entry.id, row: 0, column: 0 }); return change; }
+      }
       view.focus();
       return change;
     },
@@ -675,7 +410,7 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
         onUpdate={(update) => {
           if (update.docChanged || update.selectionSet) {
             const selection = update.state.selection.main;
-            onFormattingContextChange(detectFormattingContext(
+            onFormattingContextChange(tableRuntime(update.view).formattingContext() ?? detectFormattingContext(
               update.state.doc.toString(),
               { from: selection.from, to: selection.to },
             ));
