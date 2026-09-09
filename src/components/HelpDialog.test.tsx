@@ -103,3 +103,10 @@ describe("HelpDialog", () => {
     expect(onClose).toHaveBeenCalledOnce();
   });
 });
+
+it("explains direct table editing and source fallback in both languages", () => {
+  const en = renderToStaticMarkup(<HelpDialog language="en" onClose={() => undefined} />);
+  const ja = renderToStaticMarkup(<HelpDialog language="ja" onClose={() => undefined} />);
+  expect(en).toContain("Shift+Enter"); expect(en).toContain("Edit source");
+  expect(ja).toContain("セルを直接編集"); expect(ja).toContain("ソースを編集");
+});
