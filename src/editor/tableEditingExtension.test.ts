@@ -199,4 +199,3 @@ describe("direct table editing", () => {
     expect(view.dom.querySelectorAll("tbody tr")).toHaveLength(2);
   });
 });
-
