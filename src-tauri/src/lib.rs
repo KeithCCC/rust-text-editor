@@ -1,4 +1,5 @@
 mod atomic_write;
+mod pdf_export;
 mod recovery;
 
 use std::fs::{self, OpenOptions};
@@ -224,6 +225,8 @@ pub fn run() {
             read_text_file,
             write_text_file,
             write_binary_file,
+            pdf_export::export_pdf,
+            pdf_export::read_pdf_image,
             get_file_properties,
             open_file_in_new_instance,
             get_startup_file_path,

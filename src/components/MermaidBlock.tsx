@@ -143,7 +143,7 @@ export function MermaidBlock({ source, themeMode }: MermaidBlockProps) {
 
   if (error) {
     return (
-      <div className="diagram-error">
+      <div className="diagram-error" data-pdf-status="error">
         <strong>Mermaid render error</strong>
         <pre>{error}</pre>
       </div>
@@ -151,7 +151,7 @@ export function MermaidBlock({ source, themeMode }: MermaidBlockProps) {
   }
 
   return (
-    <div className="mermaid-card">
+    <div className="mermaid-card" data-pdf-status={svg ? "ready" : "pending"}>
       <div className="mermaid-export-toolbar" role="toolbar" aria-label="Mermaid export">
         <button type="button" disabled={!svg} onClick={() => void exportDiagram("png")}>PNG</button>
         <button type="button" disabled={!svg} onClick={() => void exportDiagram("svg")}>SVG</button>

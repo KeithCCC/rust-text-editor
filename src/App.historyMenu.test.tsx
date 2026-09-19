@@ -115,7 +115,7 @@ afterEach(() => {
 });
 
 describe("History menu", () => {
-  it("moves recent files out of File and into a top-level History menu", async () => {
+  it("groups recent files under File while preserving readable names", async () => {
     window.localStorage.setItem("koharu-recent-files", JSON.stringify([
       { path: "C:\\notes\\a-very-long-history-filename-that-needs-clipping.md", lastAccessedAt: 2 },
       { path: "C:\\notes\\short.md", lastAccessedAt: 1 },
@@ -127,10 +127,10 @@ describe("History menu", () => {
     expect(fileMenu.textContent).not.toContain("a-very-long-history-filename-that-needs-clipping.md");
     expect(fileMenu.textContent).not.toContain("Clear Recent Files");
 
-    await click(button("History"));
+    await click(button("Recent Files"));
     const historyMenu = openMenu();
     const longName = button("a-very-long-history-filename-that-needs-clipping.md", historyMenu);
-    expect(historyMenu.classList.contains("history-menu-popover")).toBe(true);
+    expect(historyMenu.querySelector(".recent-files-group")).not.toBeNull();
     expect(longName.title).toBe("a-very-long-history-filename-that-needs-clipping.md");
     expect(longName.querySelector(".recent-file-name")?.textContent).toBe(
       "a-very-long-history-filename-that-needs-clipping.md",
@@ -142,7 +142,8 @@ describe("History menu", () => {
 
   it("keeps History available and reports empty history", async () => {
     await renderApp();
-    await click(button("History"));
+    await click(button("File"));
+    await click(button("Recent Files"));
     const empty = openMenu().querySelector<HTMLElement>('.menu-empty[role="menuitem"]');
     expect(empty?.textContent).toBe("No Recent Files");
     expect(empty?.getAttribute("aria-disabled")).toBe("true");
@@ -151,7 +152,8 @@ describe("History menu", () => {
   it("localizes the History menu in Japanese", async () => {
     window.localStorage.setItem("koharu-language", "ja");
     await renderApp();
-    await click(button("履歴"));
+    await click(button("ファイル"));
+    await click(button("最近使ったファイル"));
     expect(openMenu().textContent).toContain("最近使ったファイルはありません");
   });
 
@@ -159,7 +161,8 @@ describe("History menu", () => {
     seedRecent("C:\\notes\\open-me.md");
     tauriMocks.readTextFile.mockResolvedValueOnce({ path: "C:\\notes\\open-me.md", content: "opened" });
     await renderApp();
-    await click(button("History"));
+    await click(button("File"));
+    await click(button("Recent Files"));
     await click(button("open-me.md", openMenu()));
     expect(tauriMocks.readTextFile).toHaveBeenCalledWith("C:\\notes\\open-me.md");
   });
@@ -167,7 +170,8 @@ describe("History menu", () => {
   it("removes one entry and can clear the remainder", async () => {
     seedRecent("C:\\notes\\first.md", "C:\\notes\\second.md");
     await renderApp();
-    await click(button("History"));
+    await click(button("File"));
+    await click(button("Recent Files"));
     await click(button("Remove from recent files: first.md", openMenu()));
     expect(openMenu().textContent).not.toContain("first.md");
     await click(button("Clear Recent Files", openMenu()));
@@ -178,7 +182,8 @@ describe("History menu", () => {
     seedRecent("C:\\notes\\missing.md", "C:\\notes\\kept.md");
     tauriMocks.readTextFile.mockRejectedValueOnce(new Error("missing"));
     await renderApp();
-    await click(button("History"));
+    await click(button("File"));
+    await click(button("Recent Files"));
     await click(button("missing.md", openMenu()));
     await flushEffects();
     const persisted = JSON.parse(window.localStorage.getItem("koharu-recent-files") ?? "[]");

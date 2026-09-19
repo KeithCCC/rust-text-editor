@@ -101,6 +101,9 @@ beforeEach(async () => {
     root.render(<App />);
     await Promise.resolve();
   });
+  await click(button("View"));
+  await click(container.querySelector<HTMLInputElement>('.menu-choice-item input[type="checkbox"]')!);
+  await click(button("Preview", container.querySelector(".view-mode-switcher")!));
 });
 
 afterEach(() => {

@@ -11,6 +11,7 @@ const dialogMocks = vi.hoisted(() => ({
 }));
 
 const tauriMocks = vi.hoisted(() => ({
+  exportPdf: vi.fn(),
   appendDebugLog: vi.fn(),
   deleteRecoveryDraft: vi.fn(),
   exitApp: vi.fn(),
@@ -30,6 +31,8 @@ const tauriMocks = vi.hoisted(() => ({
 
 vi.mock("@tauri-apps/plugin-dialog", () => dialogMocks);
 vi.mock("./tauri", () => tauriMocks);
+const pdfMocks = vi.hoisted(() => ({ createPdfHtml: vi.fn() }));
+vi.mock("./exportPdf", () => pdfMocks);
 
 let container: HTMLDivElement;
 let root: Root;
@@ -144,6 +147,69 @@ afterEach(() => {
 });
 
 describe("document session safety", () => {
+  it("exports unsaved content without changing document identity or display mode", async () => {
+    await shortcut(window, "b");
+    const content = editorContent();
+    dialogMocks.save.mockResolvedValueOnce("C:\\notes\\export.pdf");
+    pdfMocks.createPdfHtml.mockResolvedValueOnce("<html>PDF snapshot</html>");
+    tauriMocks.exportPdf.mockResolvedValueOnce(undefined);
+    await click(button("File"));
+    await click(button("Export as PDF..."));
+    expect(pdfMocks.createPdfHtml).toHaveBeenCalledWith(expect.objectContaining({ content, currentFile: null }));
+    expect(tauriMocks.exportPdf).toHaveBeenCalledWith("C:\\notes\\export.pdf", "<html>PDF snapshot</html>");
+    expect(editorContent()).toBe(content);
+    expect(container.querySelector(".statusbar-file")?.textContent).toBe("File: Untitled");
+    expect(container.querySelector(".statusbar")?.textContent).toContain("Unsaved");
+    expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
+    expect(container.querySelector('[role="status"].pdf-export-status')?.textContent).toContain("PDF saved");
+  });
+
+  it("treats a canceled PDF save dialog as a no-op", async () => {
+    dialogMocks.save.mockResolvedValueOnce(null);
+    await click(button("File"));
+    await click(button("Export as PDF..."));
+    expect(pdfMocks.createPdfHtml).not.toHaveBeenCalled();
+    expect(tauriMocks.exportPdf).not.toHaveBeenCalled();
+    expect(container.querySelector(".error-banner")).toBeNull();
+  });
+
+  it("blocks a second PDF export while rendering and reports failure", async () => {
+    let reject!: (error: Error) => void;
+    pdfMocks.createPdfHtml.mockImplementationOnce(() => new Promise((_resolve, onReject) => { reject = onReject; }));
+    dialogMocks.save.mockResolvedValueOnce("C:\\notes\\export.pdf");
+    await click(button("File"));
+    const exportButton = button("Export as PDF...");
+    await click(exportButton);
+    expect(exportButton.disabled).toBe(true);
+    await click(exportButton);
+    expect(dialogMocks.save).toHaveBeenCalledTimes(1);
+    await act(async () => { reject(new Error("Broken diagram")); });
+    expect(container.querySelector(".error-banner")?.textContent).toContain("Broken diagram");
+    expect(exportButton.disabled).toBe(false);
+    expect(container.querySelector(".pdf-export-status")?.textContent).not.toContain("PDF saved");
+  });
+
+  it.each(["preview", "split", "edit", "invalid", null])("always starts in Edit with outline closed despite saved mode %s", async (mode) => {
+    if (mode) window.localStorage.setItem("koharu-editor-mode", mode);
+    else window.localStorage.removeItem("koharu-editor-mode");
+    await remountApp();
+    expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
+    expect(container.querySelector(".preview-pane")).toBeNull();
+    expect(container.querySelector(".outline-panel")).toBeNull();
+    expect(editorPane().hidden).toBe(false);
+  });
+
+  it("groups appearance under View and language under Settings", async () => {
+    await click(button("View"));
+    const view = container.querySelector('.menu-root[data-open="true"]')!;
+    expect(button("Appearance...", view)).toBeTruthy();
+    expect(view.textContent).not.toContain("English UI");
+    await click(button("Settings"));
+    const settings = container.querySelector('.menu-root[data-open="true"]')!;
+    expect(settings.textContent).toContain("English UI");
+    expect(settings.textContent).not.toContain("Appearance...");
+  });
+
   it.each(["getter", "getItem", "setItem"] as const)(
     "mounts with a visible, usable formatting toolbar when the localStorage %s throws",
     async (failure) => {
@@ -226,7 +292,7 @@ describe("document session safety", () => {
     expect(editor.compareDocumentPosition(messageArea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(messageArea.querySelector(".formatting-feedback")).not.toBeNull();
 
-    await click(button("View"));
+    await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     const japaneseUi = viewMenu?.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
     if (!japaneseUi) throw new Error("Japanese UI choice not found");
@@ -272,7 +338,7 @@ describe("document session safety", () => {
     expect(splitToggle.classList.contains("is-compact")).toBe(true);
     expect(splitToggle.getAttribute("aria-label")).toBe("Hide formatting toolbar");
 
-    await click(button("View"));
+    await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     const japaneseUi = viewMenu?.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
     if (!japaneseUi) throw new Error("Japanese UI choice not found");
@@ -323,7 +389,8 @@ describe("document session safety", () => {
     expect(header.querySelector('[role="search"]')).not.toBeNull();
   });
 
-  it("toggles the search row directly from the top-level Search button", async () => {
+  it("toggles search through the Edit menu", async () => {
+    await click(button("Edit", container.querySelector(".menubar-shell")!));
     const searchToggle = button("Search");
     expect(container.querySelector('[role="search"]')).toBeNull();
 
@@ -336,6 +403,7 @@ describe("document session safety", () => {
     expect(searchToggle.getAttribute("aria-pressed")).toBe("true");
     expect(container.querySelector('.menu-root[data-open="true"] .menu-popover')).toBeNull();
 
+    await click(button("Edit", container.querySelector(".menubar-shell")!));
     await click(searchToggle);
 
     expect(container.querySelector('[role="search"]')).toBeNull();
@@ -347,7 +415,6 @@ describe("document session safety", () => {
     if (!switcher) throw new Error("View mode switcher not found");
     await click(button("Preview", switcher));
     expect(editorPane().hidden).toBe(true);
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
 
     expect((await shortcut(window, "f")).defaultPrevented).toBe(true);
     await act(async () => {
@@ -362,7 +429,6 @@ describe("document session safety", () => {
     expect(searchInput.closest(".editor-pane")).toBe(editorPane());
     expect(document.activeElement).toBe(searchInput);
     expect(container.querySelector(".preview-pane")).not.toBeNull();
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("split");
     expect(window.localStorage.getItem("koharu-toolbar-hint-dismissed")).toBe("true");
   });
 
@@ -520,13 +586,11 @@ describe("document session safety", () => {
     const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
     if (!switcher) throw new Error("View mode switcher not found");
     await click(button("Preview", switcher));
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
 
     await shortcut(window, "n");
 
     expect(switcher.getAttribute("data-mode")).toBe("edit");
     expect(editorContent()).toBe("");
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
   });
 
   it.each([
@@ -543,29 +607,26 @@ describe("document session safety", () => {
       expect(editChoice.checked).toBe(true);
       await click(editChoice);
     }],
-  ])("saves Edit as the startup preference when active Edit is explicitly selected from the %s", async (_control, selectEdit) => {
+  ])("allows reselecting Edit after New from the %s", async (_control, selectEdit) => {
     const switcher = container.querySelector<HTMLElement>(".view-mode-switcher");
     if (!switcher) throw new Error("View mode switcher not found");
     await click(button("Preview", switcher));
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
 
     await shortcut(window, "n");
     expect(switcher.getAttribute("data-mode")).toBe("edit");
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
 
     await selectEdit();
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("edit");
 
     await remountApp();
     expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
   });
 
-  it("keeps keyboard mode cycling as the saved startup preference", async () => {
+  it("cycles modes in-session but starts in Edit on the next launch", async () => {
     expect((await shortcut(window, "m", { altKey: true })).defaultPrevented).toBe(true);
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("split");
 
-    await remountApp();
     expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("split");
+    await remountApp();
+    expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
   });
 
   it("preserves Preview and the current document when New is canceled", async () => {
@@ -583,7 +644,6 @@ describe("document session safety", () => {
 
     expect(switcher.getAttribute("data-mode")).toBe("preview");
     expect(editorContent()).toBe(contentBeforeNew);
-    expect(window.localStorage.getItem("koharu-editor-mode")).toBe("preview");
   });
 
   it("disables Markdown and JSON Format-menu actions while Preview is active", async () => {
@@ -638,13 +698,13 @@ describe("document session safety", () => {
     expect(status?.closest(".editor-pane")).toBeNull();
     expect(toolbar.getAttribute("aria-describedby")).toBeNull();
     expect(toolbar.querySelector('[role="status"]')).toBeNull();
-    expect(Array.from(container.querySelectorAll('[role="status"]')).filter((candidate) => (
+    expect(Array.from(container.querySelectorAll('.preview-pane [role="status"]')).filter((candidate) => (
       candidate.textContent?.includes("Formatting is unavailable in Preview")
     ))).toHaveLength(1);
   });
 
   it("exposes one focusable Japanese Preview reason in the visible preview pane", async () => {
-    await click(button("View"));
+    await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!viewMenu) throw new Error("View menu not found");
     const japaneseUi = viewMenu.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
@@ -660,11 +720,11 @@ describe("document session safety", () => {
       "プレビュー表示では書式設定を使用できません。編集または分割表示に切り替えてください。",
     );
     expect(status?.tabIndex).toBe(0);
-    expect(container.querySelectorAll('[role="status"]')).toHaveLength(1);
+    expect(container.querySelectorAll('.preview-pane [role="status"]')).toHaveLength(1);
   });
 
   it("describes document-safety-disabled formatting in Japanese through the real toolbar", async () => {
-    await click(button("View"));
+    await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!viewMenu) throw new Error("View menu not found");
     const japaneseUi = viewMenu.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
@@ -684,7 +744,7 @@ describe("document session safety", () => {
   });
 
   it("uses the same Japanese placeholders from the toolbar and Format menu", async () => {
-    await click(button("View"));
+    await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!viewMenu) throw new Error("View menu not found");
     const japaneseUi = viewMenu.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');

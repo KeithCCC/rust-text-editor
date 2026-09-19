@@ -57,6 +57,7 @@ import {
   writeFormattingToolbarVisibility,
 } from "./formattingToolbarPreference";
 import { getFormattingUi } from "./formattingUi";
+import { handleMenuKeyDown } from "./menuKeyboard";
 import { shouldDismissMenuForPointerTarget } from "./menuBehavior";
 import type { FormattingContext, MarkdownCommand } from "./markdownFormatting";
 import { parseMarkdownOutline, type OutlineHeading } from "./markdownOutline";
@@ -65,6 +66,7 @@ import { parseRecentFiles, removeRecentFile, updateRecentFiles } from "./recentF
 import { isTauriRuntime } from "./tauriRuntime";
 import { synchronizeDocumentTitle } from "./documentTitleSync";
 import {
+  exportPdf,
   deleteRecoveryDraft,
   exitApp,
   getFileProperties,
@@ -79,7 +81,7 @@ import {
 import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
 import { saveCurrentWindowState } from "./windowState";
-import { cycleViewMode, resolveViewMode, type ViewMode } from "./viewMode";
+import { cycleViewMode, type ViewMode } from "./viewMode";
 import {
   resolvePaneVisibility,
   shouldCycleViewMode,
@@ -101,14 +103,13 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type MenuId = "file" | "history" | "view" | "settings" | "format" | "help";
+type MenuId = "file" | "edit" | "view" | "settings" | "format" | "help";
 
 const THEME_STORAGE_KEY = "koharu-theme";
 const LEGACY_THEME_STORAGE_KEY = "hotaru-theme";
 const LANGUAGE_STORAGE_KEY = "koharu-language";
 const SPLIT_STORAGE_KEY = "koharu-split";
 const LEGACY_SPLIT_STORAGE_KEY = "hotaru-split";
-const EDITOR_MODE_STORAGE_KEY = "koharu-editor-mode";
 const EDITOR_FONT_SIZE_STORAGE_KEY = "koharu-editor-font-size";
 const EDITOR_LINE_HEIGHT_STORAGE_KEY = "koharu-editor-line-height";
 const PREVIEW_FONT_SIZE_STORAGE_KEY = "koharu-preview-font-size";
@@ -124,6 +125,8 @@ const UI_TEXT = {
     help: "Help",
     howToUseKoharu: "How to use Koharu",
     file: "File",
+    edit: "Edit",
+    formattingToolbar: "Formatting toolbar",
     view: "View",
     settings: "Settings",
     search: "Search",
@@ -133,6 +136,9 @@ const UI_TEXT = {
     save: "Save",
     saveAs: "Save As...",
     exportHtml: "Export as HTML...",
+    exportPdf: "Export as PDF...",
+    pdfExporting: "Creating PDF…",
+    pdfSaved: "PDF saved",
     fileProperties: "File Properties...",
     history: "History",
     noRecentFiles: "No Recent Files",
@@ -219,6 +225,8 @@ const UI_TEXT = {
     help: "ヘルプ",
     howToUseKoharu: "Koharuの使い方",
     file: "ファイル",
+    edit: "編集",
+    formattingToolbar: "書式ツールバー",
     view: "表示",
     settings: "設定",
     search: "検索",
@@ -228,6 +236,9 @@ const UI_TEXT = {
     save: "保存",
     saveAs: "名前を付けて保存...",
     exportHtml: "HTMLとしてエクスポート...",
+    exportPdf: "PDFとしてエクスポート...",
+    pdfExporting: "PDFを作成中…",
+    pdfSaved: "PDFを保存しました",
     fileProperties: "ファイル情報...",
     history: "履歴",
     noRecentFiles: "最近使ったファイルはありません",
@@ -391,13 +402,11 @@ export default function App() {
     readFormattingToolbarVisibility,
   );
   const [formattingAnnouncement, setFormattingAnnouncement] = useState(EMPTY_FORMATTING_ANNOUNCEMENT);
-  const [isOutlineVisible, setIsOutlineVisible] = useState(true);
+  const [isOutlineVisible, setIsOutlineVisible] = useState(false);
   const [previewContent, setPreviewContent] = useState(initialDocument.content);
   const [isPreviewPending, setIsPreviewPending] = useState(false);
   const [previewRefreshToken, setPreviewRefreshToken] = useState(0);
-  const [editorMode, setEditorMode] = useState<ViewMode>(() => resolveViewMode(
-    readStoredValue(EDITOR_MODE_STORAGE_KEY),
-  ));
+  const [editorMode, setEditorMode] = useState<ViewMode>("edit");
   const [formattingContext, setFormattingContext] = useState<FormattingContext>({
     headingLevel: null,
     bold: false,
@@ -427,6 +436,10 @@ export default function App() {
   const [splitOrientation, setSplitOrientation] = useState<SplitOrientation>(() => (
     splitOrientationForWidth(window.innerWidth)
   ));
+  const pdfExportPendingRef = useRef(false);
+  const [isPdfExporting, setIsPdfExporting] = useState(false);
+  const [pdfExportStatus, setPdfExportStatus] = useState("");
+  const [isRecentFilesOpen, setIsRecentFilesOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [isNoteSearchVisible, setIsNoteSearchVisible] = useState(false);
@@ -456,7 +469,6 @@ export default function App() {
     promise: Promise<UnsavedDecision>;
     resolve: (decision: UnsavedDecision) => void;
   } | null>(null);
-  const skipNextEditorModePersistenceRef = useRef(false);
   const transitionInProgressRef = useRef(false);
   const lastRecoveryWriteMsRef = useRef(0);
   const startupLoadedRef = useRef(false);
@@ -476,7 +488,6 @@ export default function App() {
   const startupRecoveryDecisionInProgressRef = useRef(false);
 
   const selectEditorMode = useCallback((mode: ViewMode) => {
-    writeStoredValue(EDITOR_MODE_STORAGE_KEY, mode);
     setEditorMode(mode);
   }, []);
 
@@ -697,11 +708,7 @@ export default function App() {
     if (actionGateRef.current.isBlocked()) return;
     await requestDocumentTransition(async () => {
       resetDocument();
-      setEditorMode((mode) => {
-        if (mode === "edit") return mode;
-        skipNextEditorModePersistenceRef.current = true;
-        return "edit";
-      });
+      setEditorMode("edit");
       return true;
     });
   }, [requestDocumentTransition, resetDocument]);
@@ -784,6 +791,32 @@ export default function App() {
   const handleExit = useCallback(async () => {
     await requestAppClose();
   }, [requestAppClose]);
+
+  const handleExportPdf = useCallback(async () => {
+    if (pdfExportPendingRef.current) return;
+    pdfExportPendingRef.current = true;
+    setIsPdfExporting(true);
+    setPdfExportStatus("");
+    // Snapshot the document at invocation; editing may continue while it is exported.
+    const snapshot = { content, currentFile, title: fileNameFromPath(currentFile), language: appLanguage };
+    try {
+      const selected = await save({
+        defaultPath: `${fileNameFromPath(currentFile).replace(/\.[^.]+$/, "") || "Untitled"}.pdf`,
+        filters: [{ name: "PDF", extensions: ["pdf"] }],
+      });
+      if (!selected) return;
+      setPdfExportStatus(text.pdfExporting);
+      const { createPdfHtml } = await import("./exportPdf");
+      await exportPdf(selected, await createPdfHtml(snapshot));
+      setPdfExportStatus(`${text.pdfSaved}: ${selected}`);
+    } catch (exportError) {
+      setPdfExportStatus("");
+      showError(text.exportFailed, exportError instanceof Error ? exportError.message : String(exportError));
+    } finally {
+      pdfExportPendingRef.current = false;
+      setIsPdfExporting(false);
+    }
+  }, [content, currentFile, appLanguage, showError, text.exportFailed, text.pdfExporting, text.pdfSaved]);
 
   const handleExportHtml = useCallback(async () => {
     const selected = await save({
@@ -1028,6 +1061,8 @@ export default function App() {
   }, [handleMarkdownFormat]);
 
   const runMenuAction = useCallback((action: () => void | Promise<unknown>) => {
+    const menuRoot = menubarRef.current?.querySelector<HTMLElement>('.menu-root[data-open="true"]');
+    if (menuRoot?.contains(document.activeElement)) menuRoot.querySelector<HTMLElement>(".menu-title")?.focus();
     setActiveMenu(null);
     if (actionGateRef.current.isBlocked()) return;
     void action();
@@ -1094,14 +1129,6 @@ export default function App() {
   useEffect(() => {
     writeStoredValue(LANGUAGE_STORAGE_KEY, appLanguage);
   }, [appLanguage]);
-
-  useEffect(() => {
-    if (skipNextEditorModePersistenceRef.current) {
-      skipNextEditorModePersistenceRef.current = false;
-      return;
-    }
-    writeStoredValue(EDITOR_MODE_STORAGE_KEY, editorMode);
-  }, [editorMode]);
 
   useEffect(() => {
     writeStoredValue(SPLIT_STORAGE_KEY, String(splitPercent));
@@ -1393,25 +1420,14 @@ export default function App() {
       }}
     >
       <header className="app-header">
-        <nav className="menubar-shell" aria-label="Application menu" ref={menubarRef}>
-          <div className="menu-root" data-open={activeMenu === "file"} onMouseEnter={() => activeMenu && setActiveMenu("file")}>
-            <button className="menu-title" aria-expanded={activeMenu === "file"} onClick={() => setActiveMenu((menu) => (menu === "file" ? null : "file"))}>{text.file}</button>
+        <nav className="menubar-shell" aria-label="Application menu" ref={menubarRef} onKeyDown={(event) => handleMenuKeyDown<MenuId>(event, setActiveMenu)}>
+          <div className="menu-root" data-menu-id="file" data-open={activeMenu === "file"} onMouseEnter={() => activeMenu && setActiveMenu("file")}>
+            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "file"} onClick={() => setActiveMenu((menu) => (menu === "file" ? null : "file"))}>{text.file}</button>
             <div className="menu-popover" role="menu">
               <button role="menuitem" onClick={() => runMenuAction(handleNew)}>{text.new} <kbd>Ctrl+N</kbd></button>
               <button role="menuitem" onClick={() => runMenuAction(handleOpen)}>{text.open} <kbd>Ctrl+O</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleSaveAction)}>{text.save} <kbd>Ctrl+S</kbd></button>
-              <button role="menuitem" onClick={() => runMenuAction(handleSaveAsAction)}>{text.saveAs}</button>
-              <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>{text.exportHtml}</button>
-              <div className="menu-separator" />
-              <button role="menuitem" onClick={() => runMenuAction(handleFileProperties)} disabled={!currentFile}>{text.fileProperties}</button>
-              <div className="menu-separator" />
-              <button role="menuitem" onClick={() => runMenuAction(handleExit)}>{text.exit}</button>
-            </div>
-          </div>
-
-          <div className="menu-root" data-open={activeMenu === "history"} onMouseEnter={() => activeMenu && setActiveMenu("history")}>
-            <button className="menu-title" aria-expanded={activeMenu === "history"} onClick={() => setActiveMenu((menu) => (menu === "history" ? null : "history"))}>{text.history}</button>
-            <div className="menu-popover history-menu-popover" role="menu">
+              <button role="menuitem" aria-label={text.recentFiles} aria-expanded={isRecentFilesOpen} aria-controls="recent-files-group" onClick={() => setIsRecentFilesOpen((visible) => !visible)}>{text.recentFiles}<span aria-hidden="true">{isRecentFilesOpen ? "▴" : "▾"}</span></button>
+              {isRecentFilesOpen && <div id="recent-files-group" className="recent-files-group" role="group" aria-label={text.recentFiles}>
               {recentFiles.length === 0 ? (
                 <div className="menu-empty" role="menuitem" aria-disabled="true">
                   {text.noRecentFiles}
@@ -1446,44 +1462,27 @@ export default function App() {
                   <button role="menuitem" onClick={() => setRecentFiles([])}>{text.clearRecentFiles}</button>
                 </>
               )}
-            </div>
-          </div>
-
-          <div className="menu-root" data-open={activeMenu === "view"} onMouseEnter={() => activeMenu && setActiveMenu("view")}>
-            <button className="menu-title" aria-expanded={activeMenu === "view"} onClick={() => setActiveMenu((menu) => (menu === "view" ? null : "view"))}>{text.view}</button>
-            <div className="menu-popover" role="menu">
-              <MenuRadioItem name="theme" value="system" checked={themeMode === "system"} label={text.systemTheme} onSelect={() => runMenuAction(() => setThemeMode("system"))} />
-              <MenuRadioItem name="theme" value="light" checked={themeMode === "light"} label={text.lightTheme} onSelect={() => runMenuAction(() => setThemeMode("light"))} />
-              <MenuRadioItem name="theme" value="dark" checked={themeMode === "dark"} label={text.darkTheme} onSelect={() => runMenuAction(() => setThemeMode("dark"))} />
+              </div>}
+              <button role="menuitem" onClick={() => runMenuAction(handleSaveAction)}>{text.save} <kbd>Ctrl+S</kbd></button>
+              <button role="menuitem" onClick={() => runMenuAction(handleSaveAsAction)}>{text.saveAs}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleExportHtml)}>{text.exportHtml}</button>
+              <button role="menuitem" disabled={isPdfExporting || isDocumentSafetyActive} onClick={() => runMenuAction(handleExportPdf)}>{text.exportPdf}</button>
               <div className="menu-separator" />
-              <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
-              <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
+              <button role="menuitem" onClick={() => runMenuAction(handleFileProperties)} disabled={!currentFile}>{text.fileProperties}</button>
               <div className="menu-separator" />
-              <MenuRadioItem name="view-mode" value="edit" checked={editorMode === "edit"} label={text.editMode} onSelect={() => runMenuAction(() => selectEditorMode("edit"))} onReselect={() => runMenuAction(() => selectEditorMode("edit"))} />
-              <MenuRadioItem name="view-mode" value="split" checked={editorMode === "split"} label={text.splitMode} onSelect={() => runMenuAction(() => selectEditorMode("split"))} onReselect={() => runMenuAction(() => selectEditorMode("split"))} />
-              <MenuRadioItem name="view-mode" value="preview" checked={editorMode === "preview"} label={text.previewMode} onSelect={() => runMenuAction(() => selectEditorMode("preview"))} onReselect={() => runMenuAction(() => selectEditorMode("preview"))} />
-              <MenuCheckboxItem checked={isOutlineVisible} label={text.outline} onToggle={() => runMenuAction(() => setIsOutlineVisible((visible) => !visible))} />
-              <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
+              <button role="menuitem" onClick={() => runMenuAction(handleExit)}>{text.exit}</button>
             </div>
           </div>
 
-          <div className="menu-root" data-open={activeMenu === "settings"} onMouseEnter={() => activeMenu && setActiveMenu("settings")}>
-            <button className="menu-title" aria-expanded={activeMenu === "settings"} onClick={() => setActiveMenu((menu) => (menu === "settings" ? null : "settings"))}>{text.settings}</button>
+          <div className="menu-root" data-menu-id="edit" data-open={activeMenu === "edit"} onMouseEnter={() => activeMenu && setActiveMenu("edit")}>
+            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "edit"} onClick={() => setActiveMenu((menu) => menu === "edit" ? null : "edit")}>{text.edit}</button>
             <div className="menu-popover" role="menu">
-              <button role="menuitem" onClick={() => runMenuAction(() => setIsAppearanceSettingsOpen(true))}>{text.appearance}</button>
+              <button role="menuitem" aria-label={text.search} aria-pressed={isNoteSearchVisible} onClick={() => runMenuAction(toggleNoteSearch)}>{text.search}<kbd>Ctrl+F</kbd></button>
             </div>
           </div>
 
-          <button
-            type="button"
-            className="menu-title"
-            aria-pressed={isNoteSearchVisible}
-            title={`${text.search} (Ctrl+F)`}
-            onClick={toggleNoteSearch}
-          >{text.search}</button>
-
-          <div className="menu-root" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
-            <button className="menu-title" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>
+          <div className="menu-root" data-menu-id="format" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
+            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>
             <div className="menu-popover" role="menu">
               <MarkdownFormatMenu
                 language={appLanguage}
@@ -1496,10 +1495,36 @@ export default function App() {
             </div>
           </div>
 
-          <div className="menu-root" data-open={activeMenu === "help"} onMouseEnter={() => activeMenu && setActiveMenu("help")}>
+          <div className="menu-root" data-menu-id="view" data-open={activeMenu === "view"} onMouseEnter={() => activeMenu && setActiveMenu("view")}>
+            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "view"} onClick={() => setActiveMenu((menu) => (menu === "view" ? null : "view"))}>{text.view}</button>
+            <div className="menu-popover" role="menu">
+              <MenuRadioItem name="theme" value="system" checked={themeMode === "system"} label={text.systemTheme} onSelect={() => runMenuAction(() => setThemeMode("system"))} />
+              <MenuRadioItem name="theme" value="light" checked={themeMode === "light"} label={text.lightTheme} onSelect={() => runMenuAction(() => setThemeMode("light"))} />
+              <MenuRadioItem name="theme" value="dark" checked={themeMode === "dark"} label={text.darkTheme} onSelect={() => runMenuAction(() => setThemeMode("dark"))} />
+              <div className="menu-separator" />
+              <MenuRadioItem name="view-mode" value="edit" checked={editorMode === "edit"} label={text.editMode} onSelect={() => runMenuAction(() => selectEditorMode("edit"))} onReselect={() => runMenuAction(() => selectEditorMode("edit"))} />
+              <MenuRadioItem name="view-mode" value="split" checked={editorMode === "split"} label={text.splitMode} onSelect={() => runMenuAction(() => selectEditorMode("split"))} onReselect={() => runMenuAction(() => selectEditorMode("split"))} />
+              <MenuRadioItem name="view-mode" value="preview" checked={editorMode === "preview"} label={text.previewMode} onSelect={() => runMenuAction(() => selectEditorMode("preview"))} onReselect={() => runMenuAction(() => selectEditorMode("preview"))} />
+              <MenuCheckboxItem checked={isOutlineVisible} label={text.outline} onToggle={() => runMenuAction(() => setIsOutlineVisible((visible) => !visible))} />
+              <button role="menuitem" onClick={() => runMenuAction(() => setIsAppearanceSettingsOpen(true))}>{text.appearance}</button>
+              <MenuCheckboxItem checked={isFormattingToolbarVisible} label={text.formattingToolbar} onToggle={() => runMenuAction(toggleFormattingToolbar)} />
+              <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
+            </div>
+          </div>
+
+          <div className="menu-root" data-menu-id="settings" data-open={activeMenu === "settings"} onMouseEnter={() => activeMenu && setActiveMenu("settings")}>
+            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "settings"} onClick={() => setActiveMenu((menu) => (menu === "settings" ? null : "settings"))}>{text.settings}</button>
+            <div className="menu-popover" role="menu">
+              <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
+              <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
+            </div>
+          </div>
+
+          <div className="menu-root" data-menu-id="help" data-open={activeMenu === "help"} onMouseEnter={() => activeMenu && setActiveMenu("help")}>
             <button
               ref={helpMenuButtonRef}
               className="menu-title"
+              aria-haspopup="menu"
               aria-expanded={activeMenu === "help"}
               disabled={isDecisionModalOpen}
               onClick={() => setActiveMenu((menu) => (menu === "help" ? null : "help"))}
@@ -1709,6 +1734,7 @@ export default function App() {
       </section>
 
       <footer className="statusbar">
+        <span className="pdf-export-status" role="status" aria-live="polite" title={pdfExportStatus}>{pdfExportStatus}</span>
         <span className="statusbar-file" title={fileStatusText}>
           {fileStatusText}
         </span>

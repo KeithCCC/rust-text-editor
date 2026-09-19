@@ -49,15 +49,19 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       {
         title: "Choose a view",
         paragraphs: [
-          "Use Edit when you only need the editor, Split to see the editor and rendered result together, and Preview when you only need the rendered result. Choose between Edit, Split, and Preview with the controls at the top of the window.",
+          "Use Edit when you only need the editor, Split to see the editor and rendered result together, and Preview when you only need the rendered result. Choose between Edit, Split, and Preview with the controls at the top of the window. Koharu always starts in Edit with the outline closed. Appearance and outline controls are in View.",
         ],
+      },
+      {
+        title: "Export a PDF",
+        paragraphs: ["On Windows, choose File > Export as PDF and select a destination. The PDF includes unsaved changes, rendered diagrams and images on white A4 pages. Exporting does not save or rename the source document."],
       },
       {
         title: "Toolbar, file path, and Find",
         paragraphs: [
           "Use the control in the editor header to show or hide the formatting toolbar. Your choice is remembered the next time you open Koharu.",
           "The current file path appears in the bottom status bar. If it is truncated, hover it to see the full path.",
-          "Click Search in the menu bar or press Ctrl+F. Click Search again or press Escape to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.",
+          "Choose Edit > Search or press Ctrl+F. Click Search again or press Escape to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.",
         ],
       },
       {
@@ -141,15 +145,20 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       {
         title: "表示を選ぶ",
         paragraphs: [
+          "起動時は常に編集モードで、プレビューとアウトラインを閉じます。「表示」メニューから外観やアウトラインを変更できます。",
           "編集だけを行うときは「編集」、編集画面と仕上がりを並べるときは「分割」、仕上がりだけを見るときは「プレビュー」を使います。画面上部の「編集・分割・プレビュー」で切り替えられます。",
         ],
+      },
+      {
+        title: "PDFに出力する",
+        paragraphs: ["Windowsでは「ファイル → PDFとしてエクスポート」を選び、保存先を指定します。未保存の編集、図、画像を含む文書を白背景のA4 PDFに出力します。元の文書の保存先や未保存状態は変わりません。"],
       },
       {
         title: "ツールバー・ファイルパス・検索",
         paragraphs: [
           "エディターヘッダーのボタンで、書式ツールバーの表示・非表示を切り替えられます。選択は保存され、次回も引き継がれます。",
           "現在のファイルパスは画面下部のステータスバーに表示されます。省略されている場合は、マウスを重ねると完全なパスを確認できます。",
-          "メニューバーの「検索」をクリックするかCtrl+Fを押します。もう一度「検索」をクリックするかEscapeを押すと閉じます。プレビューから検索すると、自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。",
+          "「編集 → 検索」を選ぶかCtrl+Fを押します。もう一度「検索」をクリックするかEscapeを押すと閉じます。プレビューから検索すると、自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。",
         ],
       },
       {

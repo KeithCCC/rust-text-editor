@@ -88,6 +88,39 @@ afterEach(() => {
 });
 
 describe("MarkdownToolbar rendered interaction", () => {
+  it("keeps localized names and shortcut hints when controls use decorative icons", () => {
+    act(() => {
+      root.render(<MarkdownToolbar language="ja" onFormat={() => undefined} />);
+    });
+    for (const control of container.querySelectorAll('[data-toolbar-control="true"]')) {
+      expect(control.querySelector('svg[aria-hidden="true"][focusable="false"]')).not.toBeNull();
+      expect(control.querySelector('[role="tooltip"]')?.textContent).toContain(control.getAttribute("aria-label"));
+    }
+    expect(button("太字").querySelector('[role="tooltip"]')?.textContent).toContain("Ctrl+B");
+    expect(button("斜体").querySelector('[role="tooltip"]')?.textContent).toContain("Ctrl+I");
+  });
+
+  it("repairs focus when only the editor pane is resized", () => {
+    let notifyResize: (() => void) | undefined;
+    const disconnect = vi.fn();
+    vi.stubGlobal("ResizeObserver", class {
+      constructor(callback: () => void) { notifyResize = callback; }
+      observe() {}
+      disconnect = disconnect;
+    });
+    act(() => root.render(<MarkdownToolbar language="en" onFormat={() => undefined} />));
+    patchLayout();
+    focus(button("Strikethrough"));
+    button("Strikethrough").hidden = true;
+    expect(notifyResize).toBeDefined();
+    act(() => notifyResize?.());
+    flushAnimationFrame();
+    expect(document.activeElement).toBe(button("More"));
+    act(() => root.unmount());
+    expect(disconnect).toHaveBeenCalled();
+    root = createRoot(container);
+    vi.unstubAllGlobals();
+  });
   it("provides one focusable localized reason when every formatting command is disabled", () => {
     act(() => {
       root.render(

@@ -3,6 +3,7 @@ import type { ExcalidrawScene } from "../types";
 import { readExcalidrawFile, resolveRelativePath } from "../tauri";
 
 type ExcalidrawEmbedProps = {
+  printMode?: boolean;
   alt: string;
   src: string;
   currentFile: string | null;
@@ -14,7 +15,7 @@ type EmbedState =
   | { status: "ready"; path: string; svg: string; scene: ExcalidrawScene }
   | { status: "missing"; path: string; message: string };
 
-export function ExcalidrawEmbed({ alt, src, currentFile, onOpen }: ExcalidrawEmbedProps) {
+export function ExcalidrawEmbed({ alt, src, currentFile, onOpen, printMode = false }: ExcalidrawEmbedProps) {
   const [state, setState] = useState<EmbedState>({ status: "idle" });
 
   useEffect(() => {
@@ -37,7 +38,7 @@ export function ExcalidrawEmbed({ alt, src, currentFile, onOpen }: ExcalidrawEmb
         path = await resolveRelativePath(currentFile, src);
         const raw = await readExcalidrawFile(path);
         const scene = JSON.parse(raw) as ExcalidrawScene;
-        const svg = await exportScene(scene);
+        const svg = await exportScene(scene, printMode);
 
         if (!cancelled) {
           setState({ status: "ready", path, svg, scene });
@@ -58,15 +59,15 @@ export function ExcalidrawEmbed({ alt, src, currentFile, onOpen }: ExcalidrawEmb
     return () => {
       cancelled = true;
     };
-  }, [currentFile, src]);
+  }, [currentFile, src, printMode]);
 
   if (state.status === "loading" || state.status === "idle") {
-    return <div className="excalidraw-card">Loading Excalidraw preview...</div>;
+    return <div className="excalidraw-card" data-pdf-status="pending">Loading Excalidraw preview...</div>;
   }
 
   if (state.status === "missing") {
     return (
-      <button className="excalidraw-card missing" onClick={() => onOpen(state.path, null)}>
+      <button className="excalidraw-card missing" data-pdf-status="error" onClick={() => onOpen(state.path, null)}>
         <span>{alt || "Excalidraw diagram"}</span>
         <small>{state.message}</small>
       </button>
@@ -75,7 +76,7 @@ export function ExcalidrawEmbed({ alt, src, currentFile, onOpen }: ExcalidrawEmb
 
   if (state.status === "ready") {
     return (
-      <button className="excalidraw-card" onClick={() => onOpen(state.path, state.scene)}>
+      <button className="excalidraw-card" data-pdf-status="ready" onClick={() => onOpen(state.path, state.scene)}>
         <span>{alt || "Excalidraw diagram"}</span>
         <div className="excalidraw-svg" dangerouslySetInnerHTML={{ __html: state.svg }} />
         <small>{state.path}</small>
@@ -86,21 +87,22 @@ export function ExcalidrawEmbed({ alt, src, currentFile, onOpen }: ExcalidrawEmb
   return null;
 }
 
-async function exportScene(scene: ExcalidrawScene) {
+async function exportScene(scene: ExcalidrawScene, printMode: boolean) {
   const { exportToSvg } = await import("@excalidraw/excalidraw");
   const svg = await exportToSvg({
     elements: (scene.elements ?? []) as never,
     appState: {
       ...(scene.appState ?? {}),
+      ...(printMode ? { exportWithDarkMode: false } : {}),
       exportBackground: true,
       viewBackgroundColor:
-        typeof scene.appState?.viewBackgroundColor === "string"
+        !printMode && typeof scene.appState?.viewBackgroundColor === "string"
           ? scene.appState.viewBackgroundColor
           : "#ffffff",
     } as never,
     files: (scene.files ?? {}) as never,
     exportPadding: 16,
-    skipInliningFonts: true,
+    skipInliningFonts: !printMode,
   });
 
   return svg.outerHTML;

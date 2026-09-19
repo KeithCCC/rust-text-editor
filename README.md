@@ -16,7 +16,7 @@ Use **Hotaru** if you are interested in experimental notebook or vault workflows
 
 - Single-file Markdown editing with CodeMirror.
 - Open, save, Save As, drag-and-drop open, and startup file support.
-- Edit, Split, and Preview view modes for writing and checking the rendered result.
+- Edit, Split, and Preview view modes. Every launch starts in Edit with the preview and outline closed.
 - GitHub-flavored Markdown preview support.
 - Mermaid diagram rendering in preview and exported HTML.
 - `.excalidraw` image links that can open an Excalidraw editor.
@@ -27,7 +27,7 @@ Use **Hotaru** if you are interested in experimental notebook or vault workflows
 - Light, dark, and system themes.
 - English and Japanese UI switching.
 - File properties dialog.
-- Standalone HTML export.
+- Standalone HTML export and A4 PDF export on Windows, including unsaved changes, images, and diagrams.
 - Desktop packaging through Tauri.
 
 ## Basic Usage
@@ -35,7 +35,7 @@ Use **Hotaru** if you are interested in experimental notebook or vault workflows
 1. Choose **File > New** to create a document, or **File > Open** to open an existing Markdown or text file.
 2. Use **Edit** for writing, **Split** to see the editor and rendered result together, or **Preview** to see only the rendered result.
 3. Use the control in the editor header to show or hide the formatting toolbar. Koharu remembers this choice. The current file path is shown in the bottom status bar; hover it to see the full path when it is truncated.
-4. Click **Search** in the menu bar or press `Ctrl+F` to search the document. Click **Search** again or press `Escape` to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.
+4. Choose **Edit > Search** or press `Ctrl+F` to search the document. Click **Search** again or press `Escape` to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.
 
 ## Hotaru Direction
 
@@ -113,7 +113,7 @@ Vault やノートブック的な使い方、実験的なナレッジ管理機�
 
 - CodeMirror による単一ファイル Markdown 編集。
 - 開く、保存、名前を付けて保存、ドラッグ＆ドロップで開く、起動時ファイル指定に対応。
-- 編集・分割・プレビューの3つの表示モード。
+- 編集・分割・プレビューの3つの表示モード。起動時は常に編集モードで、プレビューとアウトラインを閉じます。
 - GitHub Flavored Markdown のプレビュー対応。
 - プレビューと HTML エクスポートでの Mermaid 図表表示。
 - `.excalidraw` 画像リンクから Excalidraw エディタを開く機能。
@@ -124,7 +124,7 @@ Vault やノートブック的な使い方、実験的なナレッジ管理機�
 - ライト、ダーク、システムテーマ。
 - 英語 UI と日本語 UI の切り替え。
 - ファイル情報ダイアログ。
-- 単体で開ける HTML エクスポート。
+- 単体で開ける HTML エクスポートと、未保存の編集・画像・図を含む Windows 向け A4 PDF エクスポート。
 - Tauri によるデスクトップアプリのパッケージング。
 
 ## 基本的な使い方
@@ -132,7 +132,7 @@ Vault やノートブック的な使い方、実験的なナレッジ管理機�
 1. **「ファイル」→「新規」**で文書を作るか、**「ファイル」→「開く」**で既存のMarkdownファイルまたはテキストファイルを開きます。
 2. 文章を書くときは**編集**、編集画面と仕上がりを並べるときは**分割**、仕上がりだけを見るときは**プレビュー**を選びます。
 3. エディターヘッダーのボタンで書式ツールバーの表示・非表示を切り替えられます。この設定は次回も引き継がれます。現在のファイルパスは画面下部のステータスバーに表示され、省略されている場合はマウスを重ねると完全なパスを確認できます。
-4. メニューバーの**「検索」**をクリックするか`Ctrl+F`を押すと、文書内を検索できます。もう一度**「検索」**をクリックするか`Escape`を押すと閉じます。プレビューから検索した場合は自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。
+4. **「編集 → 検索」**を選ぶか`Ctrl+F`を押すと、文書内を検索できます。もう一度**「検索」**をクリックするか`Escape`を押すと閉じます。プレビューから検索した場合は自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。
 
 ## Hotaru の方向性
 

@@ -633,6 +633,7 @@ kbd {
 .markdown-toolbar {
   position: relative;
   display: flex;
+  flex-wrap: wrap;
   gap: 3px;
   overflow: visible;
   padding: 5px 8px;
@@ -667,6 +668,8 @@ kbd {
 }
 
 .formatting-toolbar-region {
+  container-type: inline-size;
+  container-name: formatting-toolbar;
   background: var(--toolbar-bg);
 }
 
@@ -702,6 +705,8 @@ kbd {
 
 .markdown-toolbar-group {
   display: flex;
+  flex-wrap: wrap;
+  max-width: 100%;
   gap: 3px;
 }
 
@@ -755,6 +760,66 @@ kbd {
 .markdown-toolbar button:hover {
   border-color: var(--border);
   background: var(--hover-bg);
+}
+
+.markdown-toolbar button[data-toolbar-control="true"] {
+  position: relative;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 2px;
+  min-width: 32px;
+  padding: 5px;
+}
+
+.toolbar-icon {
+  flex: 0 0 auto;
+  width: 20px;
+  height: 20px;
+}
+
+.toolbar-chevron {
+  width: 12px;
+  height: 12px;
+}
+
+.markdown-toolbar button:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 1px;
+}
+
+.toolbar-tooltip {
+  position: absolute;
+  top: calc(100% + 5px);
+  left: 0;
+  z-index: 6;
+  display: none;
+  width: max-content;
+  max-width: 240px;
+  padding: 5px 8px;
+  border: 1px solid var(--strong-border);
+  border-radius: 4px;
+  background: var(--menu-bg);
+  color: var(--text);
+  box-shadow: 0 4px 12px var(--shadow);
+  font-size: var(--ui-font-size);
+  font-weight: normal;
+  white-space: normal;
+  pointer-events: none;
+}
+
+.markdown-toolbar button:hover > .toolbar-tooltip,
+.markdown-toolbar button:focus-visible > .toolbar-tooltip {
+  display: block;
+}
+
+.markdown-toolbar button[aria-expanded="true"] > .toolbar-tooltip {
+  display: none;
+}
+
+.markdown-toolbar-group:last-child .toolbar-tooltip {
+  right: 0;
+  left: auto;
 }
 
 .markdown-toolbar button[aria-pressed="true"],
@@ -1917,7 +1982,7 @@ textarea {
   }
 }
 
-@media (max-width: 960px) {
+@container formatting-toolbar (max-width: 520px) {
   .markdown-toolbar {
     flex-wrap: wrap;
     align-items: center;
@@ -1928,7 +1993,7 @@ textarea {
     max-width: 100%;
   }
 
-  .toolbar-wide-action {
+  .markdown-toolbar button.toolbar-wide-action {
     display: none;
   }
 
@@ -2036,3 +2101,18 @@ textarea {
     padding: 10px;
   }
 }
+
+/* Recent files expand within File so the menu stays usable near window edges. */
+.recent-files-group {
+  max-height: min(36vh, 260px);
+  overflow-y: auto;
+  border-block: 1px solid var(--border);
+  padding: 4px 0;
+}
+.menu-popover {
+  max-width: calc(100vw - 16px);
+  max-height: calc(100vh - 40px);
+  overflow-y: auto;
+}
+.pdf-export-status:empty { display: none; }
+.pdf-export-status { max-width: 35vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }

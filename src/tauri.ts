@@ -81,3 +81,7 @@ export function resolveRelativePath(baseFile: string, relativePath: string) {
     relativePath,
   });
 }
+
+export function exportPdf(path: string, html: string) {
+  return invoke<void>("export_pdf", { path, html });
+}

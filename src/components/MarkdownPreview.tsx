@@ -19,8 +19,10 @@ import { JsonCodeBlock } from "./JsonCodeBlock";
 import { getRelativeMarkdownPath } from "../markdownLinks";
 import { parseMarkdownOutline } from "../markdownOutline";
 import type { ExcalidrawScene } from "../types";
+import { sanitizePdfMarkdown } from "../pdfSanitize";
 
 type MarkdownPreviewProps = {
+  printMode?: boolean;
   markdown: string;
   currentFile: string | null;
   themeMode: "system" | "light" | "dark";
@@ -46,6 +48,12 @@ function getPreCodeLanguage(children: ReactNode) {
   return getCodeLanguage(children.props.className);
 }
 
+function containsExcalidraw(node: { tagName?: string; properties?: Record<string, unknown>; children?: unknown[] }): boolean {
+  const source = node.properties?.dataPdfSrc ?? node.properties?.src;
+  if (node.tagName === "img" && typeof source === "string" && source.toLowerCase().endsWith(".excalidraw")) return true;
+  return node.children?.some((child) => typeof child === "object" && child !== null && containsExcalidraw(child)) ?? false;
+}
+
 type PreviewHeadingProps = ComponentPropsWithoutRef<"h1"> & ExtraProps;
 
 function createPreviewHeading(
@@ -67,7 +75,7 @@ function createPreviewHeading(
 }
 
 const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPreviewProps>(function MarkdownPreview(
-  { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenExternalLink, onOpenRelativeMarkdownLink },
+  { markdown, currentFile, themeMode, onOpenExcalidraw, onOpenExternalLink, onOpenRelativeMarkdownLink, printMode = false },
   ref,
 ) {
   const rootRef = useRef<HTMLDivElement>(null);
@@ -97,9 +105,15 @@ const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPrevi
     <div className="preview-body" ref={rootRef}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
-        rehypePlugins={[rehypeRaw]}
+        rehypePlugins={printMode ? [rehypeRaw, sanitizePdfMarkdown] : [rehypeRaw]}
         components={{
           ...headingComponents,
+          p({ node, children, ...props }) {
+            // Diagram previews contain block elements, which cannot live in p.
+            return node && containsExcalidraw(node)
+              ? <div {...props}>{children}</div>
+              : <p {...props}>{children}</p>;
+          },
           a({ href, children, ...props }) {
             const relativeMarkdownPath = href ? getRelativeMarkdownPath(href) : null;
             if (relativeMarkdownPath) {
@@ -160,19 +174,23 @@ const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPrevi
               </code>
             );
           },
-          img({ alt, src }) {
+          img({ alt, src, node }) {
+            if (printMode) src = String(node?.properties?.dataPdfSrc ?? "");
             if (typeof src === "string" && src.toLowerCase().endsWith(".excalidraw")) {
               return (
                 <ExcalidrawEmbed
                   alt={alt ?? ""}
                   src={src}
                   currentFile={currentFile}
+                  printMode={printMode}
                   onOpen={onOpenExcalidraw}
                 />
               );
             }
 
-            return <img alt={alt ?? ""} src={src ?? ""} />;
+            return printMode
+              ? <img alt={alt ?? ""} data-pdf-src={src ?? ""} />
+              : <img alt={alt ?? ""} src={src ?? ""} />;
           },
         }}
       >

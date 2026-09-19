@@ -1,5 +1,6 @@
 import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
 import type { AppLanguage } from "../appLanguage";
+import { ToolbarIcon } from "./ToolbarIcon";
 import { getFormattingUi, type FormattingUi } from "../formattingUi";
 import type {
   CodeLanguage,
@@ -225,7 +226,10 @@ export function MarkdownToolbar({
     };
 
     window.addEventListener("resize", synchronizeVisibleTabStop);
+    const observer = typeof ResizeObserver === "undefined" ? null : new ResizeObserver(synchronizeVisibleTabStop);
+    if (toolbarRef.current) observer?.observe(toolbarRef.current);
     return () => {
+      observer?.disconnect();
       window.removeEventListener("resize", synchronizeVisibleTabStop);
       if (frame !== null) window.cancelAnimationFrame(frame);
     };
@@ -320,7 +324,10 @@ export function MarkdownToolbar({
         aria-keyshortcuts={SHORTCUTS[command.kind]}
         onClick={() => runCommand(command)}
       >
-        {action.short}
+        <ToolbarIcon name={key} />
+        <span className="toolbar-tooltip" role="tooltip">
+          {action.label}{command.kind === "bold" ? " (Ctrl+B / ⌘B)" : command.kind === "italic" ? " (Ctrl+I / ⌘I)" : ""}
+        </span>
       </button>
     );
   };
@@ -384,7 +391,8 @@ export function MarkdownToolbar({
           onClick={toggleMenu}
           onKeyDown={handleMenuTriggerKeyDown}
         >
-          {action.short}<span aria-hidden="true"> ▾</span>
+          <ToolbarIcon name={key} /><ToolbarIcon name="chevron" />
+          <span className="toolbar-tooltip" role="tooltip">{action.label}</span>
         </button>
         <div
           className="toolbar-menu-popover"
