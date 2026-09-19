@@ -344,3 +344,10 @@ describe("MarkdownToolbar rendered interaction", () => {
     expect(button("Heading").getAttribute("aria-expanded")).toBe("false");
   });
 });
+
+it("disables block formatting while retaining inline commands for a table cell", () => {
+  act(() => root.render(<MarkdownToolbar language="en" onFormat={() => undefined} formattingContext={{ headingLevel: null, bold: false, italic: false, strikethrough: false, inlineCode: false, tableCell: true }} />));
+  expect(button("Heading").disabled).toBe(true);
+  expect(button("Table").disabled).toBe(true);
+  expect(button("Bold").disabled).toBe(false);
+});

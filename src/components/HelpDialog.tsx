@@ -107,6 +107,8 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         title: "Insert",
         paragraphs: [
           "Table inserts rows and columns. Mermaid diagram inserts a flowchart definition that becomes a diagram in Split or Preview.",
+          "In Edit or Split, click a table cell to edit it directly. Tab and Shift+Tab move between cells; Enter moves to the next row; Shift+Enter adds a line inside the cell. Tab at the last cell or Enter on the last row adds a row. Escape keeps your changes and moves after the table; Ctrl+Z undoes changes.",
+          "Use the ⋯ button in a cell, or press Alt+Down, to add or delete rows and columns or change alignment. Edit source shows the Markdown; Show table returns to cells. Bold, links, and other inline Markdown remain editable text inside cells. Tables in quotes or lists and unsupported table syntax remain source text.",
         ],
         examples: [
           { source: "| Heading 1 | Heading 2 |\n| --- | --- |\n| Value 1 | Value 2 |", meaning: "Table — rendered rows and columns" },
@@ -204,6 +206,8 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         title: "挿入",
         paragraphs: [
           "表は行と列を挿入します。図（Mermaid）はフローチャートの定義を挿入し、分割表示またはプレビューで図として表示します。",
+          "編集・分割では、表のセルを直接編集できます。Tab／Shift+Tabでセル間を移動、Enterで次の行へ移動、Shift+Enterでセル内改行します。最後のセルでTab、または最終行でEnterを押すと行を追加します。Escapeは変更を残して表の後へ移動し、Ctrl+Zで変更を取り消します。",
+          "セルの「⋯」またはAlt+↓から行・列の追加、削除、配置変更を操作します。「ソースを編集」でMarkdownを表示し、「表に戻す」でセル編集に戻ります。太字やリンクなどのMarkdown記法はセル内で文字として編集します。引用・リスト内の表や、対応していない表記法はソースのまま表示します。",
         ],
         examples: [
           { source: "| 見出し 1 | 見出し 2 |\n| --- | --- |\n| 値 1 | 値 2 |", meaning: "表 — 行と列として表示" },

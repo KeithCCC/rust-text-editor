@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState, type KeyboardEvent, type ReactNode 
 import type { AppLanguage } from "../appLanguage";
 import { ToolbarIcon } from "./ToolbarIcon";
 import { getFormattingUi, type FormattingUi } from "../formattingUi";
+import { isInlineMarkdownCommand } from "../markdownFormatting";
 import type {
   CodeLanguage,
   FormattingContext,
@@ -122,6 +123,7 @@ function MenuItems({
 }) {
   return items.map(({ key, command }, index) => {
     const action = ui.actions[key];
+    const commandDisabled = disabled || Boolean(formattingContext?.tableCell && !isInlineMarkdownCommand(command));
     const isHeading = command.kind === "heading";
     const isCurrentHeading = isHeading
       ? formattingContext?.headingLevel === command.level
@@ -135,8 +137,8 @@ function MenuItems({
         aria-label={action.label}
         aria-checked={isHeading ? isCurrentHeading : undefined}
         title={action.tooltip}
-        disabled={disabled}
-        aria-disabled={disabled || undefined}
+        disabled={commandDisabled}
+        aria-disabled={commandDisabled || undefined}
         aria-keyshortcuts={SHORTCUTS[command.kind]}
         tabIndex={managed ? -1 : undefined}
         onClick={() => onSelect(command)}
@@ -170,8 +172,8 @@ export function MarkdownFormatMenu({
         type="button"
         role="menuitem"
         aria-label={formatJsonLabel}
-        disabled={disabled}
-        aria-disabled={disabled || undefined}
+        disabled={disabled || formattingContext?.tableCell}
+        aria-disabled={disabled || formattingContext?.tableCell || undefined}
         onClick={onFormatJson}
       >
         {formatJsonLabel}
@@ -310,6 +312,7 @@ export function MarkdownToolbar({
     options: { className?: string; pressed?: boolean } = {},
   ) => {
     const action = ui.actions[key];
+    const commandDisabled = disabled || Boolean(formattingContext?.tableCell && !isInlineMarkdownCommand(command));
     return (
       <button
         {...controlProps(index)}
@@ -318,8 +321,8 @@ export function MarkdownToolbar({
         className={options.className}
         aria-label={action.label}
         title={action.tooltip}
-        disabled={disabled}
-        aria-disabled={disabled || undefined}
+        disabled={commandDisabled}
+        aria-disabled={commandDisabled || undefined}
         aria-pressed={formattingContext ? options.pressed : undefined}
         aria-keyshortcuts={SHORTCUTS[command.kind]}
         onClick={() => runCommand(command)}
@@ -340,6 +343,7 @@ export function MarkdownToolbar({
     options: { className?: string; pressed?: boolean } = {},
   ) => {
     const action = ui.actions[key];
+    const menuDisabled = disabled || Boolean(formattingContext?.tableCell && id !== "more");
     const isOpen = openMenu === id;
     const toggleMenu = () => {
       if (isOpen) {
@@ -385,8 +389,8 @@ export function MarkdownToolbar({
           aria-haspopup="menu"
           aria-expanded={isOpen}
           title={action.tooltip}
-          disabled={disabled}
-          aria-disabled={disabled || undefined}
+          disabled={menuDisabled}
+          aria-disabled={menuDisabled || undefined}
           aria-pressed={formattingContext ? options.pressed : undefined}
           onClick={toggleMenu}
           onKeyDown={handleMenuTriggerKeyDown}

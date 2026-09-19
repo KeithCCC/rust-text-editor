@@ -16,6 +16,10 @@ export type MarkdownCommand =
   | { kind: "bulletList" | "numberedList" | "taskList" | "quote" | "table" | "mermaid" }
   | { kind: "codeBlock"; language: CodeLanguage };
 
+export function isInlineMarkdownCommand(command: MarkdownCommand) {
+  return ["bold", "italic", "strikethrough", "link", "inlineCode"].includes(command.kind);
+}
+
 export type FormattingPlaceholders = {
   editor: string;
   bold: string;
@@ -61,6 +65,7 @@ export type FormatResult = {
 };
 
 export type FormattingContext = {
+  tableCell?: boolean;
   headingLevel: HeadingLevel | null;
   bold: boolean;
   italic: boolean;

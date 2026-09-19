@@ -1163,122 +1163,32 @@ textarea {
   display: none;
 }
 
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-wrap {
-  max-width: 100%;
-  margin: 10px 0 14px;
-  overflow: auto;
+.koharu-table-wrap { max-width: 100%; margin: 12px 0 16px; white-space: normal; }
+.koharu-table-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
+.koharu-table-wrap button, .koharu-table-actions summary {
+  border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px;
+  background: var(--surface-bg); color: var(--text); cursor: pointer;
+  font: var(--ui-font-size) / 1.4 ui-sans-serif, system-ui, sans-serif;
 }
+.koharu-table-wrap button:disabled { opacity: .5; cursor: default; }
+.koharu-table-wrap button:focus-visible, .koharu-table-actions summary:focus-visible {
+  outline: 2px solid var(--preview-link); outline-offset: 2px;
+}
+.koharu-table-scroll { overflow-x: auto; max-width: 100%; }
+.koharu-table { width: 100%; border-collapse: collapse; color: var(--preview-text); background: var(--preview-bg); }
+.koharu-table th, .koharu-table td { min-width: 180px; padding: 8px; border: 1px solid var(--border); vertical-align: top; }
+.koharu-table th { background: var(--preview-table-head); font-weight: 700; }
+.koharu-table-cell { display: block; width: 100%; min-width: 160px; box-sizing: border-box;
+  border: 0; padding: 4px; min-height: 2.2em; background: transparent; color: inherit;
+  font: inherit; line-height: 1.5; text-align: inherit; resize: vertical; overflow-y: auto;
+}
+.koharu-table-cell:focus { outline: 2px solid var(--preview-link); border-radius: 3px; }
+.koharu-table-cell[readonly] { cursor: text; }
+.koharu-table-actions { margin-top: 4px; text-align: left; font-weight: normal; }
+.koharu-table-actions summary { width: fit-content; list-style: none; padding: 0 8px; }
+.koharu-table-action-list { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 5px; max-width: 340px; }
+.koharu-table-source-controls { margin: 4px 0; }
 
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-toolbar {
-  display: flex;
-  gap: 6px;
-  margin: 0 0 6px;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-button {
-  min-height: 24px;
-  padding: 2px 8px;
-  border: 1px solid var(--border);
-  border-radius: 5px;
-  background: var(--surface-bg);
-  color: var(--text);
-  font: var(--ui-font-size) / 1.3 ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-  cursor: pointer;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-button:hover {
-  border-color: var(--preview-link);
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table {
-  width: max-content;
-  min-width: 100%;
-  border-collapse: collapse;
-  background: var(--preview-bg);
-  color: var(--preview-text);
-  font: var(--preview-font-size) / var(--preview-line-height) ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table th,
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table td {
-  min-width: 180px;
-  max-width: 440px;
-  border: 1px solid var(--border);
-  padding: 8px 10px;
-  vertical-align: top;
-  white-space: normal;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table th {
-  background: var(--preview-table-head);
-  color: var(--preview-heading);
-  font-weight: 760;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table th {
-  position: relative;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-cell-editor {
-  display: block;
-  width: 100%;
-  min-width: 150px;
-  max-width: 100%;
-  min-height: 2.2em;
-  padding: 0;
-  border: 0;
-  outline: none;
-  resize: vertical;
-  overflow: hidden;
-  background: transparent;
-  color: inherit;
-  font: inherit;
-  line-height: inherit;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-cell-editor:focus {
-  border-radius: 4px;
-  box-shadow: 0 0 0 2px color-mix(in srgb, var(--preview-link) 65%, transparent);
-  background: color-mix(in srgb, var(--active-bg) 55%, transparent);
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-cell-editor.is-header {
-  font-weight: 760;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-column-controls {
-  display: flex;
-  gap: 4px;
-  margin-top: 6px;
-  opacity: 0;
-  transition: opacity 120ms ease;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table th:focus-within .hotaru-live-table-column-controls,
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table th:hover .hotaru-live-table-column-controls {
-  opacity: 1;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-row-controls {
-  width: 1%;
-  min-width: 88px;
-  max-width: 110px;
-  background: color-mix(in srgb, var(--preview-table-head) 70%, transparent);
-  white-space: nowrap;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table-row-controls .hotaru-live-table-button {
-  margin-right: 4px;
-}
-
-.markdown-editor[data-editor-mode="live"] .hotaru-live-table code {
-  padding: 1px 4px;
-  border: 1px solid var(--preview-code-border);
-  border-radius: 4px;
-  background: var(--preview-code-bg);
-  color: var(--preview-code-text);
-  font-family: "Cascadia Code", "Fira Code", Consolas, monospace;
-}
 
 .markdown-editor[data-editor-mode="live"] .hotaru-live-link {
   color: var(--preview-link);

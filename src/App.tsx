@@ -480,6 +480,12 @@ export default function App() {
     new DocumentActionGate(isTauriRuntime() ? ["startup"] : []),
   );
   const latestDocumentRef = useRef(new LatestValue({ content, currentFile, modified }));
+  const latestDocumentSessionIdRef = useRef(documentSessionId);
+  const pendingEditorPreparationRef = useRef<{
+    sessionId: number;
+    promise: Promise<boolean>;
+  } | null>(null);
+  const openDialogInProgressRef = useRef(false);
   const latestExcalidrawDirtyRef = useRef(false);
   const latestCloseRequestRef = useRef<() => Promise<unknown>>(async () => false);
   const closeErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
@@ -487,9 +493,30 @@ export default function App() {
   const dragDropErrorReporterRef = useRef<(error: unknown) => void>(() => undefined);
   const startupRecoveryDecisionInProgressRef = useRef(false);
 
-  const selectEditorMode = useCallback((mode: ViewMode) => {
-    setEditorMode(mode);
+  const preparePendingDocumentEdits = useCallback(async () => {
+    const sessionId = latestDocumentSessionIdRef.current;
+    let pending = pendingEditorPreparationRef.current;
+    if (!pending || pending.sessionId !== sessionId) {
+      const promise = editorRef.current?.preparePendingEdits() ?? Promise.resolve(true);
+      pending = { sessionId, promise };
+      pendingEditorPreparationRef.current = pending;
+      const clearPending = () => {
+        if (pendingEditorPreparationRef.current?.promise === promise) {
+          pendingEditorPreparationRef.current = null;
+        }
+      };
+      void promise.then(clearPending, clearPending);
+    }
+
+    const prepared = await pending.promise;
+    return prepared && latestDocumentSessionIdRef.current === sessionId;
   }, []);
+
+  const selectEditorMode = useCallback(async (mode: ViewMode) => {
+    if (!(await preparePendingDocumentEdits()) || actionGateRef.current.isBlocked()) return false;
+    setEditorMode(mode);
+    return true;
+  }, [preparePendingDocumentEdits]);
 
   const isNativeRuntime = isTauriRuntime();
   const isSplitMode = editorMode === "split";
@@ -590,7 +617,8 @@ export default function App() {
 
   const loadDocument = useCallback((path: string, nextContent: string) => {
     latestDocumentRef.current.set({ content: nextContent, currentFile: path, modified: false });
-    setDocumentSessionId((sessionId) => sessionId + 1);
+    latestDocumentSessionIdRef.current += 1;
+    setDocumentSessionId(latestDocumentSessionIdRef.current);
     setContent(nextContent);
     setPreviewContent(nextContent);
     setCurrentFile(path);
@@ -603,7 +631,8 @@ export default function App() {
   const resetDocument = useCallback(() => {
     const next = createUntitledDocument();
     latestDocumentRef.current.set({ content: next.content, currentFile: next.path, modified: next.modified });
-    setDocumentSessionId((sessionId) => sessionId + 1);
+    latestDocumentSessionIdRef.current += 1;
+    setDocumentSessionId(latestDocumentSessionIdRef.current);
     setContent(next.content);
     setPreviewContent(next.content);
     setCurrentFile(next.path);
@@ -671,8 +700,13 @@ export default function App() {
     }, reportSaveError);
   }, [clearRecoverySafely, handleSaveAs, recordRecentFile, reportSaveError]);
 
-  const requestDocumentTransition = useCallback(async (proceed: () => Promise<boolean>) => {
-    if (transitionInProgressRef.current) return false;
+  const requestDocumentTransition = useCallback(async (
+    proceed: () => Promise<boolean>,
+    options: { allowExistingActionBlock?: boolean } = {},
+  ) => {
+    if (!(await preparePendingDocumentEdits())) return false;
+    if (transitionInProgressRef.current
+      || (!options.allowExistingActionBlock && actionGateRef.current.isBlocked())) return false;
     transitionInProgressRef.current = true;
     actionGateRef.current.block("transition");
     setIsDocumentTransitionPending(true);
@@ -689,7 +723,7 @@ export default function App() {
       actionGateRef.current.release("transition");
       setIsDocumentTransitionPending(false);
     }
-  }, [clearRecoverySafely, handleSave, requestUnsavedDecision]);
+  }, [clearRecoverySafely, handleSave, preparePendingDocumentEdits, requestUnsavedDecision]);
 
   const openDroppedPath = useCallback(
     (path: string) => requestDocumentTransition(() => openFilePath(path)),
@@ -705,7 +739,6 @@ export default function App() {
   dragDropErrorReporterRef.current = reportDragDropError;
 
   const handleNew = useCallback(async () => {
-    if (actionGateRef.current.isBlocked()) return;
     await requestDocumentTransition(async () => {
       resetDocument();
       setEditorMode("edit");
@@ -714,18 +747,25 @@ export default function App() {
   }, [requestDocumentTransition, resetDocument]);
 
   const handleOpen = useCallback(async () => {
-    if (actionGateRef.current.isBlocked()) return;
-    const selected = normalizeSelectedPath(await open({
-      multiple: false,
-      filters: [
-        { name: "Text files", extensions: ["txt", "md", "markdown", "json", "csv", "log"] },
-        { name: "All files", extensions: ["*"] },
-      ],
-    }));
-    if (selected) {
-      await requestDocumentTransition(() => openFilePath(selected));
+    if (!(await preparePendingDocumentEdits())
+      || actionGateRef.current.isBlocked()
+      || openDialogInProgressRef.current) return;
+    openDialogInProgressRef.current = true;
+    try {
+      const selected = normalizeSelectedPath(await open({
+        multiple: false,
+        filters: [
+          { name: "Text files", extensions: ["txt", "md", "markdown", "json", "csv", "log"] },
+          { name: "All files", extensions: ["*"] },
+        ],
+      }));
+      if (selected) {
+        await requestDocumentTransition(() => openFilePath(selected));
+      }
+    } finally {
+      openDialogInProgressRef.current = false;
     }
-  }, [openFilePath, requestDocumentTransition]);
+  }, [openFilePath, preparePendingDocumentEdits, requestDocumentTransition]);
 
   const reportCloseError = useCallback((closeError: unknown) => {
     showError(
@@ -734,8 +774,8 @@ export default function App() {
     );
   }, [showError, text.exit]);
 
-  const requestAppClose = useCallback(() => {
-    if (actionGateRef.current.isBlocked()) return Promise.resolve(false);
+  const requestAppClose = useCallback(async () => {
+    if (!(await preparePendingDocumentEdits()) || actionGateRef.current.isBlocked()) return false;
     return runCloseRequestSafely(
       async () => {
         if (transitionInProgressRef.current) return false;
@@ -764,21 +804,42 @@ export default function App() {
       },
       reportCloseError,
     );
-  }, [clearRecoverySafely, handleSave, reportCloseError, requestUnsavedDecision]);
+  }, [clearRecoverySafely, handleSave, preparePendingDocumentEdits, reportCloseError, requestUnsavedDecision]);
   latestCloseRequestRef.current = requestAppClose;
   closeErrorReporterRef.current = reportCloseError;
 
   const handleSaveAction = useCallback(async () => {
+    const focusedCell = document.activeElement instanceof HTMLTextAreaElement
+      && document.activeElement.dataset.tableCell
+      ? document.activeElement
+      : null;
+    const saveSessionId = latestDocumentSessionIdRef.current;
+    if (!(await preparePendingDocumentEdits())) return false;
     const result = await runExclusiveDocumentAction(
       actionGateRef.current,
       "direct-save",
       handleSave,
       setIsDirectSavePending,
     );
+    if (result === true && focusedCell && latestDocumentSessionIdRef.current === saveSessionId) {
+      window.setTimeout(() => {
+        const activeElement = document.activeElement;
+        const focusStayedInEditor = activeElement === document.body
+          || (activeElement instanceof HTMLElement && activeElement.closest(".cm-editor") !== null);
+        if (focusedCell.isConnected
+          && focusStayedInEditor
+          && latestDocumentSessionIdRef.current === saveSessionId
+          && !actionGateRef.current.isBlocked()
+          && !document.querySelector('[role="dialog"]')) {
+          focusedCell.focus();
+        }
+      }, 0);
+    }
     return result ?? false;
-  }, [handleSave]);
+  }, [handleSave, preparePendingDocumentEdits]);
 
   const handleSaveAsAction = useCallback(async () => {
+    if (!(await preparePendingDocumentEdits())) return false;
     const result = await runExclusiveDocumentAction(
       actionGateRef.current,
       "direct-save-as",
@@ -786,7 +847,7 @@ export default function App() {
       setIsDirectSavePending,
     );
     return result ?? false;
-  }, [handleSaveAs]);
+  }, [handleSaveAs, preparePendingDocumentEdits]);
 
   const handleExit = useCallback(async () => {
     await requestAppClose();
@@ -797,11 +858,18 @@ export default function App() {
     pdfExportPendingRef.current = true;
     setIsPdfExporting(true);
     setPdfExportStatus("");
-    // Snapshot the document at invocation; editing may continue while it is exported.
-    const snapshot = { content, currentFile, title: fileNameFromPath(currentFile), language: appLanguage };
     try {
+      if (!(await preparePendingDocumentEdits()) || actionGateRef.current.isBlocked()) return;
+      // Snapshot after IME composition and pending cell edits have reached the document.
+      const latestDocument = latestDocumentRef.current.get();
+      const snapshot = {
+        content: latestDocument.content,
+        currentFile: latestDocument.currentFile,
+        title: fileNameFromPath(latestDocument.currentFile),
+        language: appLanguage,
+      };
       const selected = await save({
-        defaultPath: `${fileNameFromPath(currentFile).replace(/\.[^.]+$/, "") || "Untitled"}.pdf`,
+        defaultPath: `${snapshot.title.replace(/\.[^.]+$/, "") || "Untitled"}.pdf`,
         filters: [{ name: "PDF", extensions: ["pdf"] }],
       });
       if (!selected) return;
@@ -816,26 +884,30 @@ export default function App() {
       pdfExportPendingRef.current = false;
       setIsPdfExporting(false);
     }
-  }, [content, currentFile, appLanguage, showError, text.exportFailed, text.pdfExporting, text.pdfSaved]);
+  }, [preparePendingDocumentEdits, appLanguage, showError, text.exportFailed, text.pdfExporting, text.pdfSaved]);
 
   const handleExportHtml = useCallback(async () => {
+    if (!(await preparePendingDocumentEdits()) || actionGateRef.current.isBlocked()) return;
+    const exportSessionId = latestDocumentSessionIdRef.current;
+    const documentBeforePicker = latestDocumentRef.current.get();
     const selected = await save({
-      defaultPath: `${fileNameFromPath(currentFile).replace(/\.[^.]+$/, "") || "Untitled"}.html`,
+      defaultPath: `${fileNameFromPath(documentBeforePicker.currentFile).replace(/\.[^.]+$/, "") || "Untitled"}.html`,
       filters: [{ name: "HTML", extensions: ["html", "htm"] }],
     });
-    if (!selected) {
+    if (!selected || latestDocumentSessionIdRef.current !== exportSessionId) {
       return;
     }
 
     try {
+      const latestDocument = latestDocumentRef.current.get();
       await writeTextFile(selected, await buildStandaloneHtml({
-        title: fileNameFromPath(currentFile),
-        bodyHtml: markdownToHtml(content),
+        title: fileNameFromPath(latestDocument.currentFile),
+        bodyHtml: markdownToHtml(latestDocument.content),
       }));
     } catch (exportError) {
       showError(text.exportFailed, exportError instanceof Error ? exportError.message : String(exportError));
     }
-  }, [content, currentFile, showError, text.exportFailed]);
+  }, [preparePendingDocumentEdits, showError, text.exportFailed]);
 
   const handleFileProperties = useCallback(async () => {
     if (!currentFile) {
@@ -895,29 +967,34 @@ export default function App() {
   }, [handleExcalidrawDirtyChange]);
 
   const handleOpenRelativeMarkdownLink = useCallback((relativePath: string) => {
-    if (actionGateRef.current.isBlocked()) return;
     if (!currentFile) {
       showError(text.linkOpenFailed, text.saveBeforeOpeningLink);
       return;
     }
 
-    void runExclusiveDocumentAction(
-      actionGateRef.current,
-      "relative-link-preflight",
-      async () => {
-        try {
-          const path = await resolveRelativePath(currentFile, relativePath);
-          await requestDocumentTransition(() => openFilePath(path));
-        } catch (linkError) {
-          showError(
-            text.linkOpenFailed,
-            linkError instanceof Error ? linkError.message : String(linkError),
-          );
-        }
-      },
-      setIsRelativeLinkPreflightPending,
-    );
-  }, [currentFile, openFilePath, requestDocumentTransition, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
+    void (async () => {
+      if (!(await preparePendingDocumentEdits())) return;
+      await runExclusiveDocumentAction(
+        actionGateRef.current,
+        "relative-link-preflight",
+        async () => {
+          try {
+            const path = await resolveRelativePath(currentFile, relativePath);
+            await requestDocumentTransition(
+              () => openFilePath(path),
+              { allowExistingActionBlock: true },
+            );
+          } catch (linkError) {
+            showError(
+              text.linkOpenFailed,
+              linkError instanceof Error ? linkError.message : String(linkError),
+            );
+          }
+        },
+        setIsRelativeLinkPreflightPending,
+      );
+    })();
+  }, [currentFile, openFilePath, preparePendingDocumentEdits, requestDocumentTransition, showError, text.linkOpenFailed, text.saveBeforeOpeningLink]);
 
   const handleOpenExternalLink = useCallback((url: string) => {
     void openUrl(url).catch((linkError) => {
@@ -959,7 +1036,8 @@ export default function App() {
             currentFile: draft.documentPath,
             modified: true,
           });
-          setDocumentSessionId((sessionId) => sessionId + 1);
+          latestDocumentSessionIdRef.current += 1;
+          setDocumentSessionId(latestDocumentSessionIdRef.current);
           setContent(draft.content);
           setPreviewContent(draft.content);
           setCurrentFile(draft.documentPath);
@@ -976,7 +1054,10 @@ export default function App() {
         } else {
           const path = pendingStartupPath;
           setPendingStartupPath(null);
-          await requestDocumentTransition(() => openFilePath(path));
+          await requestDocumentTransition(
+            () => openFilePath(path),
+            { allowExistingActionBlock: true },
+          );
           completeStartupResolution();
         }
       } else {
@@ -1035,22 +1116,27 @@ export default function App() {
     });
   }, []);
 
-  const handleFormatJson = useCallback(() => {
-    if (actionGateRef.current.isBlocked() || editorMode === "preview") return;
-    const result = formatJsonContent(content);
+  const handleFormatJson = useCallback(async () => {
+    const focusedElement = document.activeElement;
+    const tableCellFocused = focusedElement instanceof HTMLTextAreaElement
+      && Boolean(focusedElement.dataset.tableCell);
+    if (formattingContext.tableCell || tableCellFocused || editorMode === "preview") return;
+    if (!(await preparePendingDocumentEdits()) || actionGateRef.current.isBlocked()) return;
+    const latestDocument = latestDocumentRef.current.get();
+    const result = formatJsonContent(latestDocument.content);
     if (!result.ok) {
       showError(text.jsonFormatFailed, result.message);
       return;
     }
     recoveryQueueRef.current.resume();
     latestDocumentRef.current.set({
-      ...latestDocumentRef.current.get(),
+      ...latestDocument,
       content: result.content,
       modified: true,
     });
     setContent(result.content);
     setModified(true);
-  }, [content, editorMode, showError, text.jsonFormatFailed]);
+  }, [editorMode, formattingContext.tableCell, preparePendingDocumentEdits, showError, text.jsonFormatFailed]);
 
   const handleBold = useCallback(() => {
     handleMarkdownFormat({ kind: "bold" });
@@ -1109,7 +1195,12 @@ export default function App() {
     const frame = window.requestAnimationFrame(() => {
       if (actionGateRef.current.isBlocked()) return;
       lastHandledEditorFocusSessionRef.current = documentSessionId;
-      editorRef.current?.focus();
+      const editor = editorRef.current;
+      const activeElement = document.activeElement;
+      if (activeElement instanceof HTMLElement && editor?.getScrollElement()?.contains(activeElement)) {
+        return;
+      }
+      editor?.focus();
     });
     return () => window.cancelAnimationFrame(frame);
   }, [documentSessionId, editorMode, isDocumentSafetyActive]);
@@ -1230,7 +1321,10 @@ export default function App() {
           return;
         }
         if (startupPath) {
-          await requestDocumentTransition(() => openFilePath(startupPath));
+          await requestDocumentTransition(
+            () => openFilePath(startupPath),
+            { allowExistingActionBlock: true },
+          );
         }
         completeStartupResolution();
       })
@@ -1245,7 +1339,10 @@ export default function App() {
     const path = pendingStartupPath;
     setResumeStartupPathAfterRecovery(false);
     setPendingStartupPath(null);
-    void requestDocumentTransition(() => openFilePath(path))
+    void requestDocumentTransition(
+      () => openFilePath(path),
+      { allowExistingActionBlock: true },
+    )
       .catch((startupError) => {
         showError(text.startupOpenFailed, startupError instanceof Error ? startupError.message : String(startupError));
       })
@@ -1297,6 +1394,18 @@ export default function App() {
         return;
       }
 
+      if (event.isComposing || event.keyCode === 229) {
+        if (isPrimaryShortcut(event, "s")) {
+          // Saving waits for compositionend through preparePendingDocumentEdits.
+        } else {
+          const isAppShortcut = ["n", "o", "f", "b", "i"]
+            .some((key) => isPrimaryShortcut(event, key))
+            || ((event.ctrlKey || event.metaKey) && event.altKey && event.key.toLowerCase() === "m");
+          if (isAppShortcut) event.preventDefault();
+          return;
+        }
+      }
+
       if (actionGateRef.current.isBlocked()) {
         if (event.ctrlKey || event.metaKey) event.preventDefault();
         return;
@@ -1330,7 +1439,7 @@ export default function App() {
         handleItalic();
       } else if (shouldCycleViewMode(event)) {
         event.preventDefault();
-        setEditorMode((mode) => cycleViewMode(mode));
+        void selectEditorMode(cycleViewMode(editorMode));
       } else if (event.key === "Escape") {
         setActiveMenu(null);
       }
@@ -1338,7 +1447,7 @@ export default function App() {
 
     window.addEventListener("keydown", handleKeyDown);
     return () => window.removeEventListener("keydown", handleKeyDown);
-  }, [handleBold, handleItalic, handleNew, handleOpen, handleSaveAction, handleSaveAsAction, isHelpOpen, openNoteSearch]);
+  }, [editorMode, handleBold, handleItalic, handleNew, handleOpen, handleSaveAction, handleSaveAsAction, isHelpOpen, openNoteSearch, selectEditorMode]);
 
   useEffect(() => {
     const handlePointerMove = (event: PointerEvent) => {
@@ -1664,6 +1773,7 @@ export default function App() {
               value={content}
               mode="source"
               themeMode={themeMode}
+              language={appLanguage}
               placeholder={formattingUi.placeholders.editor}
               readOnly={isFormattingDisabled}
               onChange={handleContentChange}
