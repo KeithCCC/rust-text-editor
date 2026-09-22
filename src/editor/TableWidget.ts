@@ -1,7 +1,10 @@
 import { EditorView, WidgetType } from "@codemirror/view";
-import { deleteTableColumn, deleteTableRow, insertTableColumnAfter, insertTableRowAfter, setTableColumnAlignment } from "../tableMarkdown";
+import { deleteTableColumn, deleteTableRow, insertTableColumnAfter, insertTableRowAfter, setTableCellAlignment } from "../tableMarkdown";
 import { tableRuntime, type TableEntry } from "./tableEditingState";
 import { tableEditingUi } from "./tableEditingUi";
+
+const refreshToolbars = new WeakMap<HTMLElement, () => void>();
+const popupCleanup = new WeakMap<HTMLElement, () => void>();
 
 export class TableWidget extends WidgetType {
   constructor(readonly entry: TableEntry, readonly language: "ja" | "en", readonly readOnly: boolean) { super(); }
@@ -10,6 +13,7 @@ export class TableWidget extends WidgetType {
       && this.readOnly === other.readOnly && this.language === other.language;
   }
   ignoreEvent() { return true; }
+  destroy(dom: HTMLElement) { popupCleanup.get(dom)?.(); }
   updateDOM(dom: HTMLElement, view: EditorView) {
     if (dom.dataset.tableId !== this.entry.id || dom.dataset.source !== String(this.entry.source)
       || dom.dataset.language !== this.language) return false;
@@ -31,12 +35,14 @@ export class TableWidget extends WidgetType {
         this.resize(area, view);
       }
       area.readOnly = this.readOnly;
-      area.parentElement!.style.textAlign = table.alignments[column] === "none" ? "" : table.alignments[column];
+      area.parentElement!.style.textAlign = this.cellAlignment(table, row, column);
     });
-    dom.querySelectorAll<HTMLButtonElement>("button[data-mutation]").forEach(button => {
-      button.disabled = this.readOnly || button.dataset.mutation === "deleteColumn" && table.headers.length === 1;
-    });
+    refreshToolbars.get(dom)?.();
     return true;
+  }
+  private cellAlignment(table: NonNullable<TableEntry["table"]>, row: number, column: number) {
+    const alignment = (row === 0 ? table.headers : table.rows[row - 1].cells)[column].alignment ?? table.alignments[column];
+    return alignment === "none" ? "" : alignment;
   }
   private resize(area: HTMLTextAreaElement, view: EditorView) {
     area.rows = Math.max(1, area.value.split("\n").length);
@@ -70,9 +76,91 @@ export class TableWidget extends WidgetType {
     }
     const model = entry.table!;
     wrapper.dataset.columns = String(model.headers.length);
-    const toolbar = document.createElement("div"); toolbar.className = "koharu-table-toolbar";
-    toolbar.append(button(ui.source, () => runtime.toggleSource(entry.id, true)), button(ui.exit, () => runtime.leave(entry.id)));
-    wrapper.append(toolbar);
+    let selected = runtime.active?.address.tableId === entry.id
+      ? { ...runtime.active.address } : { tableId: entry.id, row: 0, column: 0 };
+    const popup = document.createElement("div");
+    popup.className = "koharu-table-popup"; popup.hidden = true;
+    popup.setAttribute("role", "menu"); popup.setAttribute("aria-label", ui.actions);
+    let opener: HTMLButtonElement | null = null;
+    const closeMenus = () => {
+      popup.hidden = true;
+      opener?.setAttribute("aria-expanded", "false");
+    };
+    const closeOnScroll = (event: Event) => {
+      if (!popup.contains(event.target as Node)) closeMenus();
+    };
+    const closeOnPointer = (event: Event) => {
+      if (!wrapper.contains(event.target as Node)) closeMenus();
+    };
+    document.addEventListener("scroll", closeOnScroll, true);
+    document.addEventListener("pointerdown", closeOnPointer, true);
+    window.addEventListener("resize", closeMenus);
+    popupCleanup.set(wrapper, () => {
+      document.removeEventListener("scroll", closeOnScroll, true);
+      document.removeEventListener("pointerdown", closeOnPointer, true);
+      window.removeEventListener("resize", closeMenus);
+    });
+    const mutate = (transform: Parameters<typeof runtime.changeTable>[1]) => {
+      closeMenus(); runtime.changeTable(entry.id, transform, selected); runtime.focus(selected);
+    };
+    const group = (label: string, controls: HTMLButtonElement[]) => {
+      const title = document.createElement("div"); title.className = "koharu-table-popup-heading"; title.textContent = label;
+      popup.append(title, ...controls);
+    };
+    group(ui.row, [
+      button(ui.addRow, () => mutate(t => insertTableRowAfter(t, selected.row - 1)), "addRow"),
+      button(ui.deleteRow, () => mutate(t => deleteTableRow(t, selected.row - 1)), "deleteRow"),
+    ]);
+    group(ui.column, [
+      button(ui.addColumn, () => mutate(t => insertTableColumnAfter(t, selected.column)), "addColumn"),
+      button(ui.deleteColumn, () => mutate(t => deleteTableColumn(t, selected.column)), "deleteColumn"),
+    ]);
+    group(ui.alignment, (["left", "center", "right"] as const).map(alignment => {
+      const control = button(ui[alignment], () => mutate(t => setTableCellAlignment(t, selected.row, selected.column, alignment)), "align");
+      control.dataset.alignment = alignment; return control;
+    }));
+    popup.append(
+      button(ui.source, () => { closeMenus(); runtime.toggleSource(entry.id, true); }),
+      button(ui.exit, () => { closeMenus(); runtime.leave(entry.id); }),
+    );
+    popup.querySelectorAll("button").forEach(control => control.setAttribute("role", "menuitem"));
+    const refreshToolbar = () => {
+      const current = runtime.entry(entry.id)?.table ?? model;
+      selected.row = Math.min(selected.row, current.rows.length);
+      selected.column = Math.min(selected.column, current.headers.length - 1);
+      const cell = (selected.row === 0 ? current.headers : current.rows[selected.row - 1].cells)[selected.column];
+      popup.querySelectorAll<HTMLButtonElement>("button[data-mutation]").forEach(control => {
+        control.disabled = view.state.readOnly
+          || control.dataset.mutation === "deleteRow" && selected.row === 0
+          || control.dataset.mutation === "deleteColumn" && current.headers.length === 1;
+        if (control.dataset.alignment) {
+          control.setAttribute("role", "menuitemradio");
+          control.setAttribute("aria-checked", String((cell.alignment ?? current.alignments[selected.column]) === control.dataset.alignment));
+        }
+      });
+      wrapper.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(area => {
+        const [row, column] = area.dataset.tableCell!.split(":").map(Number);
+        area.parentElement!.classList.toggle("is-selected-row", row === selected.row);
+        area.parentElement!.classList.toggle("is-selected-column", column === selected.column);
+      });
+    };
+    popup.addEventListener("keydown", event => {
+      if (event.key === "Escape") {
+        event.preventDefault(); event.stopPropagation(); closeMenus(); runtime.focus(selected); return;
+      }
+      if (!["ArrowDown", "ArrowUp", "Home", "End"].includes(event.key)) return;
+      event.preventDefault(); event.stopPropagation();
+      const items = Array.from(popup.querySelectorAll<HTMLButtonElement>("button:not(:disabled)"));
+      const current = items.indexOf(event.target as HTMLButtonElement);
+      const next = event.key === "Home" ? 0 : event.key === "End" ? items.length - 1
+        : (current + (event.key === "ArrowUp" ? -1 : 1) + items.length) % items.length;
+      items[next]?.focus();
+    });
+    refreshToolbars.set(wrapper, refreshToolbar);
+    wrapper.addEventListener("focusout", event => {
+      if (!(event.relatedTarget instanceof Node) || !wrapper.contains(event.relatedTarget)) closeMenus();
+    });
+    wrapper.append(popup);
     const scroll = document.createElement("div"); scroll.className = "koharu-table-scroll";
     const table = document.createElement("table"); table.className = "koharu-table";
     const head = document.createElement("thead"), body = document.createElement("tbody");
@@ -83,41 +171,39 @@ export class TableWidget extends WidgetType {
         const address = { tableId: entry.id, row, column };
         const td = document.createElement(row === 0 ? "th" : "td");
         if (row === 0) td.setAttribute("scope", "col");
-        td.style.textAlign = model.alignments[column] === "none" ? "" : model.alignments[column];
+        td.style.textAlign = this.cellAlignment(model, row, column);
         const area = document.createElement("textarea"); area.value = cell.text;
         area.dataset.tableCell = `${row}:${column}`; area.className = "koharu-table-cell";
         area.setAttribute("aria-label", ui.cell(row, column)); area.readOnly = this.readOnly;
         area.setAttribute("aria-keyshortcuts", "Alt+ArrowDown");
         area.rows = Math.max(1, cell.text.split("\n").length);
-        area.addEventListener("focus", () => runtime.activate(address, area));
+        area.addEventListener("focus", () => { selected = { ...address }; closeMenus(); runtime.activate(address, area); refreshToolbar(); });
         area.addEventListener("select", () => { if (runtime.active?.input === area) runtime.notify(); });
         area.addEventListener("input", () => { runtime.commit(address, area); this.resize(area, view); });
         area.addEventListener("compositionstart", () => runtime.beginComposition(address, area));
         area.addEventListener("compositionend", () => { runtime.endComposition(address, area); this.resize(area, view); });
         area.addEventListener("keydown", event => runtime.key(address, area, event));
-        td.append(area);
-        const menu = document.createElement("details"); menu.className = "koharu-table-actions";
-        const summary = document.createElement("summary"); summary.textContent = "⋯"; summary.setAttribute("aria-label", `${ui.actions}: ${ui.cell(row, column)}`);
-        summary.title = `${ui.actions} (Alt+↓)`;
-        const controls = document.createElement("div"); controls.className = "koharu-table-action-list";
-        const mutate = (transform: Parameters<typeof runtime.changeTable>[1]) => { menu.open = false; runtime.changeTable(entry.id, transform, address); };
-        controls.append(
-          button(ui.addRow, () => mutate(t => insertTableRowAfter(t, row - 1)), "addRow"),
-          button(ui.addColumn, () => mutate(t => insertTableColumnAfter(t, column)), "addColumn"),
-          button(ui.deleteColumn, () => mutate(t => deleteTableColumn(t, column)), "deleteColumn"),
-        );
-        if (row > 0) controls.append(button(ui.deleteRow, () => mutate(t => deleteTableRow(t, row - 1)), "deleteRow"));
-        for (const alignment of ["left", "center", "right"] as const) {
-          controls.append(button(ui[alignment], () => mutate(t => setTableColumnAlignment(t, column, alignment)), "align"));
-        }
-        menu.addEventListener("keydown", event => {
-          if (event.key === "Escape") { event.preventDefault(); event.stopPropagation(); menu.open = false; area.focus(); }
+        const trigger = button(ui.more, () => {
+          const wasOpen = !popup.hidden && opener === trigger;
+          closeMenus(); selected = { ...address }; opener = trigger; refreshToolbar();
+          if (wasOpen) return;
+          popup.hidden = false; trigger.setAttribute("aria-expanded", "true");
+          const anchor = trigger.getBoundingClientRect();
+          const bounds = popup.getBoundingClientRect();
+          popup.style.left = `${Math.max(8, Math.min(anchor.left, window.innerWidth - bounds.width - 8))}px`;
+          popup.style.top = `${Math.max(8, Math.min(anchor.bottom + 4, window.innerHeight - bounds.height - 8))}px`;
+          popup.querySelector<HTMLButtonElement>("button:not(:disabled)")?.focus();
         });
-        menu.append(summary, controls); td.append(menu); tr.append(td);
+        trigger.className = "koharu-table-cell-menu";
+        trigger.setAttribute("aria-label", `${ui.cell(row, column)}: ${ui.actions}`);
+        trigger.setAttribute("aria-haspopup", "menu"); trigger.setAttribute("aria-expanded", "false");
+        td.append(area, trigger);
+        tr.append(td);
       });
       (row === 0 ? head : body).append(tr);
     });
     table.append(head, body); scroll.append(table); wrapper.append(scroll);
+    refreshToolbar();
     // Measure after insertion (CodeMirror executes writes outside its update phase).
     wrapper.querySelectorAll<HTMLTextAreaElement>("textarea").forEach(area => this.resize(area, view));
     return wrapper;

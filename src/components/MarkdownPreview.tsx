@@ -20,6 +20,7 @@ import { getRelativeMarkdownPath } from "../markdownLinks";
 import { parseMarkdownOutline } from "../markdownOutline";
 import type { ExcalidrawScene } from "../types";
 import { sanitizePdfMarkdown } from "../pdfSanitize";
+import { tableCellAlignment } from "../tableCellAlignment";
 
 type MarkdownPreviewProps = {
   printMode?: boolean;
@@ -105,7 +106,7 @@ const MarkdownPreviewComponent = forwardRef<MarkdownPreviewHandle, MarkdownPrevi
     <div className="preview-body" ref={rootRef}>
       <ReactMarkdown
         remarkPlugins={[remarkGfm, remarkBreaks]}
-        rehypePlugins={printMode ? [rehypeRaw, sanitizePdfMarkdown] : [rehypeRaw]}
+        rehypePlugins={printMode ? [rehypeRaw, tableCellAlignment, sanitizePdfMarkdown] : [rehypeRaw, tableCellAlignment]}
         components={{
           ...headingComponents,
           p({ node, children, ...props }) {

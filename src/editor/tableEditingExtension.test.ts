@@ -41,6 +41,41 @@ beforeEach(() => {
 afterEach(() => { views.forEach(v => v.destroy()); views = []; document.body.replaceChildren(); vi.restoreAllMocks(); });
 
 describe("direct table editing", () => {
+  it("opens a popup at each cell and keeps it open while focus moves between commands", async () => {
+    const view = mount(); cell(view, 1, 1).focus();
+    expect(view.dom.querySelectorAll(".koharu-table-cell-menu")).toHaveLength(4);
+    expect(view.dom.querySelector(".koharu-table-toolbar")).toBeNull();
+    cell(view, 1, 1).parentElement!.querySelector("button")!.click();
+    const menu = view.dom.querySelector<HTMLElement>(".koharu-table-popup")!;
+    const first = menu.querySelector("button")!, remove = button(view, "Delete column");
+    const active = vi.spyOn(document, "activeElement", "get").mockReturnValue(document.body);
+    first.dispatchEvent(new FocusEvent("focusout", { bubbles: true, relatedTarget: remove }));
+    await Promise.resolve(); active.mockRestore();
+    expect(menu.hidden).toBe(false);
+    remove.focus(); remove.click();
+    expect(view.dom.querySelectorAll("th")).toHaveLength(1);
+    expect(cell(view).value).toBe("x");
+  });
+  it("targets the clicked cell in another table, including when it was not focused", () => {
+    const view = mount(raw + "\n\n" + raw);
+    cell(view, 1, 1, 1).parentElement!.querySelector("button")!.click();
+    const wrapper = view.dom.querySelectorAll<HTMLElement>(".koharu-table-wrap")[1];
+    const remove = Array.from(wrapper.querySelectorAll("button")).find(b => b.textContent === "Delete column")!;
+    remove.click();
+    expect(view.state.doc.toString().split("\n\n")[0]).toBe(raw);
+    expect(cell(view, 1, 0, 1).value).toBe("x");
+    expect(view.dom.querySelectorAll("table")[1].querySelectorAll("th")).toHaveLength(1);
+  });
+  it("disables header deletion and closes the popup with Escape", () => {
+    const view = mount(); cell(view, 0, 1).parentElement!.querySelector("button")!.click();
+    expect(button(view, "Delete row").disabled).toBe(true);
+    cell(view, 1, 1).parentElement!.querySelector("button")!.click();
+    expect(button(view, "Delete row").disabled).toBe(false);
+    const menu = view.dom.querySelector<HTMLElement>(".koharu-table-popup")!;
+    key(button(view, "Delete row"), "Escape");
+    expect(menu.hidden).toBe(true);
+    expect(document.activeElement).toBe(cell(view, 1, 1));
+  });
   it("renders one-column and multiple tables after headings", () => {
     const view = mount("# Heading\n\n| 方針 |\n| --- |\n| 内容 |\n\n" + raw);
     expect(view.dom.querySelectorAll("table")).toHaveLength(2);
@@ -133,7 +168,9 @@ describe("direct table editing", () => {
   });
   it("deletes columns and changes alignment without losing other cells", () => {
     const view = mount(); button(view, "Align right").click();
-    expect(view.state.doc.toString()).toContain("| ---: | --- |");
+    expect(view.state.doc.toString()).toContain("<!--koharu:align=right-->A");
+    expect(cell(view, 0, 0).parentElement!.style.textAlign).toBe("right");
+    expect(cell(view, 1, 0).parentElement!.style.textAlign).toBe("");
     button(view, "Delete column").click();
     expect(cell(view).value).toBe("y");
     expect(button(view, "Delete column").disabled).toBe(true);
@@ -179,8 +216,9 @@ describe("direct table editing", () => {
   it("opens cell actions with Alt+Down and returns to the cell with Escape", () => {
     const view = mount(); const area = cell(view); area.focus();
     key(area, "ArrowDown", { altKey: true });
-    expect(area.parentElement!.querySelector("details")!.open).toBe(true);
-    expect(document.activeElement).toBe(area.parentElement!.querySelector("button"));
+    const menu = view.dom.querySelector<HTMLElement>(".koharu-table-popup")!;
+    expect(menu.hidden).toBe(false);
+    expect(document.activeElement).toBe(menu.querySelector("button"));
     key(document.activeElement as HTMLElement, "Escape");
     expect(document.activeElement).toBe(area);
   });

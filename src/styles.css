@@ -23,23 +23,23 @@ body {
 
 .app-shell,
 .app-shell[data-theme="light"] {
-  --app-bg: #f4f6f8;
+  --app-bg: #f5f5f5;
   --bar-bg: #ffffff;
   --pane-bg: #ffffff;
-  --editor-bg: #fbfcfd;
+  --editor-bg: #fafafa;
   --preview-bg: #ffffff;
-  --preview-text: #1b2637;
-  --preview-heading: #0f355f;
+  --preview-text: #202020;
+  --preview-heading: #202020;
   --preview-link: #0969b8;
   --preview-link-hover: #064f8c;
-  --preview-rule: #c9d8e8;
-  --preview-code-bg: #f0f5fa;
-  --preview-code-text: #26374d;
-  --preview-code-border: #c6d5e5;
-  --preview-table-head: #eef5fc;
-  --surface-bg: #fbfcfd;
-  --active-bg: #dce8f5;
-  --accent: #0f766e;
+  --preview-rule: #d6d6d6;
+  --preview-code-bg: #f2f2f2;
+  --preview-code-text: #303030;
+  --preview-code-border: #d6d6d6;
+  --preview-table-head: #f0f0f0;
+  --surface-bg: #fafafa;
+  --active-bg: #e1effa;
+  --accent: #0969b8;
   --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--pane-bg));
   --selected-fg: var(--text);
   --focus-ring: #2563eb;
@@ -47,19 +47,19 @@ body {
   --disabled-fg: color-mix(in srgb, var(--muted) 70%, transparent);
   --disabled-bg: color-mix(in srgb, var(--pane-bg) 76%, var(--app-bg));
   --menu-bg: #ffffff;
-  --pane-header-bg: #f7f9fb;
-  --toolbar-bg: #eef3f8;
-  --text: #18212f;
-  --muted: #637083;
-  --border: #d9e1eb;
-  --strong-border: #c9d2df;
-  --code-bg: #eef2f6;
+  --pane-header-bg: #f7f7f7;
+  --toolbar-bg: #f2f2f2;
+  --text: #202020;
+  --muted: #666666;
+  --border: #dedede;
+  --strong-border: #c7c7c7;
+  --code-bg: #f0f0f0;
   --json-key: #075fb0;
   --json-string: #1d7b45;
   --json-number: #9b4d00;
   --json-literal: #8a3ffc;
-  --json-punctuation: #637083;
-  --quote: #4f5f73;
+  --json-punctuation: #666666;
+  --quote: #555555;
   --danger-bg: #fff1f1;
   --danger-border: #f3b5b5;
   --danger-text: #7a1f1f;
@@ -74,43 +74,43 @@ body {
 }
 
 .app-shell[data-theme="dark"] {
-  --app-bg: #101915;
-  --bar-bg: #17231d;
-  --pane-bg: #14211b;
-  --editor-bg: #0d1612;
-  --preview-bg: #111d18;
-  --preview-text: #e7eef7;
-  --preview-heading: #a7f3d0;
-  --preview-link: #5eead4;
-  --preview-link-hover: #99f6e4;
-  --preview-rule: #315244;
-  --preview-code-bg: #0b211a;
-  --preview-code-text: #ecfdf5;
-  --preview-code-border: #2f6b58;
-  --preview-table-head: #1b352b;
-  --surface-bg: #1a2b23;
-  --active-bg: #285244;
-  --accent: #5eead4;
+  --app-bg: #202020;
+  --bar-bg: #292929;
+  --pane-bg: #242424;
+  --editor-bg: #1e1e1e;
+  --preview-bg: #202020;
+  --preview-text: #ededed;
+  --preview-heading: #f5f5f5;
+  --preview-link: #75bfff;
+  --preview-link-hover: #a6d7ff;
+  --preview-rule: #444444;
+  --preview-code-bg: #292929;
+  --preview-code-text: #ededed;
+  --preview-code-border: #484848;
+  --preview-table-head: #2d2d2d;
+  --surface-bg: #2b2b2b;
+  --active-bg: #263d50;
+  --accent: #75bfff;
   --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--pane-bg));
   --selected-fg: var(--text);
-  --focus-ring: #2563eb;
+  --focus-ring: #75bfff;
   --hover-bg: var(--active-bg);
   --disabled-fg: color-mix(in srgb, var(--muted) 70%, transparent);
   --disabled-bg: color-mix(in srgb, var(--pane-bg) 76%, var(--app-bg));
-  --menu-bg: #1a2b23;
-  --pane-header-bg: #16261f;
-  --toolbar-bg: #102019;
-  --text: #e9f8f1;
-  --muted: #9bc2b4;
-  --border: #294139;
-  --strong-border: #3e6d5c;
-  --code-bg: #1d3329;
+  --menu-bg: #2b2b2b;
+  --pane-header-bg: #282828;
+  --toolbar-bg: #262626;
+  --text: #f0f0f0;
+  --muted: #b0b0b0;
+  --border: #3d3d3d;
+  --strong-border: #5a5a5a;
+  --code-bg: #303030;
   --json-key: #67e8f9;
   --json-string: #86efac;
   --json-number: #facc15;
   --json-literal: #c4b5fd;
-  --json-punctuation: #9bc2b4;
-  --quote: #b7decf;
+  --json-punctuation: #b0b0b0;
+  --quote: #c4c4c4;
   --danger-bg: #3a1c1d;
   --danger-border: #884242;
   --danger-text: #ffdada;
@@ -119,52 +119,55 @@ body {
   --shadow: rgb(0 0 0 / 45%);
 }
 
-@media (prefers-color-scheme: dark) {
-  .app-shell[data-theme="system"] {
-    --app-bg: #101915;
-    --bar-bg: #17231d;
-    --pane-bg: #14211b;
-    --editor-bg: #0d1612;
-    --preview-bg: #111d18;
-    --preview-text: #e7eef7;
-    --preview-heading: #a7f3d0;
-    --preview-link: #5eead4;
-    --preview-link-hover: #99f6e4;
-    --preview-rule: #315244;
-    --preview-code-bg: #0b211a;
-    --preview-code-text: #ecfdf5;
-    --preview-code-border: #2f6b58;
-    --preview-table-head: #1b352b;
-    --surface-bg: #1a2b23;
-    --active-bg: #285244;
-    --accent: #5eead4;
-    --accent-soft: color-mix(in srgb, var(--accent) 16%, var(--pane-bg));
-    --selected-fg: var(--text);
-    --focus-ring: #2563eb;
-    --hover-bg: var(--active-bg);
-    --disabled-fg: color-mix(in srgb, var(--muted) 70%, transparent);
-    --disabled-bg: color-mix(in srgb, var(--pane-bg) 76%, var(--app-bg));
-    --menu-bg: #1a2b23;
-    --pane-header-bg: #16261f;
-    --toolbar-bg: #102019;
-    --text: #e9f8f1;
-    --muted: #9bc2b4;
-    --border: #294139;
-    --strong-border: #3e6d5c;
-    --code-bg: #1d3329;
-    --json-key: #67e8f9;
-    --json-string: #86efac;
-    --json-number: #facc15;
-    --json-literal: #c4b5fd;
-    --json-punctuation: #9bc2b4;
-    --quote: #b7decf;
-    --danger-bg: #3a1c1d;
-    --danger-border: #884242;
-    --danger-text: #ffdada;
-    --warning-bg: #342a12;
-    --warning-text: #fde68a;
-    --shadow: rgb(0 0 0 / 45%);
-  }
+.app-shell[data-theme="light"] { color-scheme: light; }
+.app-shell[data-theme="dark"] { color-scheme: dark; }
+
+/* Resolve semantic colors through the host WebView instead of Koharu's palette. */
+.app-shell[data-theme="system"] {
+  color-scheme: light dark;
+  --app-bg: Canvas;
+  --bar-bg: ButtonFace;
+  --pane-bg: Canvas;
+  --editor-bg: Canvas;
+  --preview-bg: Canvas;
+  --preview-text: CanvasText;
+  --preview-heading: CanvasText;
+  --preview-link: LinkText;
+  --preview-link-hover: LinkText;
+  --preview-rule: GrayText;
+  --preview-code-bg: ButtonFace;
+  --preview-code-text: ButtonText;
+  --preview-code-border: GrayText;
+  --preview-table-head: ButtonFace;
+  --surface-bg: Canvas;
+  --active-bg: Highlight;
+  --accent: Highlight;
+  --accent-soft: color-mix(in srgb, Highlight 16%, Canvas);
+  --selected-fg: HighlightText;
+  --focus-ring: Highlight;
+  --hover-bg: color-mix(in srgb, Highlight 16%, Canvas);
+  --disabled-fg: GrayText;
+  --disabled-bg: ButtonFace;
+  --menu-bg: Canvas;
+  --pane-header-bg: ButtonFace;
+  --toolbar-bg: ButtonFace;
+  --text: CanvasText;
+  --muted: GrayText;
+  --border: color-mix(in srgb, CanvasText 25%, Canvas);
+  --strong-border: GrayText;
+  --code-bg: ButtonFace;
+  --json-key: LinkText;
+  --json-string: CanvasText;
+  --json-number: CanvasText;
+  --json-literal: LinkText;
+  --json-punctuation: GrayText;
+  --quote: CanvasText;
+  --danger-bg: Canvas;
+  --danger-border: CanvasText;
+  --danger-text: CanvasText;
+  --warning-bg: ButtonFace;
+  --warning-text: ButtonText;
+  --shadow: color-mix(in srgb, CanvasText 20%, transparent);
 }
 
 button {
@@ -1164,29 +1167,25 @@ textarea {
 }
 
 .koharu-table-wrap { max-width: 100%; margin: 12px 0 16px; white-space: normal; }
-.koharu-table-toolbar { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 6px; }
-.koharu-table-wrap button, .koharu-table-actions summary {
-  border: 1px solid var(--border); border-radius: 5px; padding: 4px 8px;
-  background: var(--surface-bg); color: var(--text); cursor: pointer;
-  font: var(--ui-font-size) / 1.4 ui-sans-serif, system-ui, sans-serif;
-}
+.koharu-table-wrap:focus-within .is-selected-row.is-selected-column { box-shadow: inset 0 0 0 2px var(--preview-link); }
+.koharu-table-wrap button { font: inherit; color: inherit; cursor: pointer; }
 .koharu-table-wrap button:disabled { opacity: .5; cursor: default; }
-.koharu-table-wrap button:focus-visible, .koharu-table-actions summary:focus-visible {
-  outline: 2px solid var(--preview-link); outline-offset: 2px;
-}
+.koharu-table-cell-menu { position: absolute; top: 4px; right: 4px; border: 1px solid var(--border); border-radius: 4px; background: var(--preview-bg); padding: 0 5px; }
+.koharu-table-popup { position: fixed; z-index: 100; width: 190px; max-height: calc(100vh - 16px); overflow-y: auto; padding: 6px; border: 1px solid var(--strong-border); border-radius: 6px; background: var(--menu-bg); color: var(--text); box-shadow: 0 6px 18px var(--shadow); }
+.koharu-table-popup[hidden] { display: none; }
+.koharu-table-popup button { display: block; width: 100%; padding: 5px 8px; border: 0; background: transparent; text-align: left; }
+.koharu-table-popup button:hover:not(:disabled), .koharu-table-popup button[aria-checked="true"] { background: var(--hover-bg); }
+.koharu-table-popup-heading { color: var(--muted); font-size: .85em; padding: 5px 8px 2px; }
 .koharu-table-scroll { overflow-x: auto; max-width: 100%; }
 .koharu-table { width: 100%; border-collapse: collapse; color: var(--preview-text); background: var(--preview-bg); }
-.koharu-table th, .koharu-table td { min-width: 180px; padding: 8px; border: 1px solid var(--border); vertical-align: top; }
+.koharu-table th, .koharu-table td { position: relative; min-width: 180px; padding: 8px; border: 1px solid var(--border); vertical-align: top; }
 .koharu-table th { background: var(--preview-table-head); font-weight: 700; }
 .koharu-table-cell { display: block; width: 100%; min-width: 160px; box-sizing: border-box;
-  border: 0; padding: 4px; min-height: 2.2em; background: transparent; color: inherit;
+  border: 0; padding: 4px 28px 4px 4px; min-height: 2.2em; background: transparent; color: inherit;
   font: inherit; line-height: 1.5; text-align: inherit; resize: vertical; overflow-y: auto;
 }
 .koharu-table-cell:focus { outline: 2px solid var(--preview-link); border-radius: 3px; }
 .koharu-table-cell[readonly] { cursor: text; }
-.koharu-table-actions { margin-top: 4px; text-align: left; font-weight: normal; }
-.koharu-table-actions summary { width: fit-content; list-style: none; padding: 0 8px; }
-.koharu-table-action-list { display: flex; flex-wrap: wrap; gap: 4px; padding-top: 5px; max-width: 340px; }
 .koharu-table-source-controls { margin: 4px 0; }
 
 

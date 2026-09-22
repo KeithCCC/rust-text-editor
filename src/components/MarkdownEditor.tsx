@@ -1,4 +1,4 @@
-import { forwardRef, useImperativeHandle, useMemo, useRef } from "react";
+import { forwardRef, useEffect, useImperativeHandle, useMemo, useRef, useState } from "react";
 import CodeMirror from "@uiw/react-codemirror";
 import { markdown, markdownLanguage } from "@codemirror/lang-markdown";
 import { json } from "@codemirror/lang-json";
@@ -294,7 +294,15 @@ export const MarkdownEditor = forwardRef<MarkdownEditorHandle, MarkdownEditorPro
   ref,
 ) {
   const viewRef = useRef<EditorView | null>(null);
-  const effectiveTheme = getEffectiveTheme(themeMode);
+  const [systemTheme, setSystemTheme] = useState(() => getEffectiveTheme("system"));
+  useEffect(() => {
+    const media = window.matchMedia("(prefers-color-scheme: dark)");
+    const update = () => setSystemTheme(media.matches ? "dark" : "light");
+    update();
+    media.addEventListener("change", update);
+    return () => media.removeEventListener("change", update);
+  }, []);
+  const effectiveTheme = themeMode === "system" ? systemTheme : themeMode;
   const contextCallback = useRef(onFormattingContextChange);
   contextCallback.current = onFormattingContextChange;
   const tables = useMemo(() => tableEditingExtension({ language, onContextChange: () => {

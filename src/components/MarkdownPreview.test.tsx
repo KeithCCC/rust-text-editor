@@ -3,6 +3,16 @@ import { describe, expect, it } from "vitest";
 import { MarkdownPreview } from "./MarkdownPreview";
 
 describe("MarkdownPreview", () => {
+  it.each([false, true])("renders per-cell alignment in preview and PDF (print=%s)", printMode => {
+    const html = renderToStaticMarkup(<MarkdownPreview
+      markdown={"| A | B |\n| --- | --- |\n| <!--koharu:align=right-->**value** | other |"}
+      printMode={printMode} currentFile={null} themeMode="light"
+      onOpenExcalidraw={() => {}} onOpenExternalLink={() => {}} onOpenRelativeMarkdownLink={() => {}}
+    />);
+    expect(html).toContain('<td style="text-align:right"><strong>value</strong></td>');
+    expect(html).toContain('<td>other</td>');
+    expect(html).not.toContain('koharu:align');
+  });
   it("renders a single source newline as a visible line break", () => {
     const html = renderToStaticMarkup(
       <MarkdownPreview

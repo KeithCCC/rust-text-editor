@@ -8,6 +8,7 @@ import {
   parseMarkdownTable,
   serializeMarkdownTable,
   setTableColumnAlignment,
+  setTableCellAlignment,
   updateTableCell,
 } from "./tableMarkdown";
 
@@ -18,6 +19,20 @@ const source = [
 ].join("\n");
 
 describe("markdown table model", () => {
+  it("persists cell alignment without changing the column and retains it through edits", () => {
+    const table = parseMarkdownTable(source, 0, source.length)!;
+    const aligned = setTableCellAlignment(table, 1, 0, "right");
+    const saved = serializeMarkdownTable(aligned);
+    const reopened = parseMarkdownTable(saved, 0, saved.length)!;
+    expect(reopened.alignments).toEqual(table.alignments);
+    expect(reopened.rows[0].cells[0].alignment).toBe("right");
+    expect(reopened.headers[0].alignment).toBeUndefined();
+    expect(reopened.rows[0].cells[0].text).toBe(table.rows[0].cells[0].text);
+    const change = createTableCellChange(saved, reopened, 1, 0, "updated")!;
+    const edited = saved.slice(0, change.from) + change.insert + saved.slice(change.to);
+    expect(parseMarkdownTable(edited, 0, edited.length)!.rows[0].cells[0]).toMatchObject({ text: "updated", alignment: "right" });
+    expect(serializeMarkdownTable(deleteTableColumn(reopened, 1))).toContain("<!--koharu:align=right-->");
+  });
   it("rejects a stale range even when another cell contains identical text", () => {
     const source = "| A | B |\n| - | - |\n| x | x |";
     const table = parseMarkdownTable(source, 0, source.length)!;

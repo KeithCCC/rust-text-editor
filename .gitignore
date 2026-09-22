@@ -9,3 +9,7 @@ src-tauri/target
 *.dll
 *.so
 *.dylib
+
+# Local browser session snapshots and transient verification logs
+.playwright-cli/
+output/playwright/*.log

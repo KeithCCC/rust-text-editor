@@ -49,7 +49,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       {
         title: "Choose a view",
         paragraphs: [
-          "Use Edit when you only need the editor, Split to see the editor and rendered result together, and Preview when you only need the rendered result. Choose between Edit, Split, and Preview with the controls at the top of the window. Koharu always starts in Edit with the outline closed. Appearance and outline controls are in View.",
+          "Use Edit when you only need the editor, Split to see the editor and rendered result together, and Preview when you only need the rendered result. Choose between Edit, Split, and Preview with the controls at the top of the window. Koharu always starts in Edit with the outline closed. Appearance and outline controls are in View. Choose System to use the host WebView’s system colors and follow Windows light/dark settings.",
         ],
       },
       {
@@ -60,6 +60,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         title: "Toolbar, file path, and Find",
         paragraphs: [
           "Use the control in the editor header to show or hide the formatting toolbar. Your choice is remembered the next time you open Koharu.",
+          "Hover a formatting icon, or focus it with the keyboard, to see its name. Heading, List, and Code block open menus with more choices.",
           "The current file path appears in the bottom status bar. If it is truncated, hover it to see the full path.",
           "Choose Edit > Search or press Ctrl+F. Click Search again or press Escape to close it. If you start from Preview, Koharu automatically switches to Split and focuses the visible search field.",
         ],
@@ -104,16 +105,31 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "Insert",
+        title: "Insert tables and diagrams",
         paragraphs: [
-          "Table inserts rows and columns. Mermaid diagram inserts a flowchart definition that becomes a diagram in Split or Preview.",
-          "In Edit or Split, click a table cell to edit it directly. Tab and Shift+Tab move between cells; Enter moves to the next row; Shift+Enter adds a line inside the cell. Tab at the last cell or Enter on the last row adds a row. Escape keeps your changes and moves after the table; Ctrl+Z undoes changes.",
-          "Use the ⋯ button in a cell, or press Alt+Down, to add or delete rows and columns or change alignment. Edit source shows the Markdown; Show table returns to cells. Bold, links, and other inline Markdown remain editable text inside cells. Tables in quotes or lists and unsupported table syntax remain source text.",
+          "Choose Table on the formatting toolbar to insert a table, or type the Markdown example below. Mermaid diagram inserts a flowchart definition that becomes a diagram in Split or Preview.",
         ],
         examples: [
           { source: "| Heading 1 | Heading 2 |\n| --- | --- |\n| Value 1 | Value 2 |", meaning: "Table — rendered rows and columns" },
         ],
         codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
+      },
+      {
+        title: "Edit table cells",
+        paragraphs: [
+          "In Edit or Split, click a table cell to edit it directly. Changes become part of the document; use Save to write them to the file. Bold, links, and other inline Markdown remain editable text inside cells.",
+          "Use the ⋯ button at the top right of a cell to open a popup beside it, without returning to the top of the table. Add row below and Delete row act on that cell’s row; Add column after and Delete column act on its column. The header row and the last remaining column cannot be deleted.",
+          "Tab and Shift+Tab move between cells; Enter moves to the next row; Shift+Enter adds a line inside the cell. Tab at the last cell or Enter on the last row adds a row. Ctrl+Z undoes an edit or a row, column, or alignment change; Ctrl+Y redoes it.",
+          "Alt+Down opens the cell popup. Use Up/Down to select an item and Enter to run it. Escape closes the popup and returns to the cell. Escape while editing a cell keeps your changes and moves after the table.",
+          "Choose Edit source in the popup to edit the Markdown directly; Show table returns to cells. Tables inside quotes or lists and unsupported table syntax remain source text.",
+        ],
+      },
+      {
+        title: "Align individual cells",
+        paragraphs: [
+          "Open a cell’s ⋯ popup and choose Align left, Align center, or Align right under Cell alignment. Only that cell changes; other cells in the same column keep their alignment. Existing Markdown column alignment remains the default for cells without an individual setting.",
+          "Cell alignment is kept when you save and reopen the file, and appears in Preview and exported PDFs. It is stored in a hidden Koharu comment in the Markdown source. Other Markdown apps may ignore this setting and use the column alignment instead.",
+        ],
       },
     ],
     shortcuts: [
@@ -124,6 +140,11 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       { action: "Find", keys: "Ctrl+F" },
       { action: "Bold", keys: "Ctrl+B" },
       { action: "Italic", keys: "Ctrl+I" },
+      { action: "Move between table cells", keys: "Tab / Shift+Tab" },
+      { action: "Move to the next table row", keys: "Enter" },
+      { action: "Add a line inside a table cell", keys: "Shift+Enter" },
+      { action: "Open the current cell’s popup", keys: "Alt+↓" },
+      { action: "Undo / Redo", keys: "Ctrl+Z / Ctrl+Y" },
       { action: "Cycle Edit, Split, and Preview", keys: "Ctrl/Cmd+Alt+M" },
     ],
   },
@@ -147,7 +168,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       {
         title: "表示を選ぶ",
         paragraphs: [
-          "起動時は常に編集モードで、プレビューとアウトラインを閉じます。「表示」メニューから外観やアウトラインを変更できます。",
+          "起動時は常に編集モードで、プレビューとアウトラインを閉じます。「表示」メニューから外観やアウトラインを変更できます。外観で「システム」を選ぶと、WebViewが提供するシステム色を使い、Windowsのライト／ダーク設定に追従します。",
           "編集だけを行うときは「編集」、編集画面と仕上がりを並べるときは「分割」、仕上がりだけを見るときは「プレビュー」を使います。画面上部の「編集・分割・プレビュー」で切り替えられます。",
         ],
       },
@@ -159,6 +180,7 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         title: "ツールバー・ファイルパス・検索",
         paragraphs: [
           "エディターヘッダーのボタンで、書式ツールバーの表示・非表示を切り替えられます。選択は保存され、次回も引き継がれます。",
+          "書式アイコンにマウスを重ねるか、キーボードでフォーカスすると名前を確認できます。見出し・リスト・コードブロックはメニューから種類を選べます。",
           "現在のファイルパスは画面下部のステータスバーに表示されます。省略されている場合は、マウスを重ねると完全なパスを確認できます。",
           "「編集 → 検索」を選ぶかCtrl+Fを押します。もう一度「検索」をクリックするかEscapeを押すと閉じます。プレビューから検索すると、自動的に分割表示へ切り替わり、見える検索欄にフォーカスします。",
         ],
@@ -203,16 +225,31 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
         ],
       },
       {
-        title: "挿入",
+        title: "表と図を挿入する",
         paragraphs: [
-          "表は行と列を挿入します。図（Mermaid）はフローチャートの定義を挿入し、分割表示またはプレビューで図として表示します。",
-          "編集・分割では、表のセルを直接編集できます。Tab／Shift+Tabでセル間を移動、Enterで次の行へ移動、Shift+Enterでセル内改行します。最後のセルでTab、または最終行でEnterを押すと行を追加します。Escapeは変更を残して表の後へ移動し、Ctrl+Zで変更を取り消します。",
-          "セルの「⋯」またはAlt+↓から行・列の追加、削除、配置変更を操作します。「ソースを編集」でMarkdownを表示し、「表に戻す」でセル編集に戻ります。太字やリンクなどのMarkdown記法はセル内で文字として編集します。引用・リスト内の表や、対応していない表記法はソースのまま表示します。",
+          "書式ツールバーの「表」で表を挿入できます。下のMarkdown例を直接入力しても表になります。「図（Mermaid）」はフローチャートの定義を挿入し、分割表示またはプレビューで図として表示します。",
         ],
         examples: [
           { source: "| 見出し 1 | 見出し 2 |\n| --- | --- |\n| 値 1 | 値 2 |", meaning: "表 — 行と列として表示" },
         ],
         codeExample: "```mermaid\nflowchart LR\n  A[Start] --> B[Finish]\n```",
+      },
+      {
+        title: "表のセルを編集する",
+        paragraphs: [
+          "編集・分割では、表のセルを直接編集できます。変更は文書に反映され、ファイルに残すには「保存」を使います。太字やリンクなどのMarkdown記法は、セル内で文字として編集します。",
+          "セル右上の「…」を押すと、その場にポップアップが開きます。表の上まで戻る必要はありません。「下に行を追加」「行を削除」はそのセルの行に、「右に列を追加」「列を削除」はそのセルの列に作用します。見出し行と最後の1列は削除できません。",
+          "Tab／Shift+Tabでセル間を移動、Enterで次の行へ移動、Shift+Enterでセル内改行します。最後のセルでTab、または最終行でEnterを押すと行を追加します。Ctrl+Zでセル編集・行や列の操作・配置変更を取り消し、Ctrl+Yでやり直せます。",
+          "Alt+↓でもセルのポップアップを開けます。上下キーで項目を選び、Enterで実行します。ポップアップ内でEscapeを押すとセルに戻ります。セルの編集中にEscapeを押すと、変更を残して表の後へ移動します。",
+          "ポップアップの「ソースを編集」でMarkdownを直接編集し、「表に戻す」でセル編集に戻ります。引用・リスト内の表や、対応していない表記法はソースのまま表示します。",
+        ],
+      },
+      {
+        title: "セルごとに配置を変える",
+        paragraphs: [
+          "対象セルの「…」を開き、「このセルの配置」から「左揃え」「中央揃え」「右揃え」を選びます。そのセルだけが変わり、同じ列の他のセルの配置は変わりません。セルごとの指定がない場合は、Markdownの列配置に従います。",
+          "セル配置は保存・再読み込み後も維持され、プレビューとPDFにも反映されます。Markdownソースには非表示のKoharuコメントとして保存されます。他のMarkdownアプリではこの指定が無視され、列の配置で表示される場合があります。",
+        ],
       },
     ],
     shortcuts: [
@@ -223,6 +260,11 @@ const HELP_CONTENT: Record<HelpLanguage, HelpContent> = {
       { action: "検索", keys: "Ctrl+F" },
       { action: "太字", keys: "Ctrl+B" },
       { action: "斜体", keys: "Ctrl+I" },
+      { action: "表のセル間を移動", keys: "Tab / Shift+Tab" },
+      { action: "表の次の行へ移動", keys: "Enter" },
+      { action: "セル内で改行", keys: "Shift+Enter" },
+      { action: "現在のセルのポップアップを開く", keys: "Alt+↓" },
+      { action: "元に戻す／やり直し", keys: "Ctrl+Z / Ctrl+Y" },
       { action: "編集・分割・プレビューを切り替える", keys: "Ctrl/Cmd+Alt+M" },
     ],
   },

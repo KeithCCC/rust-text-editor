@@ -127,8 +127,7 @@ export class TableEditingRuntime {
     if (this.composing || event.isComposing || event.keyCode === 229) return;
     if (event.altKey && event.key === "ArrowDown") {
       event.preventDefault(); event.stopPropagation();
-      const menu = input.parentElement?.querySelector("details");
-      if (menu) { menu.open = true; (menu.querySelector<HTMLButtonElement>("button:not(:disabled)") ?? menu.querySelector("summary"))?.focus(); }
+      input.parentElement?.querySelector<HTMLButtonElement>(".koharu-table-cell-menu")?.click();
       return;
     }
     if ((event.ctrlKey || event.metaKey) && ["z", "y"].includes(event.key.toLowerCase())) {

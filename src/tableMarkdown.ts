@@ -1,5 +1,6 @@
 export type MarkdownTableCell = {
   text: string;
+  alignment?: TableAlignment;
   range?: TableCellRange;
 };
 
@@ -192,10 +193,15 @@ export function isMarkdownTableRow(text: string) {
 }
 
 function toCells(cells: ParsedRowCell[]): MarkdownTableCell[] {
-  return cells.map((cell) => ({
-    text: decodeCellText(cell.raw),
-    range: { from: cell.from, to: cell.to, raw: cell.raw },
-  }));
+  return cells.map((cell) => {
+    const marker = /^<!--koharu:align=(left|center|right)-->/.exec(cell.raw);
+    const raw = cell.raw.slice(marker?.[0].length ?? 0);
+    return {
+      text: decodeCellText(raw),
+      ...(marker ? { alignment: marker[1] as TableAlignment } : {}),
+      range: { from: cell.from + (marker?.[0].length ?? 0), to: cell.to, raw },
+    };
+  });
 }
 
 function sourceLines(source: string, from: number, to: number) {
@@ -264,9 +270,10 @@ function serializeCells(cells: MarkdownTableCell[], columnCount: number) {
   const values: string[] = [];
   for (let index = 0; index < columnCount; index += 1) {
     const cell = cells[index];
-    values.push(cell?.range && decodeCellText(cell.range.raw) === cell.text
+    const value = cell?.range && decodeCellText(cell.range.raw) === cell.text
       ? cell.range.raw
-      : encodeCellText(cell?.text ?? ""));
+      : encodeCellText(cell?.text ?? "");
+    values.push((cell?.alignment && cell.alignment !== "none" ? `<!--koharu:align=${cell.alignment}-->` : "") + value);
   }
   return `| ${values.join(" | ")} |`;
 }
@@ -300,7 +307,7 @@ export function updateTableCell(table: MarkdownTable, rowIndex: number, columnIn
   if (!targetRow || columnIndex < 0 || columnIndex >= next.headers.length) {
     return next;
   }
-  targetRow.cells[columnIndex] = { text };
+  targetRow.cells[columnIndex] = { text, alignment: targetRow.cells[columnIndex].alignment };
   return next;
 }
 
@@ -401,5 +408,12 @@ export function setTableColumnAlignment(
     return next;
   }
   next.alignments[column] = alignment;
+  return next;
+}
+
+export function setTableCellAlignment(table: MarkdownTable, row: number, column: number, alignment: TableAlignment) {
+  const next = cloneTable(table);
+  const cell = (row === 0 ? next.headers : next.rows[row - 1]?.cells)?.[column];
+  if (cell) cell.alignment = alignment;
   return next;
 }
