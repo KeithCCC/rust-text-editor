@@ -289,7 +289,8 @@ describe("App table editing lifecycle", () => {
     });
     expect(document.activeElement).toBe(cell);
 
-    await click(button("Format"));
+    await click(button("Edit"));
+    await click(button("Format", container.querySelector('.menu-root[data-open="true"]')!));
     await click(button("Format JSON"));
 
     expect(container.querySelector('[role="alert"]')).toBeNull();
@@ -322,7 +323,8 @@ describe("App table editing lifecycle", () => {
     if (!editorBody) throw new Error("CodeMirror content element not found");
     act(() => editorBody.dispatchEvent(new PointerEvent("pointerdown", { bubbles: true })));
 
-    await click(button("Format"));
+    await click(button("Edit"));
+    await click(button("Format", container.querySelector('.menu-root[data-open="true"]')!));
     await click(button("Format JSON"));
 
     expect(container.querySelector('[role="alert"]')?.textContent).toContain("JSON format failed");

@@ -1972,14 +1972,17 @@ textarea {
   }
 
   .menubar-shell {
-    align-items: stretch;
-    flex-direction: column;
-    gap: 0;
+    flex-flow: row nowrap;
     padding: 0;
   }
 
-  .menubar {
-    width: 100%;
+  .menu-title {
+    padding-inline: clamp(3px, 1vw, 8px);
+  }
+
+  .view-mode-switcher button {
+    min-width: 0;
+    padding-inline: 4px;
   }
 
   .editor-pane {
@@ -2025,3 +2028,9 @@ textarea {
 }
 .pdf-export-status:empty { display: none; }
 .pdf-export-status { max-width: 35vw; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+
+.menu-command-group {
+  display: flex;
+  flex-direction: column;
+  padding-inline-start: 8px;
+}

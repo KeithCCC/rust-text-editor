@@ -189,7 +189,7 @@ describe("document session safety", () => {
     expect(container.querySelector(".pdf-export-status")?.textContent).not.toContain("PDF saved");
   });
 
-  it.each(["preview", "split", "edit", "invalid", null])("always starts in Edit with outline closed despite saved mode %s", async (mode) => {
+  it.each(["preview", "split", "edit", "invalid", null])("opens a blank document in Edit with saved mode %s", async (mode) => {
     if (mode) window.localStorage.setItem("koharu-editor-mode", mode);
     else window.localStorage.removeItem("koharu-editor-mode");
     await remountApp();
@@ -204,6 +204,7 @@ describe("document session safety", () => {
     const view = container.querySelector('.menu-root[data-open="true"]')!;
     expect(button("Appearance...", view)).toBeTruthy();
     expect(view.textContent).not.toContain("English UI");
+    await click(button("File"));
     await click(button("Settings"));
     const settings = container.querySelector('.menu-root[data-open="true"]')!;
     expect(settings.textContent).toContain("English UI");
@@ -292,6 +293,7 @@ describe("document session safety", () => {
     expect(editor.compareDocumentPosition(messageArea) & Node.DOCUMENT_POSITION_FOLLOWING).not.toBe(0);
     expect(messageArea.querySelector(".formatting-feedback")).not.toBeNull();
 
+    await click(button("File"));
     await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     const japaneseUi = viewMenu?.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
@@ -338,6 +340,7 @@ describe("document session safety", () => {
     expect(splitToggle.classList.contains("is-compact")).toBe(true);
     expect(splitToggle.getAttribute("aria-label")).toBe("Hide formatting toolbar");
 
+    await click(button("File"));
     await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     const japaneseUi = viewMenu?.querySelector<HTMLInputElement>('input[name="language"][value="ja"]');
@@ -621,11 +624,20 @@ describe("document session safety", () => {
     expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
   });
 
-  it("cycles modes in-session but starts in Edit on the next launch", async () => {
+  it("starts a blank session in Edit after cycling modes", async () => {
     expect((await shortcut(window, "m", { altKey: true })).defaultPrevented).toBe(true);
 
     expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("split");
     await remountApp();
+    expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
+  });
+
+  it.each(["Edit", "Split", "Preview"])("remembers %s selected with the mode switcher across launches", async (mode) => {
+    const switcher = container.querySelector<HTMLElement>(".view-mode-switcher")!;
+    await click(button("Split", switcher));
+    await click(button(mode, switcher));
+    await remountApp();
+    expect(window.localStorage.getItem("koharu-editor-mode")).toBe(mode.toLowerCase());
     expect(container.querySelector(".view-mode-switcher")?.getAttribute("data-mode")).toBe("edit");
   });
 
@@ -658,7 +670,8 @@ describe("document session safety", () => {
     const viewModeSwitcher = container.querySelector(".view-mode-switcher");
     if (!viewModeSwitcher) throw new Error("View mode switcher not found");
     await click(button("Preview", viewModeSwitcher));
-    await click(button("Format"));
+    await click(button("Edit"));
+    await click(button("Format", container.querySelector('.menu-root[data-open="true"]')!));
 
     const formatMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!formatMenu) throw new Error("Format menu not found");
@@ -704,6 +717,7 @@ describe("document session safety", () => {
   });
 
   it("exposes one focusable Japanese Preview reason in the visible preview pane", async () => {
+    await click(button("File"));
     await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!viewMenu) throw new Error("View menu not found");
@@ -724,6 +738,7 @@ describe("document session safety", () => {
   });
 
   it("describes document-safety-disabled formatting in Japanese through the real toolbar", async () => {
+    await click(button("File"));
     await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!viewMenu) throw new Error("View menu not found");
@@ -744,6 +759,7 @@ describe("document session safety", () => {
   });
 
   it("uses the same Japanese placeholders from the toolbar and Format menu", async () => {
+    await click(button("File"));
     await click(button("Settings"));
     const viewMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!viewMenu) throw new Error("View menu not found");
@@ -762,7 +778,8 @@ describe("document session safety", () => {
     await shortcut(editor, "z");
     expect(container.querySelector(".cm-placeholder")?.textContent).toBe("ここに Markdown を入力してください。");
 
-    await click(button("書式"));
+    await click(button("編集"));
+    await click(button("書式", container.querySelector('.menu-root[data-open="true"]')!));
     const formatMenu = container.querySelector<HTMLElement>('.menu-root[data-open="true"] .menu-popover');
     if (!formatMenu) throw new Error("Format menu not found");
     await click(button("太字", formatMenu));

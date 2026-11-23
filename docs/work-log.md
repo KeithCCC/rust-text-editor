@@ -1,5 +1,11 @@
 # Work Log
 
+## 2026-11-24 00:53 JST - master
+
+- Blank sessions open in Edit with the editor ready for typing. Opening a startup file or restoring a draft uses the saved mode.
+- The menu bar stays horizontal on narrow windows. Formatting commands are under Edit and language settings are under File.
+- Verified the menu and startup changes in isolation. TypeScript passed and all 393 source tests passed on rerun. The first run had one intermittent failure checking search focus.
+
 ## 2026-08-26 13:52:00 +09:00 - master
 
 ### Summary

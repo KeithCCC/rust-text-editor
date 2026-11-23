@@ -81,7 +81,7 @@ import {
 import type { FileProperties } from "./tauri";
 import type { EditorError, ExcalidrawScene } from "./types";
 import { saveCurrentWindowState } from "./windowState";
-import { cycleViewMode, type ViewMode } from "./viewMode";
+import { cycleViewMode, resolveViewMode, type ViewMode } from "./viewMode";
 import {
   resolvePaneVisibility,
   shouldCycleViewMode,
@@ -103,9 +103,10 @@ type ExcalidrawSession = {
 };
 
 type ThemeMode = "system" | "light" | "dark";
-type MenuId = "file" | "edit" | "view" | "settings" | "format" | "help";
+type MenuId = "file" | "edit" | "view" | "help";
 
 const THEME_STORAGE_KEY = "koharu-theme";
+const EDITOR_MODE_STORAGE_KEY = "koharu-editor-mode";
 const LEGACY_THEME_STORAGE_KEY = "hotaru-theme";
 const LANGUAGE_STORAGE_KEY = "koharu-language";
 const SPLIT_STORAGE_KEY = "koharu-split";
@@ -439,6 +440,8 @@ export default function App() {
   const pdfExportPendingRef = useRef(false);
   const [isPdfExporting, setIsPdfExporting] = useState(false);
   const [pdfExportStatus, setPdfExportStatus] = useState("");
+  const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+  const [isFormatOpen, setIsFormatOpen] = useState(false);
   const [isRecentFilesOpen, setIsRecentFilesOpen] = useState(false);
   const [activeMenu, setActiveMenu] = useState<MenuId | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
@@ -472,7 +475,7 @@ export default function App() {
   const transitionInProgressRef = useRef(false);
   const lastRecoveryWriteMsRef = useRef(0);
   const startupLoadedRef = useRef(false);
-  const lastHandledEditorFocusSessionRef = useRef(documentSessionId);
+  const lastHandledEditorFocusSessionRef = useRef<number | null>(null);
   const recoveryQueueRef = useRef(
     new RecoveryDraftQueue(writeRecoveryDraft, deleteRecoveryDraft),
   );
@@ -515,6 +518,7 @@ export default function App() {
   const selectEditorMode = useCallback(async (mode: ViewMode) => {
     if (!(await preparePendingDocumentEdits()) || actionGateRef.current.isBlocked()) return false;
     setEditorMode(mode);
+    writeStoredValue(EDITOR_MODE_STORAGE_KEY, mode);
     return true;
   }, [preparePendingDocumentEdits]);
 
@@ -1038,6 +1042,7 @@ export default function App() {
           });
           latestDocumentSessionIdRef.current += 1;
           setDocumentSessionId(latestDocumentSessionIdRef.current);
+          setEditorMode(resolveViewMode(readStoredValue(EDITOR_MODE_STORAGE_KEY)));
           setContent(draft.content);
           setPreviewContent(draft.content);
           setCurrentFile(draft.documentPath);
@@ -1055,7 +1060,11 @@ export default function App() {
           const path = pendingStartupPath;
           setPendingStartupPath(null);
           await requestDocumentTransition(
-            () => openFilePath(path),
+            async () => {
+              const opened = await openFilePath(path);
+              if (opened) setEditorMode(resolveViewMode(readStoredValue(EDITOR_MODE_STORAGE_KEY)));
+              return opened;
+            },
             { allowExistingActionBlock: true },
           );
           completeStartupResolution();
@@ -1322,7 +1331,11 @@ export default function App() {
         }
         if (startupPath) {
           await requestDocumentTransition(
-            () => openFilePath(startupPath),
+            async () => {
+              const opened = await openFilePath(startupPath);
+              if (opened) setEditorMode(resolveViewMode(readStoredValue(EDITOR_MODE_STORAGE_KEY)));
+              return opened;
+            },
             { allowExistingActionBlock: true },
           );
         }
@@ -1579,6 +1592,11 @@ export default function App() {
               <div className="menu-separator" />
               <button role="menuitem" onClick={() => runMenuAction(handleFileProperties)} disabled={!currentFile}>{text.fileProperties}</button>
               <div className="menu-separator" />
+              <button role="menuitem" aria-label={text.settings} aria-expanded={isSettingsOpen} aria-controls="settings-group" onClick={() => setIsSettingsOpen((open) => !open)}>{text.settings}<span aria-hidden="true">{isSettingsOpen ? "▴" : "▾"}</span></button>
+              {isSettingsOpen && <div id="settings-group" className="menu-command-group" role="group" aria-label={text.settings}>
+                <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
+                <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
+              </div>}
               <button role="menuitem" onClick={() => runMenuAction(handleExit)}>{text.exit}</button>
             </div>
           </div>
@@ -1587,20 +1605,17 @@ export default function App() {
             <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "edit"} onClick={() => setActiveMenu((menu) => menu === "edit" ? null : "edit")}>{text.edit}</button>
             <div className="menu-popover" role="menu">
               <button role="menuitem" aria-label={text.search} aria-pressed={isNoteSearchVisible} onClick={() => runMenuAction(toggleNoteSearch)}>{text.search}<kbd>Ctrl+F</kbd></button>
-            </div>
-          </div>
-
-          <div className="menu-root" data-menu-id="format" data-open={activeMenu === "format"} onMouseEnter={() => activeMenu && setActiveMenu("format")}>
-            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "format"} onClick={() => setActiveMenu((menu) => (menu === "format" ? null : "format"))}>{text.format}</button>
-            <div className="menu-popover" role="menu">
-              <MarkdownFormatMenu
-                language={appLanguage}
-                disabled={isFormattingDisabled}
-                formatJsonLabel={text.formatJson}
-                formattingContext={formattingContext}
-                onFormat={(command) => runMenuAction(() => handleMarkdownFormat(command))}
-                onFormatJson={() => runMenuAction(handleFormatJson)}
-              />
+              <button role="menuitem" aria-label={text.format} aria-expanded={isFormatOpen} aria-controls="format-group" onClick={() => setIsFormatOpen((open) => !open)}>{text.format}<span aria-hidden="true">{isFormatOpen ? "▴" : "▾"}</span></button>
+              {isFormatOpen && <div id="format-group" className="menu-command-group" role="group" aria-label={text.format}>
+                <MarkdownFormatMenu
+                  language={appLanguage}
+                  disabled={isFormattingDisabled}
+                  formatJsonLabel={text.formatJson}
+                  formattingContext={formattingContext}
+                  onFormat={(command) => runMenuAction(() => handleMarkdownFormat(command))}
+                  onFormatJson={() => runMenuAction(handleFormatJson)}
+                />
+              </div>}
             </div>
           </div>
 
@@ -1618,14 +1633,6 @@ export default function App() {
               <button role="menuitem" onClick={() => runMenuAction(() => setIsAppearanceSettingsOpen(true))}>{text.appearance}</button>
               <MenuCheckboxItem checked={isFormattingToolbarVisible} label={text.formattingToolbar} onToggle={() => runMenuAction(toggleFormattingToolbar)} />
               <button role="menuitem" onClick={() => runMenuAction(() => setSplitPercent(58))}>{text.resetSplit}</button>
-            </div>
-          </div>
-
-          <div className="menu-root" data-menu-id="settings" data-open={activeMenu === "settings"} onMouseEnter={() => activeMenu && setActiveMenu("settings")}>
-            <button className="menu-title" aria-haspopup="menu" aria-expanded={activeMenu === "settings"} onClick={() => setActiveMenu((menu) => (menu === "settings" ? null : "settings"))}>{text.settings}</button>
-            <div className="menu-popover" role="menu">
-              <MenuRadioItem name="language" value="en" checked={appLanguage === "en"} label={text.englishUi} onSelect={() => runMenuAction(() => setAppLanguage("en"))} />
-              <MenuRadioItem name="language" value="ja" checked={appLanguage === "ja"} label={text.japaneseUi} onSelect={() => runMenuAction(() => setAppLanguage("ja"))} />
             </div>
           </div>
 
